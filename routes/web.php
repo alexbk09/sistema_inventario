@@ -1,0 +1,239 @@
+<?php
+
+use App\Http\Controllers\ProfileController;
+use Illuminate\Foundation\Application;
+use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
+use App\Models\Product;
+use App\Http\Controllers\{ProductController, ProviderController, InvoiceController, CategoryController, RolesController, ProductInventoryController, ProductImageController, CustomerController, UserController, RmaController, WarehouseController, StockTransferController, CreditAccountController, LayawayController};
+use App\Http\Controllers\CurrencyController;
+use App\Services\CurrencyService;
+use App\Http\Controllers\CartController;
+use App\Http\Controllers\CheckoutController;
+Route::middleware(['auth', 'verified', 'role:admin'])->group(function () {
+    Route::get('/admin/qr', function () {
+        return Inertia::render('Admin/QRScanner');
+    })->name('admin.qr');
+
+    // Productos
+    Route::get('/admin/products', [ProductController::class, 'index'])->name('admin.products.index');
+    Route::get('/admin/products/create', [ProductController::class, 'create'])->name('admin.products.create');
+    Route::post('/admin/products', [ProductController::class, 'store'])->name('admin.products.store');
+    Route::post('/admin/products/import', [ProductController::class, 'import'])->name('admin.products.import');
+    Route::get('/admin/products/{product}/edit', [ProductController::class, 'edit'])->name('admin.products.edit');
+    Route::put('/admin/products/{product}', [ProductController::class, 'update'])->name('admin.products.update');
+    Route::delete('/admin/products/{product}', [ProductController::class, 'destroy'])->name('admin.products.destroy');
+
+    Route::delete('/admin/product-images/{image}', [ProductImageController::class, 'destroy'])->name('admin.product-images.destroy');
+
+    // Inventario por producto
+    Route::get('/admin/products/{product}/inventory', [ProductInventoryController::class, 'index'])->name('admin.products.inventory.index');
+    Route::post('/admin/products/{product}/inventory', [ProductInventoryController::class, 'store'])->name('admin.products.inventory.store');
+
+    // Categorías
+    Route::get('/admin/categories', [CategoryController::class, 'index'])->name('admin.categories.index');
+    Route::get('/admin/categories/create', [CategoryController::class, 'create'])->name('admin.categories.create');
+    Route::post('/admin/categories', [CategoryController::class, 'store'])->name('admin.categories.store');
+    Route::get('/admin/categories/{category}/edit', [CategoryController::class, 'edit'])->name('admin.categories.edit');
+    Route::put('/admin/categories/{category}', [CategoryController::class, 'update'])->name('admin.categories.update');
+    Route::delete('/admin/categories/{category}', [CategoryController::class, 'destroy'])->name('admin.categories.destroy');
+
+    // Roles y permisos
+    Route::get('/admin/roles', [RolesController::class, 'index'])->name('admin.roles.index');
+    Route::get('/admin/roles/{role}/edit', [RolesController::class, 'edit'])->name('admin.roles.edit');
+    Route::put('/admin/roles/{role}', [RolesController::class, 'update'])->name('admin.roles.update');
+
+    // Proveedores
+    Route::get('/admin/providers', [ProviderController::class, 'index'])->name('admin.providers.index');
+    Route::get('/admin/providers/create', [ProviderController::class, 'create'])->name('admin.providers.create');
+    Route::post('/admin/providers', [ProviderController::class, 'store'])->name('admin.providers.store');
+    Route::get('/admin/providers/{provider}/edit', [ProviderController::class, 'edit'])->name('admin.providers.edit');
+    Route::put('/admin/providers/{provider}', [ProviderController::class, 'update'])->name('admin.providers.update');
+    Route::delete('/admin/providers/{provider}', [ProviderController::class, 'destroy'])->name('admin.providers.destroy');
+
+    // Clientes (CRM)
+    Route::get('/admin/customers', [CustomerController::class, 'index'])->name('admin.customers.index');
+    Route::post('/admin/customers', [CustomerController::class, 'store'])->name('admin.customers.store');
+    Route::get('/admin/customers/{customer}', [CustomerController::class, 'show'])->name('admin.customers.show');
+
+    // Usuarios
+    Route::get('/admin/users', [UserController::class, 'index'])->name('admin.users.index');
+    Route::get('/admin/users/{user}', [UserController::class, 'show'])->name('admin.users.show');
+
+    // Facturas
+    Route::get('/admin/invoices', [InvoiceController::class, 'index'])->name('admin.invoices.index');
+    Route::get('/admin/invoices/create', [InvoiceController::class, 'create'])->name('admin.invoices.create');
+    Route::post('/admin/invoices', [InvoiceController::class, 'store'])->name('admin.invoices.store');
+    Route::put('/admin/invoices/{invoice}', [InvoiceController::class, 'update'])->name('admin.invoices.update');
+
+    // Devoluciones y Garantías (RMA)
+    Route::get('/admin/rmas', [RmaController::class, 'index'])->name('admin.rmas.index');
+    Route::get('/admin/rmas/create', [RmaController::class, 'create'])->name('admin.rmas.create');
+    Route::post('/admin/rmas', [RmaController::class, 'store'])->name('admin.rmas.store');
+    Route::get('/admin/rmas/{rma}', [RmaController::class, 'show'])->name('admin.rmas.show');
+    Route::put('/admin/rmas/{rma}', [RmaController::class, 'update'])->name('admin.rmas.update');
+
+    // Multi-sucursal / Multi-bodega
+    Route::get('/admin/warehouses', [WarehouseController::class, 'index'])->name('admin.warehouses.index');
+    Route::post('/admin/warehouses', [WarehouseController::class, 'store'])->name('admin.warehouses.store');
+
+    Route::get('/admin/transfers', [StockTransferController::class, 'index'])->name('admin.transfers.index');
+    Route::get('/admin/transfers/create', [StockTransferController::class, 'create'])->name('admin.transfers.create');
+    Route::post('/admin/transfers', [StockTransferController::class, 'store'])->name('admin.transfers.store');
+    Route::get('/admin/transfers/{transfer}', [StockTransferController::class, 'show'])->name('admin.transfers.show');
+    Route::put('/admin/transfers/{transfer}', [StockTransferController::class, 'update'])->name('admin.transfers.update');
+
+    // Sistema de Apartados y Créditos
+    Route::get('/admin/layaways', [LayawayController::class, 'index'])->name('admin.layaways.index');
+    Route::get('/admin/layaways/create', [LayawayController::class, 'create'])->name('admin.layaways.create');
+    Route::post('/admin/layaways', [LayawayController::class, 'store'])->name('admin.layaways.store');
+    Route::get('/admin/layaways/{layaway}', [LayawayController::class, 'show'])->name('admin.layaways.show');
+    Route::put('/admin/layaways/{layaway}', [LayawayController::class, 'update'])->name('admin.layaways.update');
+
+        Route::get('/admin/credits', [CreditAccountController::class, 'index'])->name('admin.credits.index');
+        Route::post('/admin/credits', [CreditAccountController::class, 'store'])->name('admin.credits.store');
+    Route::get('/admin/credits/{account}', [CreditAccountController::class, 'show'])->name('admin.credits.show');
+    Route::post('/admin/credits/{account}/movements', [CreditAccountController::class, 'storeMovement'])->name('admin.credits.movements.store');
+});
+
+Route::get('/', function () {
+    $currency = app(CurrencyService::class);
+    $rate = $currency->getPromedio('oficial') ?? (float) config('currency.bs_rate', 0);
+    $featured = Product::where('is_featured', true)->with(['categories:id,name', 'images' => function ($q) { $q->orderBy('sort_order'); }])->take(8)->get()->map(function ($p) use ($rate) {
+        return [
+            'id' => $p->id,
+            'name' => $p->name,
+            'price' => (float) $p->price_usd,
+            'price_bs' => round((float) $p->price_usd * ($rate ?: 0), 2),
+            'images' => $p->images->map(fn ($img) => [
+                'id' => $img->id,
+                'url' => asset('storage/'.$img->path),
+            ]),
+            'image' => $p->image_url,
+            'category' => optional($p->categories->first())->name ?? null,
+            'categories' => $p->categories->pluck('name'),
+            'stock' => (int) $p->stock,
+        ];
+    });
+    return Inertia::render('Home', [
+        'products' => $featured,
+        'canLogin' => Route::has('login'),
+        'canRegister' => Route::has('register'),
+        'rate' => $rate,
+    ]);
+})->name('home');
+
+Route::get('/shop', function () {
+    $currency = app(CurrencyService::class);
+    $rate = $currency->getPromedio('oficial') ?? (float) config('currency.bs_rate', 0);
+    $products = Product::with(['categories:id,name', 'images' => function ($q) { $q->orderBy('sort_order'); }])->latest()->take(48)->get()->map(function ($p) use ($rate) {
+        return [
+            'id' => $p->id,
+            'name' => $p->name,
+            'price' => (float) $p->price_usd,
+            'price_bs' => round((float) $p->price_usd * ($rate ?: 0), 2),
+            'images' => $p->images->map(fn ($img) => [
+                'id' => $img->id,
+                'url' => asset('storage/'.$img->path),
+            ]),
+            'image' => $p->image_url,
+            'category' => optional($p->categories->first())->name ?? null,
+            'categories' => $p->categories->pluck('name'),
+            'stock' => (int) $p->stock,
+            'description' => $p->description,
+            'rating' => 5,
+            'reviews' => 0,
+        ];
+    });
+    $categories = \App\Models\Category::orderBy('name')->get(['id','name']);
+    return Inertia::render('Shop/Index', [
+        'products' => $products,
+        'categories' => $categories,
+        'rate' => $rate,
+    ]);
+})->name('shop.index');
+
+// Checkout público
+Route::get('/checkout', function () {
+    $currency = app(CurrencyService::class);
+    $rate = $currency->getPromedio('oficial') ?? (float) config('currency.bs_rate', 0);
+    return Inertia::render('Checkout/Index', [
+        'rate' => $rate,
+    ]);
+})->name('checkout.index');
+
+// Guardar checkout
+Route::post('/checkout', [CheckoutController::class, 'store'])->name('checkout.store');
+Route::get('/confirmacion', [CheckoutController::class, 'confirmation'])->name('checkout.confirmation');
+
+Route::get('/dashboard', function () {
+    $today = now()->startOfDay();
+    $monthStart = now()->startOfMonth();
+    $currency = app(CurrencyService::class);
+    $rate = $currency->getPromedio('oficial') ?? (float) config('currency.bs_rate', 0);
+    $warehouseId = request()->query('warehouse_id');
+
+    $todayCompleted = \App\Models\Invoice::where('status', 'paid')
+        ->when($warehouseId, fn($q) => $q->where('warehouse_id', $warehouseId))
+        ->where('created_at', '>=', $today);
+    $monthCompleted = \App\Models\Invoice::where('status', 'paid')
+        ->when($warehouseId, fn($q) => $q->where('warehouse_id', $warehouseId))
+        ->where('created_at', '>=', $monthStart);
+
+    $metrics = [
+        'today_sales_usd' => (float) $todayCompleted->sum('total_usd'),
+        'today_sales_count' => (int) $todayCompleted->count(),
+        'month_sales_usd' => (float) $monthCompleted->sum('total_usd'),
+        'month_sales_count' => (int) $monthCompleted->count(),
+        'low_stock_products' => (int) \App\Models\Product::where('stock', '<=', 5)->count(),
+        'total_stock' => (int) \App\Models\Product::sum('stock'),
+        'invoice_pending' => (int) \App\Models\Invoice::where('status', 'pending')->when($warehouseId, fn($q) => $q->where('warehouse_id', $warehouseId))->count(),
+        'invoice_paid' => (int) \App\Models\Invoice::where('status', 'paid')->when($warehouseId, fn($q) => $q->where('warehouse_id', $warehouseId))->count(),
+        'invoice_cancelled' => (int) \App\Models\Invoice::where('status', 'cancelled')->count(),
+        'rma_pending' => (int) \App\Models\Rma::whereIn('status', ['pending','approved'])->count(),
+        'layaway_active' => (int) \App\Models\Layaway::where('status', 'active')->count(),
+        'credit_open' => (int) \App\Models\CreditAccount::where('status', 'active')->count(),
+    ];
+
+    $counts = [
+        'products' => (int) \App\Models\Product::count(),
+        'categories' => (int) \App\Models\Category::count(),
+        'providers' => (int) \App\Models\Provider::count(),
+        'invoices' => (int) \App\Models\Invoice::count(),
+        'customers' => (int) \App\Models\Customer::count(),
+        'users' => (int) \App\Models\User::count(),
+        'rmas' => (int) \App\Models\Rma::count(),
+        'warehouses' => (int) \App\Models\Warehouse::count(),
+        'credits' => (int) \App\Models\CreditAccount::count(),
+    ];
+
+    $top = \App\Models\Product::orderByDesc('stock')->take(8)->get(['id','name','stock']);
+
+    return Inertia::render('Admin/Dashboard', [
+        'metrics' => $metrics,
+        'counts' => $counts,
+        'topProducts' => $top,
+        'warehouses' => \App\Models\Warehouse::orderBy('name')->get(['id','name','code']),
+        'selected_warehouse' => $warehouseId,
+        'rate' => $rate,
+    ]);
+})->middleware(['auth', 'verified', 'role:admin'])->name('dashboard');
+
+Route::middleware('auth')->group(function () {
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    // Carrito
+    Route::post('/cart/add', [CartController::class, 'add'])->name('cart.add');
+    Route::post('/cart/remove', [CartController::class, 'remove'])->name('cart.remove');
+    Route::post('/cart/update', [CartController::class, 'update'])->name('cart.update');
+    Route::post('/cart/clear', [CartController::class, 'clear'])->name('cart.clear');
+    Route::get('/api/cart', [CartController::class, 'summary'])->name('api.cart.summary');
+});
+
+require __DIR__.'/auth.php';
+
+// API de moneda: promedios de USD->BS desde dolarapi
+Route::get('/api/currency/promedio', [CurrencyController::class, 'promedio'])->name('api.currency.promedio');
+Route::get('/api/currency/promedios', [CurrencyController::class, 'promedios'])->name('api.currency.promedios');
