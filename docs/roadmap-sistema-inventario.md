@@ -95,7 +95,7 @@ Crear un **módulo de configuración** accesible desde el panel admin para que e
 - [x] Filtros avanzados en `/shop` (precio, categoría, stock disponible, etiquetas).
 - [x] Ordenar por más vendidos, más recientes, precio asc/desc.
 - [x] Búsqueda por nombre, SKU, código de barras.
-- [ ] Páginas de detalle de producto con galería de imágenes, descripción extendida, productos relacionados.
+- [x] Páginas de detalle de producto con galería de imágenes, descripción extendida, productos relacionados.
 
 ### 4.2. Carrito y checkout
 
@@ -103,14 +103,14 @@ Crear un **módulo de configuración** accesible desde el panel admin para que e
 - [x] Cálculo de costos adicionales: delivery/envío, recargos o descuentos por método de pago.
 - [x] Cupón de descuento (porcentaje o valor fijo) con validación de vigencia y uso.
 - [x] Resumen claro en BS y USD con desglose de impuestos.
-- [ ] Página de confirmación de pedido con QR para ver factura o hacer seguimiento.
+- [x] Página de confirmación de pedido con QR para ver factura o hacer seguimiento.
 
 ### 4.3. Valor añadido en la tienda
 
-- [ ] Sección de productos recomendados / upselling en carrito y checkout.
-- [ ] Productos destacados configurables desde admin (banners o carrusel).
-- [ ] Sección de testimonios o reseñas básicas (aunque no completamente abierta).
-- [ ] Suscripción a newsletter (captura de email/WhatsApp para marketing futuro).
+- [x] Sección de productos recomendados / upselling en carrito y checkout.
+- [x] Productos destacados configurables desde admin (banners o carrusel).
+- [x] Sección de testimonios o reseñas básicas (aunque no completamente abierta).
+- [x] Suscripción a newsletter (captura de email/WhatsApp para marketing futuro).
 
 ---
 
@@ -118,37 +118,37 @@ Crear un **módulo de configuración** accesible desde el panel admin para que e
 
 ### 5.1. Multilenguaje (es/en como mínimo)
 
-- [ ] Definir sistema de traducciones para textos del frontend (Inertia + React): archivos de traducción por idioma.
-- [ ] Permitir seleccionar idioma desde el frontend (selector en navbar o footer).
-- [ ] Guardar preferencia de idioma en usuario/sesión.
+- [x] Definir sistema de traducciones para textos del frontend (Inertia + React): archivos de traducción por idioma.
+- [x] Permitir seleccionar idioma desde el frontend (selector en navbar o footer).
+- [x] Guardar preferencia de idioma en usuario/sesión.
 - [ ] Traducir correos, PDFs y textos del backend usando archivos de idioma Laravel.
 
 ### 5.2. Multimoneda
 
 - [ ] Generalizar `CurrencyService` para soportar varias monedas configurables.
-- [ ] Permitir cambiar moneda mostrada en la tienda (ej: USD, BS, otra) con conversión en tiempo real.
-- [ ] Almacenar precios base en una sola moneda (USD) y registrar la tasa usada por factura.
-- [ ] Historial de tasas usadas para cada transacción (evitar reprocesos con tasa actual).
+- [x] Permitir cambiar moneda mostrada en la tienda (ej: USD, BS, otra) con conversión en tiempo real.
+- [x] Almacenar precios base en una sola moneda (USD) y registrar la tasa usada por factura.
+- [x] Historial de tasas usadas para cada transacción (evitar reprocesos con tasa actual).
 - [ ] Soportar diferentes fuentes de tasa (dolarapi, tasa manual, otras APIs) configurables en settings.
 
 ---
 
 ## 6. QR y utilidades
 
-- [ ] Módulo para generar códigos QR de:
-- [ ] Facturas (link a detalle público o comprobante PDF).
-- [ ] Productos (para escanear en tienda/almacén).
-- [ ] URLs de contacto/WhatsApp de la empresa.
-- [ ] Pantalla admin para ver/descargar QR en lote.
-- [ ] Integrar escáner QR en el panel para buscar producto/factura rápidamente.
+- [x] Módulo para generar códigos QR de:
+- [x] Facturas (link a detalle público o comprobante PDF).
+- [x] Productos (para escanear en tienda/almacén).
+- [x] URLs de contacto/WhatsApp de la empresa.
+- [x] Pantalla admin para ver/descargar QR en lote.
+- [x] Integrar escáner QR en el panel para buscar producto/factura rápidamente.
 
 ---
 
 ## 7. Notificaciones y comunicación
 
-- [ ] Notificaciones por correo al crear factura/venta importante.
+- [x] Notificaciones por correo al crear factura/venta importante.
 - [ ] Notificaciones internas al admin por bajo stock o vencimiento de apartados.
-- [ ] Integración básica con WhatsApp (deep links) desde vista de cliente/factura.
+- [x] Integración básica con WhatsApp (deep links) desde vista de cliente/factura.
 - [ ] Plantillas de correo configurables (logo, colores, textos).
 
 ---

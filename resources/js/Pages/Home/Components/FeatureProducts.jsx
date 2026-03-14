@@ -1,5 +1,6 @@
 import { Link } from '@inertiajs/react'
 import { useEffect, useState } from 'react'
+import { useI18n } from '@/Hooks/useI18n'
 
 function FeaturedProductCard({ product }) {
   const [imageIndex, setImageIndex] = useState(0)
@@ -85,15 +86,18 @@ function FeaturedProductCard({ product }) {
 }
 
 export default function FeaturedProducts({ products = [] }) {
+  const { t } = useI18n()
   return (
     <section className="py-12">
       <div className="flex items-center justify-between mb-8">
-        <h2 className="text-3xl font-bold text-foreground">Productos destacados</h2>
+        <h2 className="text-3xl font-bold text-foreground">
+          {t('home.featured.title', 'Productos destacados')}
+        </h2>
         <Link
           href={route('shop.index')}
           className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition font-medium"
         >
-          Ir a la tienda
+          {t('home.featured.cta', 'Ir a la tienda')}
         </Link>
       </div>
 

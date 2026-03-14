@@ -5,8 +5,10 @@ import ShoppingCart from '@/Components/shop/ShoppingCart.jsx'
 import { useState, useMemo } from 'react'
 import { ShoppingBag } from 'lucide-react'
 import { useCart } from '@/Hooks/useCart'
+import { useI18n } from '@/Hooks/useI18n'
 
 export default function ShopIndex({ products = [], categories = [], canLogin }) {
+  const { t } = useI18n()
   const [filters, setFilters] = useState({
     categories: [],
     priceRange: [0, 5000],
@@ -98,10 +100,11 @@ export default function ShopIndex({ products = [], categories = [], canLogin }) 
         <div className="max-w-7xl mx-auto px-4 py-8">
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-4xl font-bold text-foreground mb-2">Tienda</h1>
+            <h1 className="text-4xl font-bold text-foreground mb-2">
+              {t('shop.title', 'Tienda')}
+            </h1>
             <p className="text-muted-foreground">
-              {filteredProducts.length} producto{filteredProducts.length !== 1 ? 's' : ''} encontrado
-              {filteredProducts.length !== 1 ? 's' : ''}
+              {t('shop.results', `${filteredProducts.length} producto${filteredProducts.length !== 1 ? 's' : ''}`, { count: filteredProducts.length })}
             </p>
           </div>
 
@@ -129,10 +132,10 @@ export default function ShopIndex({ products = [], categories = [], canLogin }) 
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                   <ShoppingBag className="w-16 h-16 text-muted-foreground mb-4 opacity-50" />
                   <h3 className="text-2xl font-bold text-foreground mb-2">
-                    No se encontraron productos
+                    {t('shop.empty_title', 'No se encontraron productos')}
                   </h3>
                   <p className="text-muted-foreground mb-6">
-                    Intenta ajustar los filtros o la búsqueda
+                    {t('shop.empty_description', 'Intenta ajustar los filtros o la búsqueda')}
                   </p>
                   <button
                     onClick={() =>
@@ -147,7 +150,7 @@ export default function ShopIndex({ products = [], categories = [], canLogin }) 
                     }
                     className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition"
                   >
-                    Limpiar Filtros
+                    {t('shop.clear_filters', 'Limpiar Filtros')}
                   </button>
                 </div>
               ) : (

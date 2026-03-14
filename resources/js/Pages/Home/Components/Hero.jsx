@@ -1,28 +1,29 @@
 import { useState, useEffect } from 'react'
+import { useI18n } from '@/Hooks/useI18n'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
-const banners = [
-  {
-    id: 1,
-    title: 'Iluminación LED Moderna',
-    description: 'Descubre nuestras luces LED de alta eficiencia',
-    gradient: 'from-blue-600 to-cyan-500',
-  },
-  {
-    id: 2,
-    title: 'Bombillos Inteligentes',
-    description: 'Control total desde tu dispositivo móvil',
-    gradient: 'from-blue-700 to-blue-500',
-  },
-  {
-    id: 3,
-    title: 'Lámparas Decorativas',
-    description: 'Estilo y funcionalidad para tu hogar',
-    gradient: 'from-indigo-600 to-blue-600',
-  },
-]
-
 export default function Hero() {
+  const { t } = useI18n()
+  const banners = [
+    {
+      id: 1,
+      title: t('home.hero.banners.0.title', 'Iluminación LED Moderna'),
+      description: t('home.hero.banners.0.description', 'Descubre nuestras luces LED de alta eficiencia'),
+      gradient: 'from-blue-600 to-cyan-500',
+    },
+    {
+      id: 2,
+      title: t('home.hero.banners.1.title', 'Bombillos Inteligentes'),
+      description: t('home.hero.banners.1.description', 'Control total desde tu dispositivo móvil'),
+      gradient: 'from-blue-700 to-blue-500',
+    },
+    {
+      id: 3,
+      title: t('home.hero.banners.2.title', 'Lámparas Decorativas'),
+      description: t('home.hero.banners.2.description', 'Estilo y funcionalidad para tu hogar'),
+      gradient: 'from-indigo-600 to-blue-600',
+    },
+  ]
   const [current, setCurrent] = useState(0)
 
   useEffect(() => {

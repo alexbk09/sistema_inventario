@@ -1,7 +1,9 @@
 
 import { MapPin, Mail, Phone } from 'lucide-react'
+import { useI18n } from '@/Hooks/useI18n'
 
 export default function LocationContact({ company = {}, location = {}, store = {} }) {
+  const { t } = useI18n()
   return (
     <section className="py-16 bg-muted/30 rounded-2xl px-6 my-12">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
@@ -9,7 +11,9 @@ export default function LocationContact({ company = {}, location = {}, store = {
         <div>
           <div className="flex items-center gap-3 mb-6">
             <MapPin className="w-8 h-8 text-primary" />
-            <h3 className="text-2xl font-bold text-foreground">Ubicación</h3>
+            <h3 className="text-2xl font-bold text-foreground">
+              {t('home.location.title', 'Ubicación')}
+            </h3>
           </div>
           <div className="bg-white rounded-lg overflow-hidden h-64 shadow-md">
             <iframe
@@ -28,7 +32,9 @@ export default function LocationContact({ company = {}, location = {}, store = {
         <div>
           <div className="flex items-center gap-3 mb-6">
             <Mail className="w-8 h-8 text-primary" />
-            <h3 className="text-2xl font-bold text-foreground">Contacto</h3>
+            <h3 className="text-2xl font-bold text-foreground">
+              {t('home.contact.title', 'Contacto')}
+            </h3>
           </div>
 
           <div className="space-y-6">
@@ -36,7 +42,9 @@ export default function LocationContact({ company = {}, location = {}, store = {
               <div className="flex items-start gap-4">
                 <Mail className="w-6 h-6 text-primary mt-1 flex-shrink-0" />
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Email</p>
+                  <p className="text-sm text-muted-foreground mb-1">
+                    {t('home.contact.email_label', 'Email')}
+                  </p>
                   {company.email && (
                     <a
                       href={`mailto:${company.email}`}
@@ -53,7 +61,9 @@ export default function LocationContact({ company = {}, location = {}, store = {
               <div className="flex items-start gap-4">
                 <Phone className="w-6 h-6 text-primary mt-1 flex-shrink-0" />
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Teléfono</p>
+                  <p className="text-sm text-muted-foreground mb-1">
+                    {t('home.contact.phone_label', 'Teléfono')}
+                  </p>
                   {company.phone && (
                     <a
                       href={`tel:${company.phone}`}
@@ -67,9 +77,15 @@ export default function LocationContact({ company = {}, location = {}, store = {
             </div>
 
             <div className="bg-white p-6 rounded-lg shadow-md">
-              <p className="text-sm text-muted-foreground mb-2">Horario de atención</p>
-              <p className="text-foreground font-medium">Lunes a Viernes: 9:00 - 18:00</p>
-              <p className="text-foreground font-medium">Sábado: 10:00 - 14:00</p>
+              <p className="text-sm text-muted-foreground mb-2">
+                {t('home.contact.schedule_label', 'Horario de atención')}
+              </p>
+              <p className="text-foreground font-medium">
+                {t('home.contact.schedule_weekdays', 'Lunes a Viernes: 9:00 - 18:00')}
+              </p>
+              <p className="text-foreground font-medium">
+                {t('home.contact.schedule_saturday', 'Sábado: 10:00 - 14:00')}
+              </p>
             </div>
           </div>
         </div>

@@ -11,10 +11,19 @@ use App\Http\Controllers\CurrencyController;
 use App\Services\CurrencyService;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\HomeController;
+use App\Http\Controllers\ShopController;
+use App\Http\Controllers\OrderTrackingController;
+use App\Http\Controllers\RecommendationController;
+use App\Http\Controllers\NewsletterSubscriptionController;
+use App\Http\Controllers\LocaleController;
+use App\Http\Controllers\QrController;
 Route::middleware(['auth', 'verified', 'role:admin'])->group(function () {
     Route::get('/admin/qr', function () {
         return Inertia::render('Admin/QRScanner');
     })->name('admin.qr');
+
+    Route::get('/admin/qr-codes', [QrController::class, 'index'])->name('admin.qr.codes');
 
     // Configuración general del sistema
     Route::get('/admin/settings', [SettingsController::class, 'index'])->name('admin.settings.index');
@@ -101,101 +110,81 @@ Route::middleware(['auth', 'verified', 'role:admin'])->group(function () {
     Route::post('/admin/credits/{account}/movements', [CreditAccountController::class, 'storeMovement'])->name('admin.credits.movements.store');
 });
 
-Route::get('/', function () {
-    $currency = app(CurrencyService::class);
+Route::get('/', [HomeController::class, 'index'])->name('home');
+
+Route::get('/shop', [ShopController::class, 'index'])->name('shop.index');
+
+Route::get('/product/{product}', function (\App\Models\Product $product) {
+    $currency = app(\App\Services\CurrencyService::class);
     $rate = $currency->getPromedio('oficial') ?? (float) config('currency.bs_rate', 0);
-    $store = Settings::get('store', null);
-    $general = Settings::get('general', null);
-    $featured = Product::where('is_featured', true)->with(['categories:id,name', 'images' => function ($q) { $q->orderBy('sort_order'); }])->take(8)->get()->map(function ($p) use ($rate) {
+
+    $product->load(['categories:id,name', 'images' => function ($q) { $q->orderBy('sort_order'); }]);
+
+    $data = [
+        'id' => $product->id,
+        'name' => $product->name,
+        'sku' => $product->sku,
+        'barcode' => $product->barcode,
+        'description' => $product->description,
+        'price' => (float) $product->price_usd,
+        'price_bs' => round((float) $product->price_usd * ($rate ?: 0), 2),
+        'images' => $product->images->map(fn ($img) => [
+            'id' => $img->id,
+            'url' => asset('storage/'.$img->path),
+        ]),
+        'image' => $product->image_url,
+        'category' => optional($product->categories->first())->name ?? null,
+        'categories' => $product->categories->pluck('name'),
+        'stock' => (int) $product->stock,
+        'rating' => 5,
+        'reviews' => 0,
+    ];
+
+    $relatedQuery = \App\Models\Product::where('id', '!=', $product->id)
+        ->when($product->categories->isNotEmpty(), function ($q) use ($product) {
+            $q->whereHas('categories', function ($q2) use ($product) {
+                $q2->whereIn('categories.id', $product->categories->pluck('id'));
+            });
+        })
+        ->with(['categories:id,name']);
+
+    $related = $relatedQuery->take(8)->get()->map(function ($p) use ($rate) {
         return [
             'id' => $p->id,
             'name' => $p->name,
             'price' => (float) $p->price_usd,
-            'price_bs' => round((float) $p->price_usd * ($rate ?: 0), 2),
-            'images' => $p->images->map(fn ($img) => [
-                'id' => $img->id,
-                'url' => asset('storage/'.$img->path),
-            ]),
             'image' => $p->image_url,
             'category' => optional($p->categories->first())->name ?? null,
-            'categories' => $p->categories->pluck('name'),
-            'stock' => (int) $p->stock,
         ];
     });
-    return Inertia::render('Home', [
-        'products' => $featured,
-        'canLogin' => Route::has('login'),
-        'canRegister' => Route::has('register'),
+
+    return Inertia::render('Product/Show', [
+        'product' => $data,
+        'related' => $related,
         'rate' => $rate,
-        'store' => $store,
-        'company' => $general,
     ]);
-})->name('home');
-
-Route::get('/shop', function () {
-    $currency = app(CurrencyService::class);
-    $rate = $currency->getPromedio('oficial') ?? (float) config('currency.bs_rate', 0);
-    $store = Settings::get('store', null);
-    $general = Settings::get('general', null);
-
-    // Ventas históricas por producto (solo facturas pagadas)
-    $salesByProduct = \App\Models\InvoiceItem::selectRaw('product_id, SUM(quantity) as total_sold')
-        ->whereHas('invoice', function ($q) {
-            $q->where('status', 'paid');
-        })
-        ->groupBy('product_id')
-        ->pluck('total_sold', 'product_id');
-
-    $products = Product::with(['categories:id,name', 'images' => function ($q) { $q->orderBy('sort_order'); }])
-        ->latest()
-        ->take(48)
-        ->get()
-        ->map(function ($p) use ($rate, $salesByProduct) {
-            return [
-                'id' => $p->id,
-                'name' => $p->name,
-                'sku' => $p->sku,
-                'barcode' => $p->barcode,
-                'price' => (float) $p->price_usd,
-                'price_bs' => round((float) $p->price_usd * ($rate ?: 0), 2),
-                'images' => $p->images->map(fn ($img) => [
-                    'id' => $img->id,
-                    'url' => asset('storage/'.$img->path),
-                ]),
-                'image' => $p->image_url,
-                'category' => optional($p->categories->first())->name ?? null,
-                'categories' => $p->categories->pluck('name'),
-                'stock' => (int) $p->stock,
-                'description' => $p->description,
-                'is_featured' => (bool) $p->is_featured,
-                'created_at' => $p->created_at?->toIso8601String(),
-                'sold_quantity' => (int) ($salesByProduct[$p->id] ?? 0),
-                'rating' => 5,
-                'reviews' => 0,
-            ];
-        });
-    $categories = \App\Models\Category::orderBy('name')->get(['id','name']);
-    return Inertia::render('Shop/Index', [
-        'products' => $products,
-        'categories' => $categories,
-        'rate' => $rate,
-        'store' => $store,
-        'company' => $general,
-    ]);
-})->name('shop.index');
+})->name('product.show');
 
 // Checkout público
-Route::get('/checkout', function () {
-    $currency = app(CurrencyService::class);
-    $rate = $currency->getPromedio('oficial') ?? (float) config('currency.bs_rate', 0);
-    return Inertia::render('Checkout/Index', [
-        'rate' => $rate,
-    ]);
-})->name('checkout.index');
+Route::get('/checkout', [CheckoutController::class, 'index'])->name('checkout.index');
 
 // Guardar checkout
 Route::post('/checkout', [CheckoutController::class, 'store'])->name('checkout.store');
 Route::get('/confirmacion', [CheckoutController::class, 'confirmation'])->name('checkout.confirmation');
+
+// Ruta pública simple para seguimiento de pedido/factura
+Route::get('/pedido/{invoice}', [OrderTrackingController::class, 'show'])->name('order.track');
+
+// Códigos QR públicos
+Route::get('/qr/invoices/{invoice}', [QrController::class, 'invoice'])->name('qr.invoice');
+Route::get('/qr/products/{product}', [QrController::class, 'product'])->name('qr.product');
+Route::get('/qr/whatsapp', [QrController::class, 'whatsapp'])->name('qr.whatsapp');
+
+// Newsletter
+Route::post('/newsletter/subscribe', [NewsletterSubscriptionController::class, 'store'])->name('newsletter.subscribe');
+
+// Cambio de idioma (es/en)
+Route::post('/locale/{locale}', [LocaleController::class, 'switch'])->name('locale.switch');
 
 Route::get('/dashboard', function () {
     $today = now()->startOfDay();
@@ -268,3 +257,6 @@ require __DIR__.'/auth.php';
 // API de moneda: promedios de USD->BS desde dolarapi
 Route::get('/api/currency/promedio', [CurrencyController::class, 'promedio'])->name('api.currency.promedio');
 Route::get('/api/currency/promedios', [CurrencyController::class, 'promedios'])->name('api.currency.promedios');
+
+// Recomendaciones para carrito/checkout
+Route::get('/api/recommendations/cart', [RecommendationController::class, 'forCart'])->name('api.recommendations.cart');

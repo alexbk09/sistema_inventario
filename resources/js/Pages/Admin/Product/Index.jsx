@@ -70,6 +70,7 @@ export default function Index({ products, filters, summary, warehouses = [] }) {
     if (payload.description) {
       formData.append('description', payload.description);
     }
+    formData.append('is_featured', payload.is_featured ? '1' : '0');
 
     if (Array.isArray(payload.images)) {
       payload.images.forEach((file, index) => {
@@ -133,6 +134,11 @@ export default function Index({ products, filters, summary, warehouses = [] }) {
         </span>
       );
     } },
+    { key: 'is_featured', label: 'Destacado', width: '10%', render: (v) => (
+      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${v ? 'bg-emerald-50 text-emerald-700' : 'bg-muted text-muted-foreground'}`}>
+        {v ? 'Sí' : 'No'}
+      </span>
+    ) },
     { key: 'description', label: 'Descripción', width: '25%', render: (v) => (<p className="truncate" title={v}>{v || '-'}</p>) },
     { key: 'inventory', label: 'Inventario', width: '15%', render: (v, row) => (
       <button

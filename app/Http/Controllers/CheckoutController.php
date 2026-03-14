@@ -4,13 +4,24 @@ namespace App\Http\Controllers;
 
 use App\Models\{Invoice, InvoiceItem, Product, InvoiceContact, Customer, InvoiceStatus, Coupon};
 use App\Services\CurrencyService;
+use App\Mail\InvoiceCreated;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
 
 class CheckoutController extends Controller
 {
+    public function index(CurrencyService $currency)
+    {
+        $rate = $currency->getPromedio('oficial') ?? (float) config('currency.bs_rate', 0);
+
+        return Inertia::render('Checkout/Index', [
+            'rate' => $rate,
+        ]);
+    }
+
     public function store(Request $request, CurrencyService $currency)
     {
         $payload = $request->validate([
@@ -158,7 +169,7 @@ class CheckoutController extends Controller
             ]);
 
             // Datos de contacto asociados
-            InvoiceContact::create([
+            $contact = InvoiceContact::create([
                 'invoice_id' => $invoice->id,
                 'full_name' => $payload['fullName'],
                 'email' => $payload['email'],
@@ -173,15 +184,49 @@ class CheckoutController extends Controller
                 'payment_date' => $payload['date'],
             ]);
 
+            // Notificación por correo (cliente + correo de la empresa si está configurado)
+            try {
+                $to = $contact->email;
+
+                if ($to) {
+                    Mail::to($to)->queue(new InvoiceCreated($invoice));
+                }
+
+                $general = \App\Support\Settings::get('general', [
+                    'email' => null,
+                ]);
+
+                if (!empty($general['email']) && $general['email'] !== $to) {
+                    Mail::to($general['email'])->queue(new InvoiceCreated($invoice));
+                }
+            } catch (\Throwable $e) {
+                // No interrumpir el checkout si el correo falla
+                report($e);
+            }
+
             // Respuesta: redirigir a confirmación
-            return redirect()->route('checkout.confirmation')->with('invoice_number', $invoice->number);
+            return redirect()->route('checkout.confirmation')->with([
+                'invoice_number' => $invoice->number,
+                'invoice_id' => $invoice->id,
+            ]);
         });
     }
 
     public function confirmation()
     {
+        $invoiceId = session('invoice_id');
+        $invoiceNumber = session('invoice_number');
+
+        $publicUrl = null;
+        if ($invoiceId) {
+            $publicUrl = route('order.track', ['invoice' => $invoiceId]);
+        }
+
         return Inertia::render('Checkout/Confirmation', [
             'message' => 'Tu pedido fue registrado. ¡Gracias!',
+            'publicUrl' => $publicUrl,
+            'qrUrl' => $invoiceId ? route('qr.invoice', ['invoice' => $invoiceId]) : null,
+            'invoiceNumber' => $invoiceNumber,
         ]);
     }
 }

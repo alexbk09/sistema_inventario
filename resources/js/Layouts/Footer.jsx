@@ -1,11 +1,13 @@
 import { Link, usePage } from '@inertiajs/react';
 import { Mail, Phone, Facebook, Instagram, Twitter } from 'lucide-react'
+import { useI18n } from '@/Hooks/useI18n';
 export default function FooterLayout() {
     const currentYear = new Date().getFullYear()
       const { props } = usePage();
       const settings = props.settings || {};
       const general = settings.general || {};
       const store = settings.store || {};
+  const { t } = useI18n();
     return (
    <footer className="bg-primary text-primary-foreground mt-16">
       <div className="max-w-7xl mx-auto px-4 py-12">
@@ -23,21 +25,23 @@ export default function FooterLayout() {
 
           {/* Links */}
           <div>
-            <h4 className="font-semibold mb-4">Navegación</h4>
+            <h4 className="font-semibold mb-4">
+              {t('footer.navigation_title', 'Navegación')}
+            </h4>
             <ul className="space-y-2 text-sm">
               <li>
                 <Link href="/" className="hover:text-accent transition">
-                  Inicio
+                  {t('footer.navigation_home', 'Inicio')}
                 </Link>
               </li>
               <li>
                 <li>
                   <Link href={route('shop.index')} className="hover:text-accent transition">
-                    Tienda
+                    {t('footer.navigation_shop', 'Tienda')}
                   </Link>
                 </li>
                 <Link href="#" className="hover:text-accent transition">
-                  Sobre nosotros
+                  {t('footer.navigation_about', 'Sobre nosotros')}
                 </Link>
               </li>
             </ul>
@@ -45,21 +49,23 @@ export default function FooterLayout() {
 
           {/* Legal */}
           <div>
-            <h4 className="font-semibold mb-4">Legal</h4>
+            <h4 className="font-semibold mb-4">
+              {t('footer.legal_title', 'Legal')}
+            </h4>
             <ul className="space-y-2 text-sm">
               <li>
                 <Link href="#" className="hover:text-accent transition">
-                  Términos de servicio
+                  {t('footer.legal_terms', 'Términos de servicio')}
                 </Link>
               </li>
               <li>
                 <Link href="#" className="hover:text-accent transition">
-                  Política de privacidad
+                  {t('footer.legal_privacy', 'Política de privacidad')}
                 </Link>
               </li>
               <li>
                 <Link href="#" className="hover:text-accent transition">
-                  Política de devoluciones
+                  {t('footer.legal_returns', 'Política de devoluciones')}
                 </Link>
               </li>
             </ul>
@@ -67,7 +73,9 @@ export default function FooterLayout() {
 
           {/* Contacto y Redes */}
           <div>
-            <h4 className="font-semibold mb-4">Síguenos</h4>
+            <h4 className="font-semibold mb-4">
+              {t('footer.follow_us_title', 'Síguenos')}
+            </h4>
             <div className="flex gap-3 mb-6">
               <a
                   href={general.facebook_url || '#'}
@@ -93,13 +101,18 @@ export default function FooterLayout() {
 
         {/* Divisor */}
         <div className="border-t border-primary-foreground/20 pt-8 flex flex-col md:flex-row items-center justify-between text-sm text-primary-foreground/70">
-            <p>&copy; {currentYear} {general.company_name || 'Inventario'}. Todos los derechos reservados.</p>
+            <p>
+              &copy; {currentYear} {general.company_name || 'Inventario'}. {t(
+                'footer.rights',
+                'Todos los derechos reservados.'
+              )}
+            </p>
           <div className="flex gap-4 mt-4 md:mt-0">
             <Link href="/" className="hover:text-accent transition">
               <Link href={route('shop.index')} className="hover:text-accent transition">
-                Tienda
+                {t('footer.navigation_shop', 'Tienda')}
               </Link>
-              Tienda
+              {t('footer.navigation_shop', 'Tienda')}
             </Link>
           </div>
         </div>

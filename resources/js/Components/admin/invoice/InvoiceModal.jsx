@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import Modal from '@/Components/Modal'
 import { router } from '@inertiajs/react'
-import { Download, Printer } from 'lucide-react'
+import { Download, Printer, MessageCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const statusLabels = {
@@ -101,6 +101,15 @@ export default function InvoiceModal({
 
   const totalBs = typeof invoice.total_bs === 'number' ? invoice.total_bs : Math.round(total * 57);
 
+  const whatsappUrl = (() => {
+    const phone = contact.phone || '';
+    if (!phone) return null;
+    const digits = phone.replace(/[^0-9]/g, '');
+    if (!digits) return null;
+    const text = encodeURIComponent(`Hola, tengo una consulta sobre la factura ${invoice.number}`);
+    return `https://wa.me/${digits}?text=${text}`;
+  })();
+
   return (
     <Modal
       show={isOpen}
@@ -117,6 +126,17 @@ export default function InvoiceModal({
             </p>
           </div>
           <div className="flex gap-2">
+            {whatsappUrl && (
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white hover:bg-green-700 rounded-lg transition text-sm"
+              >
+                <MessageCircle className="w-4 h-4" />
+                WhatsApp cliente
+              </a>
+            )}
             <button className="flex items-center gap-2 px-4 py-2 bg-muted hover:bg-muted/80 text-foreground rounded-lg transition">
               <Printer className="w-4 h-4" />
               Imprimir

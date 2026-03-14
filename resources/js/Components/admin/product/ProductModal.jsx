@@ -14,6 +14,7 @@ export default function ProductModal({ isOpen, onClose, onSave, editingProduct }
     stock: '',
     min_stock: '',
     description: '',
+    is_featured: false,
   })
   const [images, setImages] = useState([])
   const [existingImages, setExistingImages] = useState([])
@@ -28,11 +29,12 @@ export default function ProductModal({ isOpen, onClose, onSave, editingProduct }
         stock: editingProduct.stock ?? '',
         min_stock: editingProduct.min_stock ?? '',
         description: editingProduct.description ?? '',
+        is_featured: Boolean(editingProduct.is_featured),
       })
       setImages([])
       setExistingImages(editingProduct.images ?? [])
     } else {
-      setFormData({ name: '', sku: '', barcode: '', price_usd: '', stock: '', min_stock: String(defaultMinStock ?? 0), description: '' })
+      setFormData({ name: '', sku: '', barcode: '', price_usd: '', stock: '', min_stock: String(defaultMinStock ?? 0), description: '', is_featured: false })
       setImages([])
       setExistingImages([])
     }
@@ -112,6 +114,24 @@ export default function ProductModal({ isOpen, onClose, onSave, editingProduct }
           <div>
             <label className="block text-sm font-semibold text-foreground mb-2">Descripción</label>
             <textarea name="description" value={formData.description} onChange={handleChange} className="w-full px-4 py-2 bg-background border border-border rounded-lg resize-none" rows={3} />
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              id="is_featured"
+              type="checkbox"
+              name="is_featured"
+              checked={Boolean(formData.is_featured)}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  is_featured: e.target.checked,
+                }))
+              }
+              className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+            />
+            <label htmlFor="is_featured" className="text-sm text-foreground">
+              Destacado en la tienda (aparece en el home y recomendaciones)
+            </label>
           </div>
           {editingProduct && existingImages.length > 0 && (
             <div>

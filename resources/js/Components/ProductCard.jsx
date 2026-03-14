@@ -1,7 +1,9 @@
 import { useCart } from '@/Hooks/useCart'
-import { usePage, router } from '@inertiajs/react'
+import { usePage, router, Link } from '@inertiajs/react'
 import { Star, ShoppingCart, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useState, useEffect } from 'react'
+import { useDisplayCurrency } from '@/Hooks/useDisplayCurrency'
+import { useI18n } from '@/Hooks/useI18n'
 export default function ProductCard({
   product,
   onAddedToCart,
@@ -13,6 +15,8 @@ export default function ProductCard({
   const pageRate = usePage().props?.rate ?? null
   const [imageIndex, setImageIndex] = useState(0)
   const [isHovered, setIsHovered] = useState(false)
+  const { displayCurrency, baseCurrency, secondaryCurrency } = useDisplayCurrency()
+  const { t } = useI18n()
 
   const primaryImageUrl = Array.isArray(product.images) && product.images.length > 0
     ? product.images[0]?.url
@@ -77,8 +81,9 @@ export default function ProductCard({
   }, [images.length, isHovered])
 
   return (
-    <div
-      className="bg-card border border-border rounded-lg overflow-hidden hover:border-primary hover:shadow-lg transition-all duration-300 group"
+    <Link
+      href={route('product.show', product.id)}
+      className="bg-card border border-border rounded-lg overflow-hidden hover:border-primary hover:shadow-lg transition-all duration-300 group block"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -140,12 +145,14 @@ export default function ProductCard({
         )}
         {isOutOfStock && (
           <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-            <span className="text-white font-bold text-lg">Sin Stock</span>
+            <span className="text-white font-bold text-lg">
+              {t('product.out_of_stock', 'Sin Stock')}
+            </span>
           </div>
         )}
         {product.stock > 0 && (
           <div className="absolute top-2 right-2 bg-destructive text-destructive-foreground px-3 py-1 rounded-full text-xs font-semibold text-white">
-            {product.stock} disponibles
+            {t('product.stock_label', `${product.stock} disponibles`, { count: product.stock })}
           </div>
         )}
       </div>
@@ -190,12 +197,27 @@ export default function ProductCard({
 
         {/* Price */}
         <div>
-          <p className="text-2xl font-bold text-primary">
-            USD ${priceUsd.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            BS {priceBs.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-          </p>
+          {displayCurrency === (secondaryCurrency || 'VES') ? (
+            <>
+              <p className="text-2xl font-bold text-primary">
+                {secondaryCurrency || 'Bs.'}{' '}
+                {priceBs.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {baseCurrency || 'USD'} ${priceUsd.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-2xl font-bold text-primary">
+                {baseCurrency || 'USD'} ${priceUsd.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {secondaryCurrency || 'Bs.'}{' '}
+                {priceBs.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+              </p>
+            </>
+          )}
         </div>
 
         {/* Button */}
@@ -209,16 +231,18 @@ export default function ProductCard({
           }`}
         >
           <ShoppingCart className="w-4 h-4" />
-          {isAdding ? 'Agregando...' : 'Agregar al Carrito'}
+          {isAdding
+            ? t('cart.adding', 'Agregando...')
+            : t('product.add_to_cart', 'Agregar al Carrito')}
         </button>
 
         {/* Notification */}
         {showNotification && (
           <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-700 text-center animate-fade-in">
-            ✓ Agregado al carrito
+            {t('cart.added', '✓ Agregado al carrito')}
           </div>
         )}
       </div>
-    </div>
+    </Link>
   )
 }
