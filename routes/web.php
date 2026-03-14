@@ -5,7 +5,8 @@ use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Models\Product;
-use App\Http\Controllers\{ProductController, ProviderController, InvoiceController, CategoryController, RolesController, ProductInventoryController, ProductImageController, CustomerController, UserController, RmaController, WarehouseController, StockTransferController, CreditAccountController, LayawayController};
+use App\Support\Settings;
+use App\Http\Controllers\{ProductController, ProviderController, InvoiceController, CategoryController, RolesController, ProductInventoryController, ProductImageController, CustomerController, UserController, RmaController, WarehouseController, StockTransferController, CreditAccountController, LayawayController, SettingsController};
 use App\Http\Controllers\CurrencyController;
 use App\Services\CurrencyService;
 use App\Http\Controllers\CartController;
@@ -14,6 +15,10 @@ Route::middleware(['auth', 'verified', 'role:admin'])->group(function () {
     Route::get('/admin/qr', function () {
         return Inertia::render('Admin/QRScanner');
     })->name('admin.qr');
+
+    // Configuración general del sistema
+    Route::get('/admin/settings', [SettingsController::class, 'index'])->name('admin.settings.index');
+    Route::put('/admin/settings', [SettingsController::class, 'update'])->name('admin.settings.update');
 
     // Productos
     Route::get('/admin/products', [ProductController::class, 'index'])->name('admin.products.index');
@@ -99,6 +104,8 @@ Route::middleware(['auth', 'verified', 'role:admin'])->group(function () {
 Route::get('/', function () {
     $currency = app(CurrencyService::class);
     $rate = $currency->getPromedio('oficial') ?? (float) config('currency.bs_rate', 0);
+    $store = Settings::get('store', null);
+    $general = Settings::get('general', null);
     $featured = Product::where('is_featured', true)->with(['categories:id,name', 'images' => function ($q) { $q->orderBy('sort_order'); }])->take(8)->get()->map(function ($p) use ($rate) {
         return [
             'id' => $p->id,
@@ -120,36 +127,60 @@ Route::get('/', function () {
         'canLogin' => Route::has('login'),
         'canRegister' => Route::has('register'),
         'rate' => $rate,
+        'store' => $store,
+        'company' => $general,
     ]);
 })->name('home');
 
 Route::get('/shop', function () {
     $currency = app(CurrencyService::class);
     $rate = $currency->getPromedio('oficial') ?? (float) config('currency.bs_rate', 0);
-    $products = Product::with(['categories:id,name', 'images' => function ($q) { $q->orderBy('sort_order'); }])->latest()->take(48)->get()->map(function ($p) use ($rate) {
-        return [
-            'id' => $p->id,
-            'name' => $p->name,
-            'price' => (float) $p->price_usd,
-            'price_bs' => round((float) $p->price_usd * ($rate ?: 0), 2),
-            'images' => $p->images->map(fn ($img) => [
-                'id' => $img->id,
-                'url' => asset('storage/'.$img->path),
-            ]),
-            'image' => $p->image_url,
-            'category' => optional($p->categories->first())->name ?? null,
-            'categories' => $p->categories->pluck('name'),
-            'stock' => (int) $p->stock,
-            'description' => $p->description,
-            'rating' => 5,
-            'reviews' => 0,
-        ];
-    });
+    $store = Settings::get('store', null);
+    $general = Settings::get('general', null);
+
+    // Ventas históricas por producto (solo facturas pagadas)
+    $salesByProduct = \App\Models\InvoiceItem::selectRaw('product_id, SUM(quantity) as total_sold')
+        ->whereHas('invoice', function ($q) {
+            $q->where('status', 'paid');
+        })
+        ->groupBy('product_id')
+        ->pluck('total_sold', 'product_id');
+
+    $products = Product::with(['categories:id,name', 'images' => function ($q) { $q->orderBy('sort_order'); }])
+        ->latest()
+        ->take(48)
+        ->get()
+        ->map(function ($p) use ($rate, $salesByProduct) {
+            return [
+                'id' => $p->id,
+                'name' => $p->name,
+                'sku' => $p->sku,
+                'barcode' => $p->barcode,
+                'price' => (float) $p->price_usd,
+                'price_bs' => round((float) $p->price_usd * ($rate ?: 0), 2),
+                'images' => $p->images->map(fn ($img) => [
+                    'id' => $img->id,
+                    'url' => asset('storage/'.$img->path),
+                ]),
+                'image' => $p->image_url,
+                'category' => optional($p->categories->first())->name ?? null,
+                'categories' => $p->categories->pluck('name'),
+                'stock' => (int) $p->stock,
+                'description' => $p->description,
+                'is_featured' => (bool) $p->is_featured,
+                'created_at' => $p->created_at?->toIso8601String(),
+                'sold_quantity' => (int) ($salesByProduct[$p->id] ?? 0),
+                'rating' => 5,
+                'reviews' => 0,
+            ];
+        });
     $categories = \App\Models\Category::orderBy('name')->get(['id','name']);
     return Inertia::render('Shop/Index', [
         'products' => $products,
         'categories' => $categories,
         'rate' => $rate,
+        'store' => $store,
+        'company' => $general,
     ]);
 })->name('shop.index');
 

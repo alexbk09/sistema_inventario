@@ -154,12 +154,18 @@ class ProductController extends Controller
             'description' => ['nullable','string'],
             'price_usd' => ['required','numeric','min:0'],
             'stock' => ['required','integer','min:0'],
+            'min_stock' => ['nullable','integer','min:0'],
             'is_featured' => ['boolean'],
         ]);
 
         // Compat: si no viene category_id, usar el primero de category_ids
         if (empty($data['category_id']) && !empty($data['category_ids'])) {
             $data['category_id'] = $data['category_ids'][0];
+        }
+
+        if (!array_key_exists('min_stock', $data) || $data['min_stock'] === null) {
+            $inventory = \App\Support\Settings::get('inventory', ['default_min_stock' => 0]);
+            $data['min_stock'] = (int) ($inventory['default_min_stock'] ?? 0);
         }
 
         $product = Product::create(collect($data)->except('category_ids')->toArray());
@@ -231,11 +237,16 @@ class ProductController extends Controller
             'description' => ['nullable','string'],
             'price_usd' => ['required','numeric','min:0'],
             'stock' => ['required','integer','min:0'],
+            'min_stock' => ['nullable','integer','min:0'],
             'is_featured' => ['boolean'],
         ]);
 
         if (empty($data['category_id']) && !empty($data['category_ids'])) {
             $data['category_id'] = $data['category_ids'][0];
+        }
+
+        if (array_key_exists('min_stock', $data) && $data['min_stock'] === null) {
+            unset($data['min_stock']);
         }
 
         $product->update(collect($data)->except('category_ids')->toArray());

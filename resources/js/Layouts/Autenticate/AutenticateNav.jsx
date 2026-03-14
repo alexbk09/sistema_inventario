@@ -15,6 +15,7 @@ export default function AutenticateNav() {
     const canViewRmas = permissions.includes('view rmas');
     const canViewWarehouses = permissions.includes('view warehouses');
     const canViewCredits = permissions.includes('view credits');
+    const canManageSettings = isAdmin || permissions.includes('manage settings');
     return (
             <nav className="border-b border-gray-100 bg-white">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -207,6 +208,14 @@ export default function AutenticateNav() {
                                                 active={route().current('admin.warehouses.*')}
                                             >
                                                 Sucursales
+                                            </NavLink>
+                                        )}
+                                        {canManageSettings && (
+                                            <NavLink
+                                                href={route('admin.settings.index')}
+                                                active={route().current('admin.settings.*')}
+                                            >
+                                                Configuración
                                             </NavLink>
                                         )}
                                         <NavLink
@@ -412,6 +421,14 @@ export default function AutenticateNav() {
                                         active={route().current('admin.warehouses.*')}
                                     >
                                         Sucursales
+                                    </ResponsiveNavLink>
+                                )}
+                                {canManageSettings && (
+                                    <ResponsiveNavLink
+                                        href={route('admin.settings.index')}
+                                        active={route().current('admin.settings.*')}
+                                    >
+                                        Configuración
                                     </ResponsiveNavLink>
                                 )}
                                 <ResponsiveNavLink

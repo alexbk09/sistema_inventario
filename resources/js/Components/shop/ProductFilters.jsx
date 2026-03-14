@@ -7,6 +7,7 @@ const SORT_OPTIONS = [
   { value: 'price-asc', label: 'Precio: Menor a Mayor' },
   { value: 'price-desc', label: 'Precio: Mayor a Menor' },
   { value: 'newest', label: 'Más Recientes' },
+  { value: 'best-sellers', label: 'Más Vendidos' },
 ]
 
 export default function ProductFilters({
@@ -19,6 +20,8 @@ export default function ProductFilters({
   const [selectedCategories, setSelectedCategories] = useState([])
   const [priceRange, setPriceRange] = useState([0, 5000])
   const [sortBy, setSortBy] = useState('relevance')
+  const [inStockOnly, setInStockOnly] = useState(false)
+  const [tags, setTags] = useState([])
 
   const handleCategoryToggle = (category) => {
     setSelectedCategories((prev) =>
@@ -32,6 +35,8 @@ export default function ProductFilters({
       categories: selectedCategories,
       priceRange,
       sortBy,
+      inStockOnly,
+      tags,
     })
   }
 
@@ -40,10 +45,17 @@ export default function ProductFilters({
     setSelectedCategories([])
     setPriceRange([0, 5000])
     setSortBy('relevance')
+    setInStockOnly(false)
+    setTags([])
     onReset?.()
   }
 
-  const isFiltered = Boolean(search) || selectedCategories.length > 0 || priceRange[0] > 0
+  const isFiltered =
+    Boolean(search) ||
+    selectedCategories.length > 0 ||
+    priceRange[0] > 0 ||
+    inStockOnly ||
+    (tags && tags.length > 0)
 
   return (
     <>
@@ -155,6 +167,55 @@ export default function ProductFilters({
                   ${priceRange[1].toLocaleString('es-AR')}
                 </span>
               </div>
+            </div>
+          </div>
+
+          {/* Disponibilidad */}
+          <div>
+            <label className="block text-sm font-semibold text-foreground mb-2">
+              Disponibilidad
+            </label>
+            <label className="flex items-center gap-3 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={inStockOnly}
+                onChange={(e) => {
+                  setInStockOnly(e.target.checked)
+                  // Aplicar filtros inmediatamente para mejor UX
+                  setTimeout(handleFilterChange, 0)
+                }}
+                className="w-4 h-4 accent-primary rounded cursor-pointer"
+              />
+              <span className="text-sm text-muted-foreground group-hover:text-foreground transition">
+                Solo productos con stock disponible
+              </span>
+            </label>
+          </div>
+
+          {/* Etiquetas */}
+          <div>
+            <label className="block text-sm font-semibold text-foreground mb-2">
+              Etiquetas
+            </label>
+            <div className="space-y-2">
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={tags.includes('featured')}
+                  onChange={() => {
+                    setTags((prev) =>
+                      prev.includes('featured')
+                        ? prev.filter((t) => t !== 'featured')
+                        : [...prev, 'featured']
+                    )
+                    setTimeout(handleFilterChange, 0)
+                  }}
+                  className="w-4 h-4 accent-primary rounded cursor-pointer"
+                />
+                <span className="text-sm text-muted-foreground group-hover:text-foreground transition">
+                  Destacados
+                </span>
+              </label>
             </div>
           </div>
 

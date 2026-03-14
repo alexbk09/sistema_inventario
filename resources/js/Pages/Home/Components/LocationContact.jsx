@@ -1,7 +1,7 @@
 
 import { MapPin, Mail, Phone } from 'lucide-react'
 
-export default function LocationContact() {
+export default function LocationContact({ company = {}, location = {}, store = {} }) {
   return (
     <section className="py-16 bg-muted/30 rounded-2xl px-6 my-12">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
@@ -13,7 +13,7 @@ export default function LocationContact() {
           </div>
           <div className="bg-white rounded-lg overflow-hidden h-64 shadow-md">
             <iframe
-              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3919.6718521903447!2d-75.5304836!3d6.2093!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8e4429e09c13c759%3A0xe8f6b3a2c3b4d5e6!2sMedell%C3%ADn%2C%20Antioquia!5e0!3m2!1ses!2sco!4v1234567890"
+              src={location.google_maps_url || "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3919.6718521903447!2d-75.5304836!3d6.2093!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8e4429e09c13c759%3A0xe8f6b3a2c3b4d5e6!2sMedell%C3%ADn%2C%20Antioquia!5e0!3m2!1ses!2sco!4v1234567890"}
               width="100%"
               height="100%"
               style={{ border: 0 }}
@@ -37,12 +37,14 @@ export default function LocationContact() {
                 <Mail className="w-6 h-6 text-primary mt-1 flex-shrink-0" />
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Email</p>
-                  <a
-                    href="mailto:contacto@tienda.com"
-                    className="text-foreground font-medium hover:text-primary transition"
-                  >
-                    contacto@tienda.com
-                  </a>
+                  {company.email && (
+                    <a
+                      href={`mailto:${company.email}`}
+                      className="text-foreground font-medium hover:text-primary transition"
+                    >
+                      {company.email}
+                    </a>
+                  )}
                 </div>
               </div>
             </div>
@@ -52,12 +54,14 @@ export default function LocationContact() {
                 <Phone className="w-6 h-6 text-primary mt-1 flex-shrink-0" />
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Teléfono</p>
-                  <a
-                    href="tel:+584124000000"
-                    className="text-foreground font-medium hover:text-primary transition"
-                  >
-                    +58 412-4000000
-                  </a>
+                  {company.phone && (
+                    <a
+                      href={`tel:${company.phone}`}
+                      className="text-foreground font-medium hover:text-primary transition"
+                    >
+                      {company.phone}
+                    </a>
+                  )}
                 </div>
               </div>
             </div>

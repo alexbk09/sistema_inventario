@@ -15,6 +15,8 @@ class Warehouse extends Model
         'code',
         'address',
         'is_active',
+        'invoice_prefix',
+        'invoice_length',
     ];
 
     public function outgoingTransfers(): HasMany

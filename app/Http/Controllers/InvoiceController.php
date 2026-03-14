@@ -2,8 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\{Invoice, InvoiceItem, Product, Customer, MovementType, InvoiceStatus, Warehouse};
+use App\Models\{Invoice, InvoiceItem, Product, Customer, MovementType, InvoiceStatus, Warehouse, InvoiceAdjustment, CreditAccount, CreditMovement, Layaway};
 use App\Services\{CurrencyService, InventoryService};
+use App\Support\Settings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -30,8 +31,12 @@ class InvoiceController extends Controller
             ->latest()
             ->with([
                 'customer:id,name',
+                'creditAccount:id,customer_id,balance_usd',
+                'layaway:id,number,status',
                 'items.product',
                 'contact',
+                'payments',
+                'adjustments',
                 'invoiceStatus',
             ])
             ->paginate(12)
@@ -48,6 +53,7 @@ class InvoiceController extends Controller
             'products' => Product::select('id','name','price_usd','stock')->get(),
             'customers' => Customer::select('id','name')->get(),
             'warehouses' => Warehouse::select('id','name','code')->orderBy('name')->get(),
+            'layaways' => Layaway::where('status', 'active')->with('customer:id,name')->orderByDesc('id')->get(['id','number','customer_id','total_usd']),
         ]);
     }
 
@@ -56,17 +62,79 @@ class InvoiceController extends Controller
         $data = $request->validate([
             'customer_id' => ['nullable','exists:customers,id'],
             'warehouse_id' => ['nullable','exists:warehouses,id'],
+            'layaway_id' => ['nullable','exists:layaways,id'],
+            'document_type' => ['required','in:invoice,delivery_note,proforma'],
             'items' => ['required','array','min:1'],
             'items.*.product_id' => ['required','exists:products,id'],
             'items.*.quantity' => ['required','integer','min:1'],
             'items.*.bs_subtotal' => ['nullable','numeric'],
+            'internal_notes' => ['nullable','string'],
+            'public_notes' => ['nullable','string'],
+            'cancellation_reason' => ['nullable','string','max:500'],
+            'adjustments' => ['sometimes','array'],
+            'adjustments.*.type' => ['required_with:adjustments','in:credit,debit'],
+            'adjustments.*.amount_usd' => ['required_with:adjustments','numeric','min:0.01'],
+            'adjustments.*.description' => ['nullable','string','max:255'],
+            'credit_sale' => ['sometimes','boolean'],
+            'credit_due_date' => ['nullable','date'],
+            'payments' => ['sometimes','array'],
+            'payments.*.method' => ['required_with:payments','string','max:50'],
+            'payments.*.amount_usd' => ['required_with:payments','numeric','min:0'],
+            'payments.*.amount_bs' => ['nullable','numeric','min:0'],
+            'payments.*.reference' => ['nullable','string','max:255'],
+            'payments.*.bank' => ['nullable','string','max:255'],
+            'payments.*.notes' => ['nullable','string','max:500'],
         ]);
 
+        // Aplicar reglas de multi-bodega desde settings (bodega por defecto y obligatoriedad)
+        $warehouseSettings = Settings::get('warehouses', [
+            'require_warehouse_on_invoice' => false,
+            'default_warehouse_id' => null,
+        ]);
+
+        if (empty($data['warehouse_id']) && !empty($warehouseSettings['default_warehouse_id'])) {
+            $data['warehouse_id'] = $warehouseSettings['default_warehouse_id'];
+        }
+
+        if (!empty($warehouseSettings['require_warehouse_on_invoice']) && empty($data['warehouse_id'])) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'warehouse_id' => 'Debes seleccionar una sucursal/bodega para la factura.',
+            ]);
+        }
+
+        $billing = Settings::get('billing', [
+            'invoice_prefix' => 'F-',
+            'invoice_length' => 8,
+        ]);
+
+        $prefix = (string) ($billing['invoice_prefix'] ?? 'F-');
+        $length = (int) ($billing['invoice_length'] ?? 8);
+
+        // Si la sucursal tiene una serie propia configurada, usarla para esta factura
+        if (!empty($data['warehouse_id'])) {
+            $warehouse = Warehouse::find($data['warehouse_id']);
+            if ($warehouse) {
+                if (!empty($warehouse->invoice_prefix)) {
+                    $prefix = (string) $warehouse->invoice_prefix;
+                }
+                if (!is_null($warehouse->invoice_length)) {
+                    $length = (int) $warehouse->invoice_length;
+                }
+            }
+        }
+
+        $lastId = (int) (Invoice::max('id') ?? 0) + 1;
+        $padded = str_pad((string) $lastId, max(1, $length), '0', STR_PAD_LEFT);
+
         $invoice = new Invoice();
-        $invoice->number = 'INV-'.Str::upper(Str::random(8));
+        $invoice->number = $prefix.$padded;
+        $invoice->document_type = $data['document_type'];
         $invoice->customer_id = $data['customer_id'] ?? null;
+        $invoice->layaway_id = $data['layaway_id'] ?? null;
         $invoice->warehouse_id = $data['warehouse_id'] ?? null;
         $invoice->status = 'pending';
+        $invoice->internal_notes = $data['internal_notes'] ?? null;
+        $invoice->public_notes = $data['public_notes'] ?? null;
 
         // Asociar estado inicial usando la tabla invoice_statuses
         $pendingStatus = InvoiceStatus::where('code', 'pending')->first();
@@ -77,6 +145,9 @@ class InvoiceController extends Controller
         $invoice->total_usd = 0;
         $invoice->total_bs = 0;
         $invoice->save();
+
+        $taxPercent = (float) Settings::get('billing', ['default_tax_percent' => 0])['default_tax_percent'] ?? 0;
+        $taxRate = max(0.0, min(100.0, $taxPercent)) / 100.0;
 
         $totalUsd = 0;
         foreach ($data['items'] as $it) {
@@ -101,10 +172,71 @@ class InvoiceController extends Controller
             $totalUsd += $subtotalUsd;
         }
 
+        $taxUsd = $taxRate > 0 ? round($totalUsd * $taxRate, 2) : 0.0;
+        $grandTotalUsd = $totalUsd + $taxUsd;
+
         $invoice->update([
-            'total_usd' => $totalUsd,
-            'total_bs' => $currency->usdToBs($totalUsd),
+            'total_usd' => $grandTotalUsd,
+            'total_bs' => $currency->usdToBs($grandTotalUsd),
         ]);
+
+        // Si es venta a crédito, crear/actualizar cuenta de crédito y movimiento de cargo
+        if (!empty($data['credit_sale']) && $invoice->customer_id) {
+            $account = CreditAccount::firstOrCreate(
+                ['customer_id' => $invoice->customer_id],
+                ['balance_usd' => 0, 'credit_limit_usd' => null, 'status' => 'active']
+            );
+
+            CreditMovement::create([
+                'credit_account_id' => $account->id,
+                'invoice_id' => $invoice->id,
+                'type' => 'charge',
+                'amount_usd' => $grandTotalUsd,
+                'description' => 'Venta a crédito factura '.$invoice->number,
+                'due_date' => $data['credit_due_date'] ?? null,
+            ]);
+
+            $account->balance_usd = (float) $account->balance_usd + (float) $grandTotalUsd;
+            $account->save();
+
+            $invoice->credit_account_id = $account->id;
+            $invoice->save();
+        }
+
+        // Si la factura liquida un apartado, marcarlo como completado
+        if (!empty($data['layaway_id'])) {
+            $layaway = Layaway::find($data['layaway_id']);
+            if ($layaway) {
+                $layaway->status = 'completed';
+                $layaway->paid_usd = $grandTotalUsd;
+                $layaway->save();
+            }
+        }
+
+        if (!empty($data['adjustments'])) {
+            foreach ($data['adjustments'] as $adj) {
+                InvoiceAdjustment::create([
+                    'invoice_id' => $invoice->id,
+                    'type' => $adj['type'],
+                    'amount_usd' => $adj['amount_usd'],
+                    'description' => $adj['description'] ?? null,
+                    'created_by' => $request->user()?->id,
+                ]);
+            }
+        }
+
+        if (!empty($data['payments'])) {
+            foreach ($data['payments'] as $pay) {
+                $invoice->payments()->create([
+                    'method' => $pay['method'],
+                    'amount_usd' => $pay['amount_usd'],
+                    'amount_bs' => $pay['amount_bs'] ?? 0,
+                    'reference' => $pay['reference'] ?? null,
+                    'bank' => $pay['bank'] ?? null,
+                    'notes' => $pay['notes'] ?? null,
+                ]);
+            }
+        }
 
         return redirect()->route('admin.invoices.index');
     }
@@ -120,9 +252,30 @@ class InvoiceController extends Controller
             'items' => ['required', 'array', 'min:1'],
             'items.*.id' => ['required', 'exists:invoice_items,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'internal_notes' => ['nullable','string'],
+            'public_notes' => ['nullable','string'],
+            'cancellation_reason' => ['nullable','string','max:500'],
+            'payments' => ['sometimes','array'],
+            'payments.*.method' => ['required_with:payments','string','max:50'],
+            'payments.*.amount_usd' => ['required_with:payments','numeric','min:0'],
+            'payments.*.amount_bs' => ['nullable','numeric','min:0'],
+            'payments.*.reference' => ['nullable','string','max:255'],
+            'payments.*.bank' => ['nullable','string','max:255'],
+            'payments.*.notes' => ['nullable','string','max:500'],
+            'adjustments' => ['sometimes','array'],
+            'adjustments.*.type' => ['required_with:adjustments','in:credit,debit'],
+            'adjustments.*.amount_usd' => ['required_with:adjustments','numeric','min:0.01'],
+            'adjustments.*.description' => ['nullable','string','max:255'],
         ]);
 
         $oldStatus = $invoice->status;
+
+        $billing = Settings::get('billing', [
+            'default_tax_percent' => 0,
+        ]);
+
+        $taxPercent = (float) ($billing['default_tax_percent'] ?? 0);
+        $taxRate = max(0.0, min(100.0, $taxPercent)) / 100.0;
 
         $itemsTotalUsd = 0.0;
 
@@ -144,15 +297,21 @@ class InvoiceController extends Controller
             $itemsTotalUsd += $subtotalUsd;
         }
 
-        // Recalculate invoice totals (must match checkout logic)
-        $shippingUsd = 200.0;
-        $taxRate = 0.15;
-        $taxUsd = round($itemsTotalUsd * $taxRate);
-        $totalUsd = $itemsTotalUsd + $taxUsd + $shippingUsd;
+        // Recalculate invoice totals usando impuesto por defecto y sin envío fijo
+        $taxUsd = $taxRate > 0 ? round($itemsTotalUsd * $taxRate, 2) : 0.0;
+        $totalUsd = $itemsTotalUsd + $taxUsd;
 
         $invoice->total_usd = $totalUsd;
         $invoice->total_bs = $currency->usdToBs($totalUsd);
         $invoice->status = $data['status'];
+        $invoice->internal_notes = $data['internal_notes'] ?? null;
+        $invoice->public_notes = $data['public_notes'] ?? null;
+
+        if ($oldStatus !== 'cancelled' && $data['status'] === 'cancelled') {
+            $invoice->cancelled_at = now();
+            $invoice->cancelled_by = $request->user()?->id;
+            $invoice->cancellation_reason = $data['cancellation_reason'] ?? null;
+        }
 
         // Sincronizar invoice_status_id con el código recibido
         $newStatus = InvoiceStatus::where('code', $data['status'])->first();
@@ -161,6 +320,32 @@ class InvoiceController extends Controller
         }
 
         $invoice->save();
+
+        if (isset($data['payments'])) {
+            $invoice->payments()->delete();
+            foreach ($data['payments'] as $pay) {
+                $invoice->payments()->create([
+                    'method' => $pay['method'],
+                    'amount_usd' => $pay['amount_usd'],
+                    'amount_bs' => $pay['amount_bs'] ?? 0,
+                    'reference' => $pay['reference'] ?? null,
+                    'bank' => $pay['bank'] ?? null,
+                    'notes' => $pay['notes'] ?? null,
+                ]);
+            }
+        }
+
+        if (isset($data['adjustments'])) {
+            $invoice->adjustments()->delete();
+            foreach ($data['adjustments'] as $adj) {
+                $invoice->adjustments()->create([
+                    'type' => $adj['type'],
+                    'amount_usd' => $adj['amount_usd'],
+                    'description' => $adj['description'] ?? null,
+                    'created_by' => $request->user()?->id,
+                ]);
+            }
+        }
 
         // If status changed from pending to paid, register stock exits
         if ($oldStatus === 'pending' && $data['status'] === 'paid') {
@@ -192,6 +377,24 @@ class InvoiceController extends Controller
                     $customer->lifetime_spent_usd = (float) ($customer->lifetime_spent_usd ?? 0) + (float) ($invoice->total_usd ?? 0);
                     $customer->last_purchase_at = now();
                     $customer->save();
+                }
+
+                // Si la factura estaba ligada a crédito, registrar abono automático
+                if ($invoice->credit_account_id) {
+                    $account = $invoice->creditAccount;
+                    if ($account) {
+                        CreditMovement::create([
+                            'credit_account_id' => $account->id,
+                            'invoice_id' => $invoice->id,
+                            'type' => 'payment',
+                            'amount_usd' => $invoice->total_usd,
+                            'description' => 'Abono automático por factura '.$invoice->number,
+                            'paid_at' => now(),
+                        ]);
+
+                        $account->balance_usd = (float) $account->balance_usd - (float) $invoice->total_usd;
+                        $account->save();
+                    }
                 }
             }
         }

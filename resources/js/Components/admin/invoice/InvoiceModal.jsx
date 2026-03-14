@@ -32,6 +32,26 @@ export default function InvoiceModal({
     }))
   ))
   const [saving, setSaving] = useState(false)
+  const [payments, setPayments] = useState(() => (
+    (invoice.payments || []).map((p) => ({
+      id: p.id,
+      method: p.method,
+      amount_usd: p.amount_usd,
+      amount_bs: p.amount_bs,
+      reference: p.reference ?? '',
+      bank: p.bank ?? '',
+      notes: p.notes ?? '',
+    }))
+  ))
+    const [cancellationReason, setCancellationReason] = useState(invoice.cancellation_reason || '')
+    const [adjustments, setAdjustments] = useState(() => (
+      (invoice.adjustments || []).map((a) => ({
+        id: a.id,
+        type: a.type,
+        amount_usd: a.amount_usd,
+        description: a.description ?? '',
+      }))
+    ))
 
   useEffect(() => {
     setStatus(invoice.status)
@@ -42,6 +62,24 @@ export default function InvoiceModal({
       price: item.price_usd,
       total: item.subtotal_usd,
     })))
+    setPayments((invoice.payments || []).map((p) => ({
+      id: p.id,
+      method: p.method,
+      amount_usd: p.amount_usd,
+      amount_bs: p.amount_bs,
+      reference: p.reference ?? '',
+      bank: p.bank ?? '',
+      notes: p.notes ?? '',
+    })))
+      setInternalNotes(invoice.internal_notes || '')
+      setPublicNotes(invoice.public_notes || '')
+      setCancellationReason(invoice.cancellation_reason || '')
+      setAdjustments((invoice.adjustments || []).map((a) => ({
+        id: a.id,
+        type: a.type,
+        amount_usd: a.amount_usd,
+        description: a.description ?? '',
+      })))
   }, [invoice])
 
   const currentStatus = statusLabels[status] || {
@@ -52,7 +90,11 @@ export default function InvoiceModal({
   const contact = invoice.contact || {}
   const customer = invoice.customer || {}
 
+  const [internalNotes, setInternalNotes] = useState(invoice.internal_notes || '')
+  const [publicNotes, setPublicNotes] = useState(invoice.public_notes || '')
+
   const itemsSubtotal = items.reduce((sum, it) => sum + (it.total || 0), 0)
+  const paymentsTotalUsd = payments.reduce((sum, p) => sum + (Number(p.amount_usd) || 0), 0)
   const shippingCost = 200.0
   const total = typeof invoice.total_usd === 'number' ? invoice.total_usd : itemsSubtotal + shippingCost
   const tax = total - itemsSubtotal - shippingCost
@@ -125,22 +167,246 @@ export default function InvoiceModal({
           </div>
         </div>
 
-        {/* Información de Pago */}
-        <div className="grid grid-cols-2 gap-6 bg-orange-100 p-4 rounded-lg">
+        {/* Notas */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <p className="text-xs text-muted-foreground font-semibold mb-1">MÉTODO DE PAGO</p>
-            <p className="text-foreground font-semibold capitalize">
-              {contact.payment_method === 'transferencia' && 'Transferencia Bancaria'}
-              {contact.payment_method === 'pago-movil' && 'Pago Móvil'}
-              {contact.payment_method === 'otro' && 'Otro Método'}
-            </p>
+            <p className="text-xs text-muted-foreground font-semibold mb-1">Notas internas</p>
+            <textarea
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary transition min-h-[70px]"
+              placeholder="Solo visibles dentro del panel, no para el cliente."
+              value={internalNotes}
+              onChange={(e) => setInternalNotes(e.target.value)}
+              disabled={!isEditable}
+            />
           </div>
           <div>
-            <p className="text-xs text-muted-foreground font-semibold mb-1">DATOS BANCARIOS</p>
-            <p className="text-sm text-foreground">Banco: {contact.bank}</p>
-            <p className="text-sm text-foreground">Origen: {contact.origin_bank}</p>
-            <p className="text-sm text-foreground">Ref: {contact.reference}</p>
+            <p className="text-xs text-muted-foreground font-semibold mb-1">Notas para el cliente</p>
+            <textarea
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary transition min-h-[70px]"
+              placeholder="Mensaje que aparecerá en la factura o comprobante."
+              value={publicNotes}
+              onChange={(e) => setPublicNotes(e.target.value)}
+              disabled={!isEditable}
+            />
           </div>
+        </div>
+
+        {/* Anulación y notas de crédito/débito */}
+        <div className="space-y-4">
+          {status === 'cancelled' && (
+            <div>
+              <p className="text-xs text-red-700 font-semibold mb-1">Motivo de anulación</p>
+              <textarea
+                className="w-full px-3 py-2 bg-background border border-red-300 rounded-lg text-sm text-foreground focus:outline-none focus:border-red-500 transition min-h-[60px]"
+                placeholder="Describe brevemente por qué se cancela esta factura."
+                value={cancellationReason}
+                onChange={(e) => setCancellationReason(e.target.value)}
+                disabled={!isEditable}
+              />
+            </div>
+          )}
+
+          <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-blue-700 font-semibold mb-1">Notas de crédito / débito</p>
+                <p className="text-sm text-muted-foreground">Ajustes vinculados a esta factura (no modifican el total actual).</p>
+              </div>
+              {isEditable && (
+                <button
+                  type="button"
+                  onClick={() => setAdjustments((prev) => ([
+                    ...prev,
+                    { type: 'credit', amount_usd: '', description: '' },
+                  ]))}
+                  className="px-3 py-1.5 text-xs rounded bg-blue-600 text-white hover:bg-blue-700"
+                >
+                  Añadir ajuste
+                </button>
+              )}
+            </div>
+
+            {adjustments.length === 0 ? (
+              <p className="text-sm text-blue-700">No hay notas de crédito/débito registradas.</p>
+            ) : (
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {adjustments.map((a, idx) => (
+                  <div
+                    key={a.id ?? idx}
+                    className="grid grid-cols-1 md:grid-cols-4 gap-2 items-center bg-white/70 border border-blue-100 rounded p-2 text-xs"
+                  >
+                    <select
+                      className="md:col-span-1 border border-border rounded px-2 py-1 bg-background"
+                      value={a.type}
+                      disabled={!isEditable}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        setAdjustments((prev) => prev.map((adj, i) => i === idx ? { ...adj, type: value } : adj))
+                      }}
+                    >
+                      <option value="credit">Nota de crédito</option>
+                      <option value="debit">Nota de débito</option>
+                    </select>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="Monto USD"
+                      className="md:col-span-1 border border-border rounded px-2 py-1 bg-background"
+                      disabled={!isEditable}
+                      value={a.amount_usd}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        setAdjustments((prev) => prev.map((adj, i) => i === idx ? { ...adj, amount_usd: value } : adj))
+                      }}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Descripción"
+                      className="md:col-span-2 border border-border rounded px-2 py-1 bg-background"
+                      disabled={!isEditable}
+                      value={a.description}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        setAdjustments((prev) => prev.map((adj, i) => i === idx ? { ...adj, description: value } : adj))
+                      }}
+                    />
+                    {isEditable && (
+                      <button
+                        type="button"
+                        onClick={() => setAdjustments((prev) => prev.filter((_, i) => i !== idx))}
+                        className="text-red-500 hover:text-red-600 md:col-span-1 md:justify-self-end"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Pagos */}
+        <div className="bg-orange-50 border border-orange-200 p-4 rounded-lg space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-orange-700 font-semibold mb-1">PAGOS REGISTRADOS</p>
+              <p className="text-sm text-muted-foreground">Permite registrar múltiples formas de pago y referencias.</p>
+            </div>
+            {isEditable && (
+              <button
+                type="button"
+                onClick={() => setPayments((prev) => [...prev, { method: 'efectivo', amount_usd: '', amount_bs: '', reference: '', bank: '', notes: '' }])}
+                className="px-3 py-1.5 text-xs rounded bg-orange-600 text-white hover:bg-orange-700"
+              >
+                Añadir pago
+              </button>
+            )}
+          </div>
+
+          {payments.length === 0 ? (
+            <p className="text-sm text-orange-700">No hay pagos registrados.</p>
+          ) : (
+            <div className="space-y-2 max-h-40 overflow-y-auto">
+              {payments.map((p, idx) => (
+                <div key={p.id ?? idx} className="grid grid-cols-1 md:grid-cols-6 gap-2 items-center bg-white/60 border border-orange-100 rounded p-2 text-xs">
+                  <select
+                    className="md:col-span-1 border border-border rounded px-2 py-1 bg-background"
+                    value={p.method}
+                    disabled={!isEditable}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      setPayments((prev) => prev.map((pay, i) => i === idx ? { ...pay, method: value } : pay))
+                    }}
+                  >
+                    <option value="efectivo">Efectivo</option>
+                    <option value="tarjeta">Tarjeta</option>
+                    <option value="transferencia">Transferencia</option>
+                    <option value="zelle">Zelle</option>
+                    <option value="otro">Otro</option>
+                  </select>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Monto USD"
+                    className="md:col-span-1 border border-border rounded px-2 py-1 bg-background"
+                    disabled={!isEditable}
+                    value={p.amount_usd}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      setPayments((prev) => prev.map((pay, i) => i === idx ? { ...pay, amount_usd: value } : pay))
+                    }}
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Monto Bs"
+                    className="md:col-span-1 border border-border rounded px-2 py-1 bg-background"
+                    disabled={!isEditable}
+                    value={p.amount_bs}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      setPayments((prev) => prev.map((pay, i) => i === idx ? { ...pay, amount_bs: value } : pay))
+                    }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Banco / Cuenta"
+                    className="md:col-span-1 border border-border rounded px-2 py-1 bg-background"
+                    disabled={!isEditable}
+                    value={p.bank}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      setPayments((prev) => prev.map((pay, i) => i === idx ? { ...pay, bank: value } : pay))
+                    }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Referencia"
+                    className="md:col-span-1 border border-border rounded px-2 py-1 bg-background"
+                    disabled={!isEditable}
+                    value={p.reference}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      setPayments((prev) => prev.map((pay, i) => i === idx ? { ...pay, reference: value } : pay))
+                    }}
+                  />
+                  <div className="md:col-span-1 flex items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="Notas"
+                      className="flex-1 border border-border rounded px-2 py-1 bg-background"
+                      disabled={!isEditable}
+                      value={p.notes}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        setPayments((prev) => prev.map((pay, i) => i === idx ? { ...pay, notes: value } : pay))
+                      }}
+                    />
+                    {isEditable && (
+                      <button
+                        type="button"
+                        onClick={() => setPayments((prev) => prev.filter((_, i) => i !== idx))}
+                        className="text-red-500 hover:text-red-600"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {payments.length > 0 && (
+            <div className="flex justify-between text-xs text-orange-800 pt-1 border-t border-orange-200 mt-2">
+              <span>Total pagos USD:</span>
+              <span>{paymentsTotalUsd.toFixed(2)}</span>
+            </div>
+          )}
         </div>
 
         {/* Productos */}
@@ -227,7 +493,23 @@ export default function InvoiceModal({
                 setSaving(true)
                 const payload = {
                   status,
+                  internal_notes: internalNotes,
+                  public_notes: publicNotes,
+                  cancellation_reason: cancellationReason,
                   items: items.map((it) => ({ id: it.id, quantity: it.quantity })),
+                  payments: payments.map((p) => ({
+                    method: p.method,
+                    amount_usd: Number(p.amount_usd) || 0,
+                    amount_bs: Number(p.amount_bs) || 0,
+                    reference: p.reference || null,
+                    bank: p.bank || null,
+                    notes: p.notes || null,
+                  })),
+                  adjustments: adjustments.map((a) => ({
+                    type: a.type,
+                    amount_usd: Number(a.amount_usd) || 0,
+                    description: a.description || null,
+                  })),
                 }
                 const loadingId = `update-invoice-${invoice.id}`
                 toast.loading('Actualizando factura...', { id: loadingId, position: 'top-center' })

@@ -64,6 +64,9 @@ export default function Index({ products, filters, summary, warehouses = [] }) {
     }
     formData.append('price_usd', Number(payload.price_usd));
     formData.append('stock', Number(payload.stock));
+    if (payload.min_stock !== undefined && payload.min_stock !== null && payload.min_stock !== '') {
+      formData.append('min_stock', Number(payload.min_stock));
+    }
     if (payload.description) {
       formData.append('description', payload.description);
     }
@@ -105,15 +108,30 @@ export default function Index({ products, filters, summary, warehouses = [] }) {
     { key: 'name', label: 'Nombre', width: '25%' },
     { key: 'sku', label: 'SKU', width: '15%' },
     { key: 'price_usd', label: 'USD', width: '15%', render: (v) => Number(v).toFixed(2) },
-    { key: 'stock', label: 'Stock', width: '15%', render: (v) => {
+    { key: 'stock', label: 'Stock', width: '15%', render: (v, row) => {
       const value = Number(v) || 0;
+      const effectiveMin = Number(row.effective_min_stock ?? 0);
       let colorClass = 'text-red-600 font-semibold';
-      if (value > 30) {
+
+      if (effectiveMin > 0 && value < effectiveMin) {
+        colorClass = 'text-red-600 font-semibold';
+      } else if (value > 30) {
         colorClass = 'text-emerald-600 font-semibold';
       } else if (value > 5) {
         colorClass = 'text-amber-500 font-semibold';
       }
-      return <span className={colorClass}>{value}</span>;
+
+      const isLowByConfig = effectiveMin > 0 && value < effectiveMin;
+      const isLowByDefault = effectiveMin === 0 && value > 0 && value <= 5;
+
+      return (
+        <span className={colorClass}>
+          {value}
+          {(isLowByConfig || isLowByDefault) && (
+            <span className="ml-1 text-xs font-normal text-red-500">(bajo)</span>
+          )}
+        </span>
+      );
     } },
     { key: 'description', label: 'Descripción', width: '25%', render: (v) => (<p className="truncate" title={v}>{v || '-'}</p>) },
     { key: 'inventory', label: 'Inventario', width: '15%', render: (v, row) => (

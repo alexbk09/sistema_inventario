@@ -1,10 +1,15 @@
 import  NavLayaout   from '@/Layouts/Nav';
 import  FooterLayaout   from '@/Layouts/Footer';
+import { usePage } from '@inertiajs/react';
 
 function WhatsAppButton() {
+  const { props } = usePage();
+  const general = props.settings?.general || {};
+  const phone = general.whatsapp || '584120000000';
+  const phoneDigits = phone.replace(/[^0-9]/g, '');
   return (
     <a
-      href="https://wa.me/584120000000"
+      href={`https://wa.me/${phoneDigits}`}
       target="_blank"
       rel="noreferrer"
       className="fixed bottom-6 right-6 bg-green-500 text-white p-3 rounded-full shadow-lg hover:bg-green-600"

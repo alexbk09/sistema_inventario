@@ -2,12 +2,19 @@ import { Head, Link, useForm } from '@inertiajs/react';
 import { useMemo, useState, useEffect } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.jsx';
 
-export default function Create({ products, customers, warehouses = [] }) {
+export default function Create({ products, customers, warehouses = [], layaways = [] }) {
   const { data, setData, post, processing } = useForm({
     customer_id: '',
+    document_type: 'invoice',
     items: [],
     warehouse_id: '',
+    layaway_id: '',
+    credit_sale: false,
+    credit_due_date: '',
+    payments: [],
   });
+  const [internal_notes, setInternalNotes] = useState('');
+  const [public_notes, setPublicNotes] = useState('');
 
   const [rate, setRate] = useState(null);
 
@@ -57,6 +64,12 @@ export default function Create({ products, customers, warehouses = [] }) {
   }, [data.items, products]);
 
   const subtotalUsd = itemsWithDetails.reduce((sum, it) => sum + it.subtotal, 0);
+  const paymentsTotalUsd = (data.payments || []).reduce((sum, p) => sum + (Number(p.amount_usd) || 0), 0);
+
+  const layawaysForCustomer = useMemo(() => {
+    if (!data.customer_id) return layaways;
+    return (layaways || []).filter((l) => String(l.customer_id) === String(data.customer_id));
+  }, [layaways, data.customer_id]);
 
   const handleAddProduct = async (product) => {
     if (!product) return;
@@ -139,6 +152,26 @@ export default function Create({ products, customers, warehouses = [] }) {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-2">Nueva factura</h1>
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-foreground mb-1">Notas internas</label>
+                <textarea
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary transition min-h-[70px]"
+                  placeholder="Solo visibles para el equipo interno (no para el cliente)."
+                  value={data.internal_notes}
+                  onChange={(e) => setData('internal_notes', e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-foreground mb-1">Notas para el cliente</label>
+                <textarea
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary transition min-h-[70px]"
+                  placeholder="Mensaje que aparecerá en la factura o comprobante."
+                  value={data.public_notes}
+                  onChange={(e) => setData('public_notes', e.target.value)}
+                />
+              </div>
+            </div>
             <p className="text-muted-foreground">
               Crea una factura desde el panel de administración usando un flujo similar al checkout.
             </p>
@@ -175,6 +208,18 @@ export default function Create({ products, customers, warehouses = [] }) {
                 </select>
               </div>
               <div className="mt-3">
+                <label className="block text-sm font-semibold text-foreground mb-1">Tipo de comprobante</label>
+                <select
+                  className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-primary transition"
+                  value={data.document_type}
+                  onChange={(e) => setData('document_type', e.target.value)}
+                >
+                  <option value="invoice">Factura</option>
+                  <option value="delivery_note">Nota de entrega</option>
+                  <option value="proforma">Proforma / Presupuesto</option>
+                </select>
+              </div>
+              <div className="mt-3">
                 <label className="block text-sm font-semibold text-foreground mb-1">Sucursal (opcional)</label>
                 <select
                   className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-primary transition"
@@ -186,6 +231,47 @@ export default function Create({ products, customers, warehouses = [] }) {
                     <option key={w.id} value={w.id}>{w.name} ({w.code})</option>
                   ))}
                 </select>
+              </div>
+              <div className="mt-4 space-y-2">
+                <label className="inline-flex items-center gap-2 text-sm text-foreground">
+                  <input
+                    type="checkbox"
+                    className="rounded border-border text-primary focus:ring-primary"
+                    checked={data.credit_sale}
+                    onChange={(e) => setData('credit_sale', e.target.checked)}
+                  />
+                  <span>Registrar como venta a crédito (cargo en cuenta del cliente)</span>
+                </label>
+                {data.credit_sale && (
+                  <div className="mt-1">
+                    <label className="block text-xs font-semibold text-foreground mb-1">Fecha de vencimiento (opcional)</label>
+                    <input
+                      type="date"
+                      className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary transition"
+                      value={data.credit_due_date}
+                      onChange={(e) => setData('credit_due_date', e.target.value)}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-4">
+                <label className="block text-sm font-semibold text-foreground mb-1">Apartado asociado (opcional)</label>
+                <select
+                  className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-primary transition text-sm"
+                  value={data.layaway_id}
+                  onChange={(e) => setData('layaway_id', e.target.value)}
+                >
+                  <option value="">Sin apartado</option>
+                  {layawaysForCustomer.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.number} – {l.customer?.name ?? 'Sin cliente'} – USD {Number(l.total_usd ?? 0).toFixed(2)}
+                    </option>
+                  ))}
+                </select>
+                {!data.customer_id && layawaysForCustomer.length > 0 && (
+                  <p className="mt-1 text-xs text-muted-foreground">Selecciona un cliente para filtrar sus apartados activos.</p>
+                )}
               </div>
             </div>
 
@@ -350,6 +436,68 @@ export default function Create({ products, customers, warehouses = [] }) {
                     Bs {itemsWithDetails.reduce((s, it) => s + (Number(it.bs_subtotal) || 0), 0).toLocaleString('es-VE')}
                   </span>
                 </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Total pagos USD:</span>
+                  <span className="font-semibold text-foreground">${paymentsTotalUsd.toFixed(2)}</span>
+                </div>
+              </div>
+
+              {/* Pagos rápidos */}
+              <div className="space-y-2 border-t border-border pt-3">
+                <p className="text-xs text-muted-foreground">Pagos (opcional, puedes registrar formas de pago básicas aquí):</p>
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {(data.payments || []).map((p, idx) => (
+                    <div key={idx} className="flex items-center gap-2 text-xs">
+                      <select
+                        className="border border-border rounded px-2 py-1 bg-background"
+                        value={p.method}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          const next = [...data.payments];
+                          next[idx] = { ...next[idx], method: value };
+                          setData('payments', next);
+                        }}
+                      >
+                        <option value="efectivo">Efectivo</option>
+                        <option value="tarjeta">Tarjeta</option>
+                        <option value="transferencia">Transferencia</option>
+                        <option value="zelle">Zelle</option>
+                        <option value="otro">Otro</option>
+                      </select>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="Monto USD"
+                        className="flex-1 border border-border rounded px-2 py-1 bg-background"
+                        value={p.amount_usd}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          const next = [...data.payments];
+                          next[idx] = { ...next[idx], amount_usd: value };
+                          setData('payments', next);
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="text-red-500 hover:text-red-600"
+                        onClick={() => {
+                          const next = (data.payments || []).filter((_, i) => i !== idx);
+                          setData('payments', next);
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setData('payments', [...(data.payments || []), { method: 'efectivo', amount_usd: '' }])}
+                  className="w-full py-1.5 border border-dashed border-border rounded text-xs text-muted-foreground hover:bg-muted/60"
+                >
+                  Añadir pago
+                </button>
               </div>
 
               <div className="pt-3 border-t border-border space-y-3">

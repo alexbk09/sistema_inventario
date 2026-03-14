@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\{Product, InventoryMovement, MovementType};
+use App\Support\Settings;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -14,29 +15,59 @@ class InventoryService
         if ($quantity <= 0) {
             throw new InvalidArgumentException('La cantidad debe ser mayor a 0.');
         }
+        $userId = Auth::id();
+        if (! $userId) {
+            throw new InvalidArgumentException('Debe haber un usuario autenticado para registrar un movimiento de inventario.');
+        }
 
-        return DB::transaction(function () use ($product, $quantity, $unitPriceUsd, $movementTypeId, $reference, $notes, $providerId, $warehouseId) {
+        $cleanNotes = is_null($notes) ? '' : trim($notes);
+        if ($cleanNotes === '') {
+            throw new InvalidArgumentException('Debes indicar un motivo para el movimiento de inventario.');
+        }
+
+        return DB::transaction(function () use ($product, $quantity, $unitPriceUsd, $movementTypeId, $reference, $cleanNotes, $providerId, $warehouseId, $userId) {
             $totalValue = $quantity * $unitPriceUsd;
 
             $movementType = $movementTypeId ? MovementType::findOrFail($movementTypeId) : null;
+
+            $source = $movementType?->code;
+            $allowedSources = ['purchase', 'sale', 'adjustment', 'return'];
+            if (!in_array($source, $allowedSources, true)) {
+                $source = 'adjustment';
+            }
 
             $movement = InventoryMovement::create([
                 'product_id' => $product->id,
                 'provider_id' => $providerId,
                 'warehouse_id' => $warehouseId,
                 'type' => 'entry',
-                'source' => $movementType?->code,
+                'source' => $source,
                 'movement_type_id' => $movementType?->id,
                 'quantity' => $quantity,
                 'unit_price_usd' => $unitPriceUsd,
                 'total_value_usd' => $totalValue,
                 'cost_usd' => $totalValue,
-                'user_id' => Auth::id(),
+                'user_id' => $userId,
                 'reference' => $reference,
-                'notes' => $notes,
+                'notes' => $cleanNotes,
             ]);
 
-            $product->increment('stock', $quantity);
+            // Recalcular costo promedio ponderado del producto
+            $currentStock = (int) $product->stock;
+            $currentAvg = (float) ($product->average_cost_usd ?? 0.0);
+
+            $newStock = $currentStock + $quantity;
+            if ($newStock > 0) {
+                $newAvg = (($currentStock * $currentAvg) + $totalValue) / $newStock;
+                $product->stock = $newStock;
+                $product->average_cost_usd = round($newAvg, 4);
+                $product->save();
+            } else {
+                // Caso extremo: sin stock, reiniciar costo promedio
+                $product->stock = $newStock;
+                $product->average_cost_usd = null;
+                $product->save();
+            }
 
             return $movement;
         });
@@ -48,8 +79,24 @@ class InventoryService
             throw new InvalidArgumentException('La cantidad debe ser mayor a 0.');
         }
 
-        return DB::transaction(function () use ($product, $quantity, $unitPriceUsd, $movementTypeId, $reference, $notes, $warehouseId) {
-            if ($product->stock < $quantity) {
+        $userId = Auth::id();
+        if (! $userId) {
+            throw new InvalidArgumentException('Debe haber un usuario autenticado para registrar un movimiento de inventario.');
+        }
+
+        $cleanNotes = is_null($notes) ? '' : trim($notes);
+        if ($cleanNotes === '') {
+            throw new InvalidArgumentException('Debes indicar un motivo para el movimiento de inventario.');
+        }
+
+        $inventorySettings = Settings::get('inventory', [
+            'allow_negative_stock' => false,
+        ]);
+
+        $allowNegativeStock = (bool) ($inventorySettings['allow_negative_stock'] ?? false);
+
+        return DB::transaction(function () use ($product, $quantity, $unitPriceUsd, $movementTypeId, $reference, $cleanNotes, $warehouseId, $allowNegativeStock, $userId) {
+            if (! $allowNegativeStock && $product->stock < $quantity) {
                 throw new InvalidArgumentException('No hay stock suficiente para esta salida.');
             }
 
@@ -57,19 +104,25 @@ class InventoryService
 
             $movementType = $movementTypeId ? MovementType::findOrFail($movementTypeId) : null;
 
+            $source = $movementType?->code;
+            $allowedSources = ['purchase', 'sale', 'adjustment', 'return'];
+            if (!in_array($source, $allowedSources, true)) {
+                $source = 'adjustment';
+            }
+
             $movement = InventoryMovement::create([
                 'product_id' => $product->id,
                 'warehouse_id' => $warehouseId,
                 'type' => 'exit',
-                'source' => $movementType?->code,
+                'source' => $source,
                 'movement_type_id' => $movementType?->id,
                 'quantity' => $quantity,
                 'unit_price_usd' => $unitPriceUsd,
                 'total_value_usd' => $totalValue,
                 'cost_usd' => $totalValue,
-                'user_id' => Auth::id(),
+                'user_id' => $userId,
                 'reference' => $reference,
-                'notes' => $notes,
+                'notes' => $cleanNotes,
             ]);
 
             $product->decrement('stock', $quantity);

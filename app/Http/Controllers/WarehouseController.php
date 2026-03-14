@@ -31,6 +31,8 @@ class WarehouseController extends Controller
             'name' => ['required','string','max:255'],
             'code' => ['required','string','max:50','unique:warehouses,code'],
             'address' => ['nullable','string','max:255'],
+            'invoice_prefix' => ['nullable','string','max:20'],
+            'invoice_length' => ['nullable','integer','min:1','max:20'],
         ]);
 
         Warehouse::create($data);

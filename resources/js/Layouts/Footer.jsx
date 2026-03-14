@@ -1,7 +1,11 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import { Mail, Phone, Facebook, Instagram, Twitter } from 'lucide-react'
 export default function FooterLayout() {
     const currentYear = new Date().getFullYear()
+      const { props } = usePage();
+      const settings = props.settings || {};
+      const general = settings.general || {};
+      const store = settings.store || {};
     return (
    <footer className="bg-primary text-primary-foreground mt-16">
       <div className="max-w-7xl mx-auto px-4 py-12">
@@ -10,10 +14,10 @@ export default function FooterLayout() {
           <div>
             <div className="flex items-center gap-2 mb-4">
               <span className="text-2xl">⚡</span>
-              <h3 className="font-bold text-lg">Inventario</h3>
+                <h3 className="font-bold text-lg">{general.trade_name || general.company_name || 'Inventario'}</h3>
             </div>
             <p className="text-sm text-primary-foreground/80">
-              Tu tienda en línea de productos eléctricos y de iluminación.
+                {store.contact_text || 'Tu tienda en línea de productos.'}
             </p>
           </div>
 
@@ -66,19 +70,19 @@ export default function FooterLayout() {
             <h4 className="font-semibold mb-4">Síguenos</h4>
             <div className="flex gap-3 mb-6">
               <a
-                href="#"
+                  href={general.facebook_url || '#'}
                 className="w-10 h-10 bg-primary-foreground/20 rounded-lg flex items-center justify-center hover:bg-primary-foreground/30 transition"
               >
                 <Facebook className="w-5 h-5" />
               </a>
               <a
-                href="#"
+                  href={general.instagram_url || '#'}
                 className="w-10 h-10 bg-primary-foreground/20 rounded-lg flex items-center justify-center hover:bg-primary-foreground/30 transition"
               >
                 <Instagram className="w-5 h-5" />
               </a>
               <a
-                href="#"
+                  href={general.twitter_url || '#'}
                 className="w-10 h-10 bg-primary-foreground/20 rounded-lg flex items-center justify-center hover:bg-primary-foreground/30 transition"
               >
                 <Twitter className="w-5 h-5" />
@@ -89,7 +93,7 @@ export default function FooterLayout() {
 
         {/* Divisor */}
         <div className="border-t border-primary-foreground/20 pt-8 flex flex-col md:flex-row items-center justify-between text-sm text-primary-foreground/70">
-          <p>&copy; {currentYear} Inventario. Todos los derechos reservados.</p>
+            <p>&copy; {currentYear} {general.company_name || 'Inventario'}. Todos los derechos reservados.</p>
           <div className="flex gap-4 mt-4 md:mt-0">
             <Link href="/" className="hover:text-accent transition">
               <Link href={route('shop.index')} className="hover:text-accent transition">
@@ -103,7 +107,7 @@ export default function FooterLayout() {
 
       {/* WhatsApp Button */}
       <a
-        href="https://wa.me/584124000000"
+          href={general.whatsapp ? `https://wa.me/${general.whatsapp.replace(/[^0-9]/g, '')}` : 'https://wa.me/584124000000'}
         target="_blank"
         rel="noopener noreferrer"
         className="fixed bottom-6 right-6 w-14 h-14 bg-green-500 rounded-full flex items-center justify-center shadow-lg hover:bg-green-600 transition hover:scale-110 z-40"

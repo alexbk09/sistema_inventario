@@ -1,5 +1,6 @@
 import { Head, Link } from '@inertiajs/react';
 import GuestLayout from '@/Layouts/GuestLayout.jsx';
+import { usePage } from '@inertiajs/react';
 import Hero from '@/Pages/Home/Components/Hero.jsx';
 import FeaturedProducts from '@/Pages/Home/Components/FeatureProducts.jsx';
 import LocationContact from '@/Pages/Home/Components/LocationContact.jsx';
@@ -17,19 +18,29 @@ function Carousel() {
 }
 
 
-export default function Home({ products = [] }) {
+export default function Home({ products = [], store = null, company = null }) {
+  const { props } = usePage();
+  const settings = props.settings || {};
+  const effectiveStore = store || settings.store || {};
+  const effectiveCompany = company || settings.general || {};
+
   return (
     <GuestLayout>
-      <Head title="Inicio" />
+      <Head title={effectiveStore.home_title || 'Inicio'} />
           <main className="flex flex-col min-h-screen bg-background">
             
                 <div className="flex-1">
                     <div className="max-w-7xl mx-auto px-4 py-8">
                     {/* Bienvenida */}
                     <section className="mb-12">
-                        <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-8 text-balance">
-                        Bienvenido a la Tienda
+                        <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-3 text-balance">
+                          {effectiveStore.home_title || 'Bienvenido a la Tienda'}
                         </h1>
+                        {effectiveStore.home_subtitle && (
+                          <p className="text-lg text-slate-600 max-w-2xl">
+                            {effectiveStore.home_subtitle}
+                          </p>
+                        )}
                         <Hero />
                     </section>
 
@@ -37,7 +48,7 @@ export default function Home({ products = [] }) {
                     <FeaturedProducts products={products} />
 
                     {/* Ubicación y Contacto */}
-                    <LocationContact />
+                    <LocationContact company={effectiveCompany} location={settings.location} store={effectiveStore} />
                     </div>
                 </div>
 

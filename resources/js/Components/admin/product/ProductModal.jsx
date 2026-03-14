@@ -1,14 +1,18 @@
 import React, { useEffect, useState } from 'react'
-import { router } from '@inertiajs/react'
+import { router, usePage } from '@inertiajs/react'
 import toast from 'react-hot-toast'
 
 export default function ProductModal({ isOpen, onClose, onSave, editingProduct }) {
+  const { props } = usePage()
+  const defaultMinStock = props?.settings?.inventory?.default_min_stock ?? 0
+
   const [formData, setFormData] = useState({
     name: '',
     sku: '',
     barcode: '',
     price_usd: '',
     stock: '',
+    min_stock: '',
     description: '',
   })
   const [images, setImages] = useState([])
@@ -22,12 +26,13 @@ export default function ProductModal({ isOpen, onClose, onSave, editingProduct }
         barcode: editingProduct.barcode ?? '',
         price_usd: editingProduct.price_usd ?? '',
         stock: editingProduct.stock ?? '',
+        min_stock: editingProduct.min_stock ?? '',
         description: editingProduct.description ?? '',
       })
       setImages([])
       setExistingImages(editingProduct.images ?? [])
     } else {
-      setFormData({ name: '', sku: '', barcode: '', price_usd: '', stock: '', description: '' })
+      setFormData({ name: '', sku: '', barcode: '', price_usd: '', stock: '', min_stock: String(defaultMinStock ?? 0), description: '' })
       setImages([])
       setExistingImages([])
     }
@@ -91,6 +96,18 @@ export default function ProductModal({ isOpen, onClose, onSave, editingProduct }
               <label className="block text-sm font-semibold text-foreground mb-2">Stock *</label>
               <input type="number" name="stock" readOnly value={formData.stock} onChange={handleChange} className="w-full px-4 py-2 bg-background border border-border rounded-lg" required />
             </div>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-foreground mb-2">Stock mínimo (alerta)</label>
+            <input
+              type="number"
+              name="min_stock"
+              value={formData.min_stock}
+              onChange={handleChange}
+              className="w-full px-4 py-2 bg-background border border-border rounded-lg"
+              min={0}
+            />
+            <p className="mt-1 text-xs text-muted-foreground">Si se deja vacío, se usará el valor por defecto de configuración.</p>
           </div>
           <div>
             <label className="block text-sm font-semibold text-foreground mb-2">Descripción</label>

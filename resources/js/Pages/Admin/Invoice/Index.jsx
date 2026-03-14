@@ -28,8 +28,15 @@ export default function Index({ invoices, filters }) {
 
   const handlePageChange = (nextPage) => { if (nextPage < 1 || nextPage > totalPages) return; router.get(route('admin.invoices.index'), { page: nextPage, search: debounced }, { preserveScroll: true, replace: true }); };
 
+  const typeLabels = {
+    invoice: 'Factura',
+    delivery_note: 'Nota de entrega',
+    proforma: 'Proforma',
+  };
+
   const columns = [
-    { key: 'number', label: 'Número', width: '25%' },
+    { key: 'number', label: 'Número', width: '20%' },
+    { key: 'document_type', label: 'Tipo', width: '15%', render: (v, row) => typeLabels[row?.document_type] ?? 'Factura' },
     { key: 'customer', label: 'Cliente', width: '25%', render: (v, row) => row?.contact?.full_name ?? v?.name ?? 'N/A' },
     {
       key: 'status',
@@ -55,7 +62,7 @@ export default function Index({ invoices, filters }) {
       },
     },
     { key: 'total_usd', label: 'USD', width: '15%', render: (v) => Number(v).toFixed(2) },
-    { key: 'total_bs', label: 'BS', width: '20%', render: (v) => Number(v).toFixed(2) },
+    { key: 'total_bs', label: 'BS', width: '15%', render: (v) => Number(v).toFixed(2) },
   ];
 
   const handleViewInvoice = (invoice) => {

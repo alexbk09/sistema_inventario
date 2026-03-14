@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Settings;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,21 +19,51 @@ class Product extends Model
         'barcode',
         'description',
         'price_usd',
+        'average_cost_usd',
         'image_url',
         'category_id',
         'stock',
+        'min_stock',
         'is_featured',
     ];
-
     protected $casts = [
         'price_usd' => 'float',
+        'average_cost_usd' => 'float',
         'stock' => 'int',
+        'min_stock' => 'int',
         'is_featured' => 'bool',
+    ];
+
+    protected $appends = [
+        'effective_min_stock',
+        'is_low_stock',
     ];
 
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
+    }
+
+    public function getEffectiveMinStockAttribute(): int
+    {
+        if ($this->min_stock !== null) {
+            return (int) $this->min_stock;
+        }
+
+        $inventory = Settings::get('inventory', ['default_min_stock' => 0]);
+
+        return (int) ($inventory['default_min_stock'] ?? 0);
+    }
+
+    public function getIsLowStockAttribute(): bool
+    {
+        $min = $this->effective_min_stock;
+
+        if ($min <= 0) {
+            return false;
+        }
+
+        return $this->stock < $min;
     }
 
     public function categories(): BelongsToMany

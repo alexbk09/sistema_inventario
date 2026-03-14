@@ -1,4 +1,19 @@
+import { usePage } from '@inertiajs/react';
+
 export default function ApplicationLogo(props) {
+    const { props: pageProps } = usePage();
+    const branding = pageProps.settings?.branding || {};
+
+    if (branding.logo_url) {
+        return (
+            <img
+                {...props}
+                src={branding.logo_url}
+                alt={pageProps.settings?.general?.company_name || 'Logo'}
+            />
+        );
+    }
+
     return (
         <svg
             {...props}

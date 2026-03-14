@@ -1,76 +1,167 @@
-# Sistema Inventario (Laravel + Inertia React + Tailwind)
+# Sistema de Inventario
+
+Aplicación web de gestión de inventario, ventas y clientes pensada para comercios que venden en USD y BS. Está construida con **Laravel 12**, **Inertia.js + React** y **Tailwind CSS**, e incluye panel administrativo, tienda pública y módulos avanzados como créditos, apartados, multi‑bodega y RMA.
+
+Para una descripción técnica más profunda de modelos, servicios y flujos de negocio revisa la documentación ampliada en [docs/documentacion-sistema-inventario.md](docs/documentacion-sistema-inventario.md).
+
+---
+
+## Características principales
+
+- Catálogo de productos y categorías con múltiples imágenes, códigos de barras y destacados.
+- Gestión de inventario con historial de movimientos (entradas, salidas, ajustes).
+- Multi‑sucursal / multi‑bodega y transferencias internas de stock.
+- Ventas y facturación (USD/BS) con detalle por items y estados de factura.
+- Clientes (CRM básico), proveedores y base de usuarios internos con roles y permisos.
+- Sistema de **apartados (layaway)** y **créditos** al cliente con control de saldo.
+- Módulo de devoluciones y garantías (RMA) vinculado a facturas y productos.
+- Tienda pública con carrito, checkout y confirmación de compra.
+- Dashboard administrativo con métricas, productos con bajo stock y top productos.
+- Conversión dinámica USD → BS usando un servicio de tasas de cambio.
+- Integración opcional con un servicio de **IA local** para procesar imágenes de productos.
+
+Rutas públicas y del panel más usadas (ver detalle en [routes/web.php](routes/web.php)):
+
+- `/` – Home con productos destacados y tasa de cambio.
+- `/shop` – Tienda pública con listado de productos y filtros.
+- `/checkout` / `/confirmacion` – Flujo de compra pública.
+- `/dashboard` – Dashboard administrativo (requiere usuario autenticado con rol `admin`).
+- `/admin/...` – Gestión de productos, inventario, bodegas, facturas, clientes, proveedores, créditos, apartados, RMA y escáner QR.
+
+---
+
+## Tecnologías
+
+- **Backend:** Laravel 12 (PHP 8.2), MySQL/MariaDB.
+- **Frontend:** Inertia.js + React 18, Vite, Tailwind CSS, Headless UI, Lucide Icons.
+- **Colas de trabajo:** Laravel Queue con `QUEUE_CONNECTION=database`.
+- **Gráficos y UI:** Chart.js + react-chartjs-2, react-hot-toast, react-qr-reader.
+- **IA opcional:** FastAPI (Python) para generar captions y tags de imágenes (ver carpeta `tools/`).
+
+---
 
 ## Requisitos
-- PHP 8.2 (XAMPP/Laragon)
-- Composer
-- Node.js + npm
-- MySQL/MariaDB (Laragon) activo
 
-## Configuración
-1. Variables en `.env`:
+- PHP **8.2** (XAMPP, Laragon u otro stack similar).
+- Composer.
+- Node.js + npm (para Vite y React).
+- MySQL/MariaDB en ejecución.
+- Python 3.10+ (solo si usarás el servicio de IA local).
+
+En Windows se recomienda usar **Laragon** o **XAMPP**. Los ejemplos de comandos están pensados para **PowerShell**.
+
+---
+
+## Configuración de entorno (.env)
+
+Desde la raíz del proyecto (`c:/xampp/htdocs/sistema_inventario`):
+
+```powershell
+copy .env.example .env   # en PowerShell
+```
+
+Edita el archivo `.env` y ajusta, como mínimo:
+
+- Base de datos
    - `DB_CONNECTION=mysql`
    - `DB_HOST=127.0.0.1`
-   - `DB_PORT=3306` (o 3307 según Laragon)
+   - `DB_PORT=3306` (o el puerto que uses: 3307 en algunos casos de Laragon)
    - `DB_DATABASE=sistema_inventario`
    - `DB_USERNAME=root`
    - `DB_PASSWORD=` (vacío por defecto en Laragon)
-   - `BS_RATE=` tasa provisional para convertir USD→BS
-   - `BS_API_URL=` URL del API para tasa BS (futuro)
 
-2. Migraciones y seeders:
-```bash
-php artisan migrate
-php artisan db:seed --class=RoleSeeder
-php artisan db:seed --class=DemoSeeder
+- Moneda y tasas (USD → BS)
+   - `BS_RATE=` tasa provisional en BS por 1 USD (fallback si la API no responde).
+   - `BS_API_URL=` URL del API para tasa BS (cuando se use integración externa).
+
+- Colas y servicio de IA (recomendado para producción / features avanzadas)
+   - `QUEUE_CONNECTION=database`
+   - `IMAGE_AI_URL=http://127.0.0.1:8001/process` (o la URL donde expongas tu servicio de IA).
+
+Genera la key de la aplicación:
+
+```powershell
+php artisan key:generate
 ```
 
-### Comandos para levantar todo el sistema (Windows PowerShell)
+---
 
-Sigue estos pasos desde la raíz del proyecto (`c:/xampp/htdocs/sistema_inventario`).
+## Instalación y arranque en desarrollo
 
-- Instalar dependencias PHP y Node:
+### 1. Dependencias PHP y Node
+
 ```powershell
 composer install
-copy .env.example .env            # PowerShell (o use 'cp' en WSL)
-php artisan key:generate
 npm install
 ```
 
-- Configurar base de datos y migrar/seedear:
+### 2. Migraciones, seeds y enlaces de almacenamiento
+
+Primero genera las tablas necesarias (incluyendo colas) y ejecuta los seeders base:
+
 ```powershell
-php artisan migrate --force
+# (opcional pero recomendado antes de migrar si vas a usar colas)
+php artisan queue:table
+
+php artisan migrate
 php artisan db:seed --class=RoleSeeder
 php artisan db:seed --class=DemoSeeder
 php artisan storage:link
 ```
 
-- Iniciar frontend en modo desarrollo (mantenerlo abierto):
+> Nota: si ya habías corrido `php artisan migrate` antes de `php artisan queue:table`, vuelve a ejecutar `php artisan migrate` para aplicar la migración de la cola.
+
+### 3. Servidor Laravel, Vite y cola de trabajos
+
+Tienes dos formas de levantar todo en desarrollo:
+
+#### Opción A – Comandos manuales (varias terminales)
+
+En distintas ventanas de terminal, desde la raíz del proyecto:
+
 ```powershell
+# 1) Servidor HTTP de Laravel
+php artisan serve
+
+# 2) Cola de trabajos (jobs de facturación, IA, etc.)
+php artisan queue:work --tries=3 --sleep=3
+
+# 3) Frontend (Vite + React)
 npm run dev
-# o para producción
+```
+
+#### Opción B – Script de desarrollo con Composer
+
+El proyecto define un script `dev` en `composer.json` que usa `concurrently` para lanzar todo junto:
+
+```powershell
+composer dev
+```
+
+Este comando levanta:
+- `php artisan serve`
+- `php artisan queue:listen`
+- `php artisan pail` (visualización de logs en tiempo real)
+- `npm run dev`
+
+Mantén esta terminal abierta mientras desarrollas.
+
+### 4. Compilación para producción
+
+Para generar los assets listos para producción:
+
+```powershell
 npm run build
 ```
 
-- Variables importantes en `.env` para la IA local (añádelas si no existen):
-```text
-IMAGE_AI_URL=http://127.0.0.1:8001/process
-QUEUE_CONNECTION=database
-```
+---
 
-- Instalar y ejecutar la cola (worker) en segundo terminal:
-```powershell
-# ejecutar migraciones de la cola si no lo has hecho
-php artisan queue:table
-php artisan migrate
-# ejecutar worker (desarrollo)
-php artisan queue:work --tries=3 --sleep=3
-```
+## Servicio de IA local (opcional)
 
-### Servicio IA local (Python + FastAPI)
+El servicio que genera descripciones y tags de imágenes de productos está en `tools/image_service.py` y se ejecuta con **FastAPI + Uvicorn**.
 
-El servicio que genera `caption` y `tags` corre en `tools/image_service.py`.
+1. Crear entorno virtual e instalar dependencias (desde la carpeta `tools`):
 
-1. Crear virtualenv e instalar dependencias (desde `tools`):
 ```powershell
 cd tools
 python -m venv .venv
@@ -78,106 +169,86 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-2. Iniciar el servicio (mantenerlo abierto):
+2. Iniciar el servicio (mantener esta terminal abierta):
+
 ```powershell
 .venv\Scripts\python.exe -m uvicorn image_service:app --host 127.0.0.1 --port 8001
 ```
 
-3. Probar el endpoint con `curl` (ejemplo):
+3. Probar el endpoint (ejemplo con `curl` en PowerShell):
+
 ```powershell
 curl -X POST "http://127.0.0.1:8001/process" -F "file=@C:\ruta\imagen.jpg" -F "lang=es" -F "verbose=true" -F "tags_from_caption=true" -H "accept: application/json"
 ```
 
+Asegúrate de que en `.env` esté configurado `IMAGE_AI_URL` apuntando a este endpoint.
+
 Notas:
-- Si el frontend o el worker no procesan jobs, confirma que `QUEUE_CONNECTION=database` y que `php artisan queue:work` está en ejecución.
-- Si el servicio Python falla al cargar modelos, revisa la salida de `uvicorn` por dependencias faltantes (p.ej. `sentencepiece`). Instala con `pip install -r requirements.txt`.
-- Para producción considera ejecutar el worker y `uvicorn` bajo un supervisor (systemd, Supervisor, PM2, etc.)
 
-3. Compilar frontend:
-```bash
-npm install
-npm run dev
-# o
-npm run build
-```
+- Si el worker de Laravel no procesa jobs, revisa que `QUEUE_CONNECTION=database` y que `php artisan queue:work` siga corriendo.
+- Si el servicio de Python falla al cargar modelos, revisa la terminal de `uvicorn` por dependencias faltantes (por ejemplo, `sentencepiece`) y vuelve a ejecutar `pip install -r requirements.txt`.
 
-## Rutas principales
-- Inicio: `/` (Home con carrusel, destacados, contacto)
-- Tienda: `/shop` (listado de productos y carrito)
-- Dashboard Admin: `/dashboard` (requiere rol `admin`)
-- Escáner QR: `/admin/qr` (requiere rol `admin`)
+---
 
-## Roles/Permisos
-- `admin`: gestión completa (productos, inventario, facturas, proveedores, clientes).
-- `user`: puede ver productos y facturas.
+## Módulos funcionales (resumen)
 
-## Moneda
-- Precios base en USD (`price_usd`).
-- BS se calcula vía `price_bs` usando `config/currency.php` y `BS_RATE`.
-- Servicio: `App\Services\CurrencyService` (listo para futura API).
+Este es un resumen operativo de lo que hace el sistema. Los detalles técnicos (modelos, servicios y flujos) están ampliados en [docs/documentacion-sistema-inventario.md](docs/documentacion-sistema-inventario.md).
 
-## Próximos módulos
-- Carrito, facturación y pagos.
-- Proveedores y cuentas por pagar.
-- Gráficos con Chart.js (ventas, top productos).
-- Escáner QR para entradas/salidas.
-- Alertas con `react-hot-toast`.
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+- **Productos y categorías**
+   - CRUD completo de productos, categorías e imágenes asociadas.
+   - Precio base en USD y cálculo automático en BS (`price_bs`) usando la tasa configurada.
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+- **Inventario y movimientos**
+   - Entradas y salidas de stock con motivos, notas y referencia.
+   - Servicio `InventoryService` que actualiza stock y registra el historial de movimientos.
 
-## About Laravel
+- **Multi‑bodega y transferencias**
+   - Definición de bodegas/sucursales.
+   - Transferencias de stock entre bodegas con sus propios movimientos de inventario.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- **Ventas y facturación**
+   - Facturas con items, totales en USD/BS e integración con inventario.
+   - Estados de factura (pending, paid, cancelled).
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- **Clientes, proveedores y usuarios**
+   - Gestión de clientes con historial de compras.
+   - Gestión de proveedores para compras y reposición de stock.
+   - Usuarios internos con roles y permisos (admin, user, etc.).
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- **Créditos y apartados**
+   - Cuentas de crédito por cliente con movimientos de cargo y abono.
+   - Sistema de apartados (layaway) para reservar productos con pagos parciales.
 
-## Learning Laravel
+- **RMA (devoluciones y garantías)**
+   - Registro de casos de devolución/garantía asociados a facturas y productos.
+   - Control de estado y posibles ajustes de inventario.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+- **Tienda pública, carrito y checkout**
+   - Home y tienda pública con productos, precios en USD/BS y filtros.
+   - Carrito autenticado con endpoints de API para React.
+   - Flujo de checkout y página de confirmación.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+- **Dashboard y métricas**
+   - Ventas del día y del mes.
+   - Conteo de facturas por estado, productos con bajo stock, totales de entidades.
+   - Filtro por bodega para ver estadísticas por sucursal.
 
-## Laravel Sponsors
+---
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+## Scripts útiles
 
-### Premium Partners
+Además de los comandos anteriores, el proyecto define en `composer.json` y `package.json` los siguientes scripts de ayuda:
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+- `composer setup` – instalación inicial (dependencias, `.env`, key, migraciones y build de frontend).
+- `composer dev` – entorno de desarrollo completo (servidor Laravel, cola, logs y Vite).
+- `composer test` – ejecuta el suite de tests de Laravel.
+- `npm run dev` – servidor de desarrollo de Vite + React.
+- `npm run build` – build de frontend para producción.
 
-## Contributing
+---
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Próximos pasos
 
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+1. Seguir las secciones de instalación de este README para levantar el entorno local.
+2. Revisar la documentación ampliada en [docs/documentacion-sistema-inventario.md](docs/documentacion-sistema-inventario.md) para entender el dominio y la arquitectura interna.
+3. Personalizar textos, logos y estilos en los componentes React según la marca del proyecto.

@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\Settings;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -49,6 +50,18 @@ class HandleInertiaRequests extends Middleware
                         ? $user->getAllPermissions()->pluck('name')->values()
                         : [],
                 ] : null,
+            ],
+            'settings' => [
+                'general' => Settings::get('general', null),
+                'location' => Settings::get('location', null),
+                'branding' => Settings::get('branding', null),
+                'billing' => Settings::get('billing', null),
+                'currency' => Settings::get('currency', null),
+                'store' => Settings::get('store', null),
+                'inventory' => Settings::get('inventory', null),
+                'warehouses' => Settings::get('warehouses', null),
+                'security' => Settings::get('security', null),
+                'qr' => Settings::get('qr', null),
             ],
         ];
     }

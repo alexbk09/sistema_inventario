@@ -6,6 +6,8 @@ export default function Index({ warehouses }) {
     name: '',
     code: '',
     address: '',
+    invoice_prefix: '',
+    invoice_length: '',
   });
 
   const handleSubmit = (e) => {
@@ -35,6 +37,8 @@ export default function Index({ warehouses }) {
                     <th className="px-3 py-2 text-left">Nombre</th>
                     <th className="px-3 py-2 text-left">Código</th>
                     <th className="px-3 py-2 text-left">Dirección</th>
+                    <th className="px-3 py-2 text-left">Prefijo factura</th>
+                    <th className="px-3 py-2 text-left">Longitud</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -42,7 +46,9 @@ export default function Index({ warehouses }) {
                     <tr key={w.id} className="border-t border-border">
                       <td className="px-3 py-2 text-foreground">{w.name}</td>
                       <td className="px-3 py-2 text-foreground">{w.code}</td>
-                      <td className="px-3 py-2 text-muted-foreground">{w.address || '—'}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{w.address || '\\u2014'}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{w.invoice_prefix || '\\u2014'}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{w.invoice_length ?? '\\u2014'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -80,6 +86,28 @@ export default function Index({ warehouses }) {
                   onChange={(e) => setData('address', e.target.value)}
                   className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground"
                   rows={2}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-foreground mb-1">Prefijo de factura (serie opcional)</label>
+                <input
+                  type="text"
+                  value={data.invoice_prefix}
+                  onChange={(e) => setData('invoice_prefix', e.target.value)}
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground"
+                  placeholder="Ej: CCS- o TDA1-"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-foreground mb-1">Longitud de numeración para esta sucursal</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={data.invoice_length}
+                  onChange={(e) => setData('invoice_length', e.target.value)}
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground"
+                  placeholder="Dejar vacío para usar la global"
                 />
               </div>
               <button

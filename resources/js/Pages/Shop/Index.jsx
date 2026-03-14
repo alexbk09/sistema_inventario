@@ -12,6 +12,8 @@ export default function ShopIndex({ products = [], categories = [], canLogin }) 
     priceRange: [0, 5000],
     search: '',
     sortBy: 'relevance',
+    inStockOnly: false,
+    tags: [],
   })
   const [isCartOpen, setIsCartOpen] = useState(false)
   const { itemCount } = useCart()
@@ -20,12 +22,21 @@ export default function ShopIndex({ products = [], categories = [], canLogin }) 
   const filteredProducts = useMemo(() => {
     let result = [...products]
 
-    // Filtro por búsqueda
+    // Filtro por búsqueda (nombre, descripción, SKU, código de barras)
     if (filters.search) {
-      result = result.filter((p) =>
-        p.name.toLowerCase().includes(filters.search.toLowerCase()) ||
-        p.description?.toLowerCase().includes(filters.search.toLowerCase())
-      )
+      const term = filters.search.toLowerCase()
+      result = result.filter((p) => {
+        const name = p.name?.toLowerCase() ?? ''
+        const desc = p.description?.toLowerCase() ?? ''
+        const sku = p.sku?.toLowerCase() ?? ''
+        const barcode = String(p.barcode ?? '').toLowerCase()
+        return (
+          name.includes(term) ||
+          desc.includes(term) ||
+          sku.includes(term) ||
+          barcode.includes(term)
+        )
+      })
     }
 
     // Filtro por categorías
@@ -41,6 +52,18 @@ export default function ShopIndex({ products = [], categories = [], canLogin }) 
       (p) => p.price >= filters.priceRange[0] && p.price <= filters.priceRange[1]
     )
 
+    // Filtro por disponibilidad (solo con stock)
+    if (filters.inStockOnly) {
+      result = result.filter((p) => (p.stock ?? 0) > 0)
+    }
+
+    // Filtro por etiquetas simples (por ahora: destacados)
+    if (filters.tags && filters.tags.length > 0) {
+      if (filters.tags.includes('featured')) {
+        result = result.filter((p) => !!p.is_featured)
+      }
+    }
+
     // Ordenamiento
     switch (filters.sortBy) {
       case 'price-asc':
@@ -50,8 +73,14 @@ export default function ShopIndex({ products = [], categories = [], canLogin }) 
         result.sort((a, b) => b.price - a.price)
         break
       case 'newest':
-        // Asumir que los productos nuevos están al final del array
-        result.reverse()
+        result.sort((a, b) => {
+          const da = a.created_at ? new Date(a.created_at) : new Date(0)
+          const db = b.created_at ? new Date(b.created_at) : new Date(0)
+          return db - da
+        })
+        break
+      case 'best-sellers':
+        result.sort((a, b) => (b.sold_quantity ?? 0) - (a.sold_quantity ?? 0))
         break
       default:
         // relevance (sin cambios)
@@ -87,6 +116,8 @@ export default function ShopIndex({ products = [], categories = [], canLogin }) 
                   priceRange: [0, 5000],
                   search: '',
                   sortBy: 'relevance',
+                  inStockOnly: false,
+                  tags: [],
                 })
               }
               categories={categories}
@@ -110,6 +141,8 @@ export default function ShopIndex({ products = [], categories = [], canLogin }) 
                         priceRange: [0, 5000],
                         search: '',
                         sortBy: 'relevance',
+                        inStockOnly: false,
+                        tags: [],
                       })
                     }
                     className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition"
