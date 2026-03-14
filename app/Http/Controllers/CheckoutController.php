@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\{Invoice, InvoiceItem, Product, InvoiceContact, Customer, InvoiceStatus};
+use App\Models\{Invoice, InvoiceItem, Product, InvoiceContact, Customer, InvoiceStatus, Coupon};
 use App\Services\CurrencyService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -28,6 +28,7 @@ class CheckoutController extends Controller
             'reference' => ['required','string','max:100'],
             'date' => ['required','date'],
             'rateBs' => ['nullable','numeric'],
+            'coupon_code' => ['nullable','string','max:50'],
             'items' => ['required','array','min:1'],
             'items.*.product_id' => ['required','exists:products,id'],
             'items.*.quantity' => ['required','integer','min:1'],
@@ -103,9 +104,50 @@ class CheckoutController extends Controller
                 $itemsTotalUsd += $subtotalUsd;
             }
 
+            // Cupón de descuento (si aplica)
+            $discountUsd = 0.0;
+            if (!empty($payload['coupon_code'] ?? null)) {
+                $code = strtoupper(trim($payload['coupon_code']));
+                $coupon = Coupon::where('code', $code)->where('active', true)->first();
+
+                if (!$coupon) {
+                    return back()->withErrors(['coupon_code' => 'El cupón ingresado no es válido.'])->withInput();
+                }
+
+                $now = now();
+                if (($coupon->valid_from && $now->lt($coupon->valid_from)) ||
+                    ($coupon->valid_until && $now->gt($coupon->valid_until))) {
+                    return back()->withErrors(['coupon_code' => 'El cupón no está vigente.'])->withInput();
+                }
+
+                if ($coupon->max_uses !== null && $coupon->uses >= $coupon->max_uses) {
+                    return back()->withErrors(['coupon_code' => 'El cupón ha alcanzado el número máximo de usos.'])->withInput();
+                }
+
+                if ($coupon->min_amount_usd !== null && $itemsTotalUsd < $coupon->min_amount_usd) {
+                    return back()->withErrors(['coupon_code' => 'El total de la compra no cumple el mínimo para usar este cupón.'])->withInput();
+                }
+
+                if ($coupon->type === 'percent') {
+                    $discountUsd = round($itemsTotalUsd * ($coupon->value / 100), 2);
+                } else {
+                    $discountUsd = min($itemsTotalUsd, (float) $coupon->value);
+                }
+
+                $coupon->increment('uses');
+            }
+
+            // Recargo/descuento por método de pago
+            $paymentFeeRate = match ($payload['paymentMethod']) {
+                'pago-movil' => 0.02,
+                default => 0.0,
+            };
+            $baseForFees = max(0, $itemsTotalUsd - $discountUsd);
+            $paymentFeeUsd = round($baseForFees * $paymentFeeRate, 2);
+
             // Impuestos y total
-            $taxUsd = round($itemsTotalUsd * $taxRate);
-            $totalUsd = $itemsTotalUsd + $taxUsd + $shippingUsd;
+            $taxUsd = round($baseForFees * $taxRate, 2);
+            $totalUsd = $baseForFees + $taxUsd + $shippingUsd + $paymentFeeUsd;
             $totalBs = $rate !== null
                 ? round($totalUsd * $rate, 2)
                 : $currency->usdToBs($totalUsd);

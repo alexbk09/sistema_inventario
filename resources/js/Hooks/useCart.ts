@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
+import { usePage } from '@inertiajs/react'
 
 export interface CartItem {
   id: string
@@ -17,19 +18,64 @@ export interface Cart {
 export function useCart() {
   const [cart, setCart] = useState<Cart>({ items: [], total: 0 })
   const [isLoading, setIsLoading] = useState(true)
+  const { props } = usePage<any>()
+  const user = props?.auth?.user ?? null
 
   // Cargar carrito del localStorage
   useEffect(() => {
-    const savedCart = localStorage.getItem('cart')
-    if (savedCart) {
-      try {
-        setCart(JSON.parse(savedCart))
-      } catch (e) {
-        console.error('Error loading cart:', e)
+    try {
+      const savedCart = localStorage.getItem('cart')
+      if (savedCart) {
+        try {
+          setCart(JSON.parse(savedCart))
+        } catch (e) {
+          console.error('Error loading cart:', e)
+        }
       }
+    } finally {
+      setIsLoading(false)
     }
-    setIsLoading(false)
-  }, [])
+
+    // Si el usuario está autenticado, sincronizar con el carrito persistido en el backend
+    if (user) {
+      fetch('/api/cart', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then((res) => {
+          if (!res.ok) return null
+          return res.json()
+        })
+        .then((data) => {
+          if (!data || data.ok !== true || !Array.isArray(data.items)) return
+
+          const serverItems: CartItem[] = data.items
+            .map((it: any) => ({
+              id: String(it.product_id),
+              name: String(it.name ?? ''),
+              price: Number(it.price_usd ?? 0),
+              quantity: Number(it.quantity ?? 0),
+              image: '',
+              category: '',
+            }))
+            .filter((it: CartItem) => it.quantity > 0)
+
+          if (serverItems.length === 0) return
+
+          const total = serverItems.reduce(
+            (sum, item) => sum + item.price * item.quantity,
+            0,
+          )
+          const syncedCart: Cart = { items: serverItems, total }
+          setCart(syncedCart)
+          try {
+            localStorage.setItem('cart', JSON.stringify(syncedCart))
+          } catch (e) {
+            console.error('Error saving synced cart:', e)
+          }
+        })
+        .catch(() => {
+          // Si falla la sincronización simplemente seguimos usando el carrito local
+        })
+    }
+  }, [user])
 
   // Guardar carrito en localStorage
   const saveCart = useCallback((newCart: Cart) => {
@@ -162,6 +208,7 @@ export function useCart() {
     addToCart,
     removeFromCart,
     updateQuantity,
+    updatePrice,
     clearCart,
     itemCount: cart.items.length,
     total: cart.total,

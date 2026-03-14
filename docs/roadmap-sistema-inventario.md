@@ -99,10 +99,10 @@ Crear un **módulo de configuración** accesible desde el panel admin para que e
 
 ### 4.2. Carrito y checkout
 
-- [ ] Carrito persistente (guardar en base de datos por usuario, no solo en sesión).
-- [ ] Cálculo de costos adicionales: delivery/envío, recargos o descuentos por método de pago.
-- [ ] Cupón de descuento (porcentaje o valor fijo) con validación de vigencia y uso.
-- [ ] Resumen claro en BS y USD con desglose de impuestos.
+- [x] Carrito persistente (guardar en base de datos por usuario, no solo en sesión).
+- [x] Cálculo de costos adicionales: delivery/envío, recargos o descuentos por método de pago.
+- [x] Cupón de descuento (porcentaje o valor fijo) con validación de vigencia y uso.
+- [x] Resumen claro en BS y USD con desglose de impuestos.
 - [ ] Página de confirmación de pedido con QR para ver factura o hacer seguimiento.
 
 ### 4.3. Valor añadido en la tienda

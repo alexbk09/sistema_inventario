@@ -7,7 +7,7 @@ import { router } from '@inertiajs/react'
 import { ChevronRight, Lock } from 'lucide-react'
 
 export default function CheckoutPage() {
-  const { cart, clearCart, itemCount } = useCart()
+  const { cart, clearCart, itemCount, updateQuantity, updatePrice } = useCart()
   const [formData, setFormData] = useState({
     fullName: '',
     identification_type_id: '',
@@ -22,6 +22,7 @@ export default function CheckoutPage() {
     originBank: '',
     reference: '',
     date: '',
+    coupon_code: '',
     cardName: '',
     cardNumber: '',
     cardExpiry: '',
@@ -33,9 +34,16 @@ export default function CheckoutPage() {
 
   const shippingCost = 200
   const taxRate = 0.15
+  const paymentFeeRateMap = {
+    'transferencia': 0,
+    'pago-movil': 0.02,
+    'otro': 0,
+  }
   const subtotal = cart.total
+  const paymentFeeRate = paymentFeeRateMap[formData.paymentMethod] ?? 0
   const tax = Math.round(subtotal * taxRate)
-  const total = subtotal + tax + shippingCost
+  const paymentFee = Math.round(subtotal * paymentFeeRate)
+  const total = subtotal + tax + shippingCost + paymentFee
 
   // Obtener tasa BS desde API (como en el carrito)
   useEffect(() => {
@@ -358,6 +366,24 @@ export default function CheckoutPage() {
                         />
                       </div>
                     </div>
+
+                    {/* Cupón de descuento */}
+                    <div className="mt-4">
+                      <label className="block text-sm font-semibold text-foreground mb-2">
+                        Cupón de descuento
+                      </label>
+                      <input
+                        type="text"
+                        name="coupon_code"
+                        value={formData.coupon_code}
+                        onChange={handleInputChange}
+                        placeholder="Ingresa tu código de cupón"
+                        className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-primary transition uppercase"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        El descuento se aplicará al confirmar el pedido si el cupón es válido.
+                      </p>
+                    </div>
                   </div>
 
                   {/* Botón de compra */}
@@ -426,6 +452,12 @@ export default function CheckoutPage() {
                     <span className="text-muted-foreground">Envío:</span>
                     <span className="text-foreground">
                       ${shippingCost.toLocaleString('es-AR')}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Recargo por método de pago:</span>
+                    <span className="text-foreground">
+                      ${paymentFee.toLocaleString('es-AR')}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
