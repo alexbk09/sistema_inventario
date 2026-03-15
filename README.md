@@ -229,9 +229,16 @@ Este es un resumen operativo de lo que hace el sistema. Los detalles técnicos (
    - Flujo de checkout y página de confirmación.
 
 - **Dashboard y métricas**
-   - Ventas del día y del mes.
-   - Conteo de facturas por estado, productos con bajo stock, totales de entidades.
-   - Filtro por bodega para ver estadísticas por sucursal.
+   - Dashboard avanzado con gráficos de ventas por día (Chart.js) comparando últimos 30 días vs período anterior.
+   - KPIs de ventas: total facturas, total USD, ticket promedio, margen estimado y distribución % de ventas a crédito vs contado.
+   - Tarjetas clásicas de resumen: ventas del día/mes, productos con bajo stock, stock total, facturas por estado, RMA, apartados y créditos.
+   - Filtro por bodega para ver estadísticas y métricas por sucursal.
+
+- **Reportes avanzados**
+   - Reportes de ventas (3.1): por rango de fechas, ranking de productos y ventas por categoría, con navegación unificada por pestañas.
+   - Reportes de inventario (3.2): existencias por bodega, kardex y rotación de productos, también con pestañas de navegación unificadas.
+   - Reportes de créditos (3.3): resumen de créditos por cliente (saldo actual, límite, morosidad) e historial de movimientos/pagos.
+   - Reporte de apartados: resumen de apartados activos y vencidos con métricas clave y filtros por cliente/fecha/estado.
 
 ---
 
@@ -244,6 +251,23 @@ Además de los comandos anteriores, el proyecto define en `composer.json` y `pac
 - `composer test` – ejecuta el suite de tests de Laravel.
 - `npm run dev` – servidor de desarrollo de Vite + React.
 - `npm run build` – build de frontend para producción.
+
+---
+
+## Historial de cambios reciente
+
+### 14-03-2026
+
+- Se unificó la navegación de los reportes de **ventas (3.1)** y **inventario (3.2)** usando pestañas entre las distintas vistas (facturas, ranking de productos, ventas por categoría, existencias, kardex y rotación de productos).
+- Se añadieron los reportes financieros del bloque **3.3**:
+   - Reporte de **créditos por cliente** con saldo actual, límite y morosidad.
+   - Historial detallado de **movimientos de crédito y pagos**.
+   - **Resumen de apartados activos y vencidos** con métricas, filtros y tabla detallada.
+- Se implementó un **dashboard avanzado** (3.4) con:
+   - Gráfico de ventas diarias (Chart.js) comparando los últimos 30 días frente al período anterior.
+   - KPIs de ventas (total facturas, monto total, ticket promedio, margen estimado) y distribución de ventas a crédito vs contado.
+   - Filtro global por **bodega/sucursal** aplicado a las métricas de ventas.
+   - Conservación de los cuadros clásicos del dashboard: tarjetas de ventas día/mes, stock, facturas por estado, RMA pendientes, apartados activos, créditos abiertos, módulos de acceso rápido y listas de productos con stock bajo y apartados vencidos.
 
 ---
 
