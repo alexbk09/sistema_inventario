@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Invoice;
-use App\Models\InvoiceItem;
-use App\Models\Warehouse;
+use App\Models\{Invoice, InvoiceItem, Warehouse, Product, Category, Provider, Customer, User, Rma, Layaway, CreditAccount};
+use App\Services\CurrencyService;
+use App\Support\Settings;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Illuminate\Http\Request;
@@ -152,6 +152,83 @@ class DashboardController extends Controller
 
         $warehouses = Warehouse::orderBy('name')->get(['id', 'name', 'code']);
 
+        // --- Métricas clásicas del dashboard (ventas del día/mes, stock, estados, etc.) ---
+        $todayStart = now()->startOfDay();
+        $monthStart = now()->startOfMonth();
+
+        $currency = app(CurrencyService::class);
+        $rate = $currency->getPromedio('oficial') ?? (float) config('currency.bs_rate', 0);
+
+        // Configuración de inventario para umbral de stock bajo
+        $inventorySettings = Settings::get('inventory', [
+            'default_min_stock' => 0,
+        ]);
+        $defaultMinStock = (int) ($inventorySettings['default_min_stock'] ?? 0);
+
+        // Query base para productos con stock bajo
+        $lowStockQuery = Product::query()
+            ->where(function ($q) {
+                // Productos con min_stock definido: stock <= min_stock
+                $q->whereNotNull('min_stock')
+                  ->whereColumn('stock', '<=', 'min_stock');
+            })
+            ->orWhere(function ($q) use ($defaultMinStock) {
+                // Productos sin min_stock pero con umbral global definido
+                if ($defaultMinStock > 0) {
+                    $q->whereNull('min_stock')
+                      ->where('stock', '<=', $defaultMinStock);
+                }
+            })
+            ->orWhere('stock', '<=', 0); // Siempre alertar productos en cero o negativos
+
+        $todayCompleted = Invoice::where('status', 'paid')
+            ->when($warehouseId, fn($q) => $q->where('warehouse_id', $warehouseId))
+            ->where('created_at', '>=', $todayStart);
+
+        $monthCompleted = Invoice::where('status', 'paid')
+            ->when($warehouseId, fn($q) => $q->where('warehouse_id', $warehouseId))
+            ->where('created_at', '>=', $monthStart);
+
+        $legacyMetrics = [
+            'today_sales_usd' => (float) $todayCompleted->sum('total_usd'),
+            'today_sales_count' => (int) $todayCompleted->count(),
+            'month_sales_usd' => (float) $monthCompleted->sum('total_usd'),
+            'month_sales_count' => (int) $monthCompleted->count(),
+            'low_stock_products' => (int) (clone $lowStockQuery)->count(),
+            'total_stock' => (int) Product::sum('stock'),
+            'invoice_pending' => (int) Invoice::where('status', 'pending')->when($warehouseId, fn($q) => $q->where('warehouse_id', $warehouseId))->count(),
+            'invoice_paid' => (int) Invoice::where('status', 'paid')->when($warehouseId, fn($q) => $q->where('warehouse_id', $warehouseId))->count(),
+            'invoice_cancelled' => (int) Invoice::where('status', 'cancelled')->count(),
+            'rma_pending' => (int) Rma::whereIn('status', ['pending', 'approved'])->count(),
+            'layaway_active' => (int) Layaway::where('status', 'active')->count(),
+            'credit_open' => (int) CreditAccount::where('status', 'active')->count(),
+        ];
+
+        $counts = [
+            'products' => (int) Product::count(),
+            'categories' => (int) Category::count(),
+            'providers' => (int) Provider::count(),
+            'invoices' => (int) Invoice::count(),
+            'customers' => (int) Customer::count(),
+            'users' => (int) User::count(),
+            'rmas' => (int) Rma::count(),
+            'warehouses' => (int) Warehouse::count(),
+            'credits' => (int) CreditAccount::count(),
+        ];
+
+        $lowStockProducts = (clone $lowStockQuery)
+            ->orderBy('stock')
+            ->take(10)
+            ->get(['id', 'name', 'sku', 'stock', 'min_stock']);
+
+        $expiredLayaways = Layaway::whereIn('status', ['active', 'pending'])
+            ->whereNotNull('expires_at')
+            ->where('expires_at', '<', now())
+            ->with('customer:id,name')
+            ->orderBy('expires_at')
+            ->take(10)
+            ->get(['id', 'number', 'customer_id', 'total_usd', 'expires_at', 'status']);
+
         return inertia('Admin/Dashboard', [
             'filters' => [
                 'mode' => $mode,
@@ -175,9 +252,15 @@ class DashboardController extends Controller
                 'credit_share' => $creditShare,
                 'cash_share' => $cashShare,
             ],
+            'legacyMetrics' => $legacyMetrics,
+            'counts' => $counts,
+            'lowStockProducts' => $lowStockProducts,
+            'expiredLayaways' => $expiredLayaways,
             'topProducts' => $topProducts,
             'topCustomers' => $topCustomers,
             'warehouses' => $warehouses,
+            'selected_warehouse' => $warehouseId,
+            'rate' => $rate,
         ]);
     }
 }
