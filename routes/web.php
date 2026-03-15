@@ -21,6 +21,7 @@ use App\Http\Controllers\QrController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\Reports\SalesReportController;
 use App\Http\Controllers\Reports\InventoryReportController;
+use App\Http\Controllers\Reports\InventoryKardexController;
 Route::middleware(['auth', 'verified', 'role:admin|supervisor|cashier|warehouse'])->group(function () {
     Route::get('/admin/qr', function () {
         return Inertia::render('Admin/QRScanner');
@@ -107,6 +108,10 @@ Route::middleware(['auth', 'verified', 'role:admin|supervisor|cashier|warehouse'
     Route::get('/admin/reports/inventory/export-pdf', [InventoryReportController::class, 'exportPdf'])
         ->middleware('permission:view products')
         ->name('admin.reports.inventory.export_pdf');
+
+    Route::get('/admin/reports/inventory/kardex', [InventoryKardexController::class, 'index'])
+        ->middleware('permission:view products')
+        ->name('admin.reports.inventory.kardex');
 
     // Proveedores
     Route::get('/admin/providers', [ProviderController::class, 'index'])->name('admin.providers.index');

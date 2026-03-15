@@ -68,7 +68,7 @@ Crear un **módulo de configuración** accesible desde el panel admin para que e
 ### 3.2. Reportes de inventario
 
 - [ ] Reporte de valorización de stock actual (cantidad * costo promedio) por producto y por bodega.
-- [ ] Kardex de cada producto (entradas y salidas con saldo).
+- [x] Kardex de cada producto (entradas y salidas con saldo).
 - [x] Reporte de productos con bajo stock (por debajo de mínimo) con opción de exportar.
 - [ ] Reporte de rotación de productos (días de inventario, productos de baja rotación).
 
