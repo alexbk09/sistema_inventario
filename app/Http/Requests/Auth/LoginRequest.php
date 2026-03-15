@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use App\Support\Audit;
 
 class LoginRequest extends FormRequest
 {
@@ -42,6 +43,9 @@ class LoginRequest extends FormRequest
         $this->ensureIsNotRateLimited();
 
         if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
+            Audit::log('login_failed', 'auth', null, [
+                'email' => $this->input('email'),
+            ]);
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
@@ -64,6 +68,10 @@ class LoginRequest extends FormRequest
         }
 
         event(new Lockout($this));
+
+        Audit::log('login_lockout', 'auth', null, [
+            'email' => $this->input('email'),
+        ]);
 
         $seconds = RateLimiter::availableIn($this->throttleKey());
 

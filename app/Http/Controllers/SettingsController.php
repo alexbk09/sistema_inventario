@@ -79,6 +79,13 @@ class SettingsController extends Controller
             'whatsapp_contact_url' => null,
         ]);
 
+        $mail = Settings::get('mail', [
+            'invoice_subject_prefix' => 'Factura',
+            'footer_text' => null,
+            'invoice_intro' => null,
+            'invoice_button_text' => null,
+        ]);
+
         $warehouseOptions = Warehouse::orderBy('name')->get(['id','name','code']);
 
         return Inertia::render('Admin/Settings/Index', [
@@ -92,6 +99,7 @@ class SettingsController extends Controller
             'warehouses' => $warehousesConfig,
             'security' => $security,
             'qr' => $qr,
+            'mail' => $mail,
             'warehouseOptions' => $warehouseOptions,
         ]);
     }
@@ -144,6 +152,11 @@ class SettingsController extends Controller
             'qr.invoice_base_url' => ['nullable', 'url', 'max:500'],
             'qr.product_base_url' => ['nullable', 'url', 'max:500'],
             'qr.whatsapp_contact_url' => ['nullable', 'url', 'max:500'],
+
+            'mail.invoice_subject_prefix' => ['required', 'string', 'max:100'],
+            'mail.footer_text' => ['nullable', 'string', 'max:500'],
+            'mail.invoice_intro' => ['nullable', 'string', 'max:500'],
+            'mail.invoice_button_text' => ['nullable', 'string', 'max:100'],
         ]);
 
         \App\Support\Settings::set('general', $validated['general']);
@@ -156,6 +169,7 @@ class SettingsController extends Controller
         \App\Support\Settings::set('warehouses', $validated['warehouses']);
         \App\Support\Settings::set('security', $validated['security']);
         \App\Support\Settings::set('qr', $validated['qr']);
+        \App\Support\Settings::set('mail', $validated['mail']);
 
         return back()->with('success', 'Configuración actualizada correctamente.');
     }

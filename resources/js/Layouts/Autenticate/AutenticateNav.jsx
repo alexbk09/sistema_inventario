@@ -6,8 +6,10 @@ import { Link, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
 export default function AutenticateNav() {
-    const user = usePage().props.auth.user;
+    const { props } = usePage();
+    const user = props.auth.user;
     const [showingNavigationDropdown, setShowingNavigationDropdown] = useState(false);
+    const [showingNotifications, setShowingNotifications] = useState(false);
     const isAdmin = user?.type === 'admin' || (user?.roles?.some?.((r) => r.name === 'admin'));
     const permissions = useMemo(() => user?.permissions ?? [], [user]);
     const canViewCustomers = permissions.includes('view customers');
@@ -16,6 +18,14 @@ export default function AutenticateNav() {
     const canViewWarehouses = permissions.includes('view warehouses');
     const canViewCredits = permissions.includes('view credits');
     const canManageSettings = isAdmin || permissions.includes('manage settings');
+    const canViewAuditLogs = permissions.includes('view audit logs');
+    const canViewSalesReports = permissions.includes('view invoices');
+    const canViewInventoryReports = permissions.includes('view products');
+
+    const notifications = props.notifications || {};
+    const lowStock = notifications.low_stock || { count: 0, items: [] };
+    const expiredLayaways = notifications.expired_layaways || { count: 0, items: [] };
+    const totalNotifications = (lowStock.count || 0) + (expiredLayaways.count || 0);
     return (
             <nav className="border-b border-gray-100 bg-white">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -190,6 +200,14 @@ export default function AutenticateNav() {
                                                     >
                                                         Roles y permisos
                                                     </Link>
+                                                    {canViewAuditLogs && (
+                                                        <Link
+                                                            href={route('admin.audit.index')}
+                                                            className="block px-3 py-1.5 hover:bg-gray-100"
+                                                        >
+                                                            Auditoría
+                                                        </Link>
+                                                    )}
                                                     {canViewUsers && (
                                                         <Link
                                                             href={route('admin.users.index')}
@@ -201,6 +219,50 @@ export default function AutenticateNav() {
                                                 </div>
                                             </div>
                                         </div>
+
+                                        {/* Grupo Reportes */}
+                                        {(canViewSalesReports || canViewInventoryReports) && (
+                                            <div className="relative group">
+                                                <button
+                                                    type="button"
+                                                    className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent group-hover:border-gray-300"
+                                                >
+                                                    Reportes
+                                                    <svg
+                                                        className="ms-1 h-4 w-4"
+                                                        xmlns="http://www.w3.org/2000/svg"
+                                                        viewBox="0 0 20 20"
+                                                        fill="currentColor"
+                                                    >
+                                                        <path
+                                                            fillRule="evenodd"
+                                                            d="M5.23 7.21a.75.75 0 011.06.02L10 11.085l3.71-3.854a.75.75 0 111.08 1.04l-4.25 4.417a.75.75 0 01-1.08 0L5.25 8.27a.75.75 0 01-.02-1.06z"
+                                                            clipRule="evenodd"
+                                                        />
+                                                    </svg>
+                                                </button>
+                                                <div className="absolute left-0 mt-0 w-48 rounded-md bg-white shadow-lg ring-1 ring-black/5 z-20 hidden group-hover:block">
+                                                    <div className="py-1 text-sm text-gray-700">
+                                                        {canViewSalesReports && (
+                                                            <Link
+                                                                href={route('admin.reports.sales.index')}
+                                                                className="block px-3 py-1.5 hover:bg-gray-100"
+                                                            >
+                                                                Ventas
+                                                            </Link>
+                                                        )}
+                                                        {canViewInventoryReports && (
+                                                            <Link
+                                                                href={route('admin.reports.inventory.index')}
+                                                                className="block px-3 py-1.5 hover:bg-gray-100"
+                                                            >
+                                                                Inventario
+                                                            </Link>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
 
                                         {canViewWarehouses && (
                                             <NavLink
@@ -229,7 +291,105 @@ export default function AutenticateNav() {
                             </div>
                         </div>
 
-                        <div className="hidden sm:ms-6 sm:flex sm:items-center">
+                        <div className="hidden sm:ms-6 sm:flex sm:items-center gap-4">
+                            {isAdmin && (
+                                <div className="relative">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowingNotifications((prev) => !prev)}
+                                        className="relative inline-flex items-center justify-center rounded-full p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none"
+                                    >
+                                        {/* Icono de campana */}
+                                        <svg
+                                            className="h-5 w-5"
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            viewBox="0 0 20 20"
+                                            fill="currentColor"
+                                        >
+                                            <path d="M10 2a6 6 0 00-6 6v2.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 10.586V8a6 6 0 00-6-6z" />
+                                            <path d="M10 18a2.5 2.5 0 002.45-2H7.55A2.5 2.5 0 0010 18z" />
+                                        </svg>
+                                        {totalNotifications > 0 && (
+                                            <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] h-4 min-w-[16px] px-1">
+                                                {totalNotifications}
+                                            </span>
+                                        )}
+                                    </button>
+
+                                    {showingNotifications && (
+                                        <div className="absolute right-0 mt-2 w-80 max-h-80 overflow-y-auto rounded-md bg-white shadow-lg ring-1 ring-black/5 z-30 text-sm">
+                                            <div className="px-3 py-2 border-b border-gray-100 flex items-center justify-between">
+                                                <span className="font-semibold text-gray-700">Notificaciones</span>
+                                                {totalNotifications > 0 ? (
+                                                    <span className="text-xs text-gray-500">{totalNotifications} alerta{totalNotifications !== 1 ? 's' : ''}</span>
+                                                ) : (
+                                                    <span className="text-xs text-gray-400">Sin alertas</span>
+                                                )}
+                                            </div>
+                                            <div className="py-2">
+                                                {lowStock.count > 0 && (
+                                                    <div className="px-3 py-1.5 border-b border-gray-100 last:border-b-0">
+                                                        <div className="flex items-center justify-between mb-1">
+                                                            <span className="text-xs font-semibold text-yellow-700">Stock bajo</span>
+                                                            <span className="text-[11px] text-yellow-700">{lowStock.count} producto{lowStock.count !== 1 ? 's' : ''}</span>
+                                                        </div>
+                                                        <ul className="space-y-0.5 text-xs text-gray-700">
+                                                            {lowStock.items.map((p) => (
+                                                                <li key={p.id} className="flex justify-between gap-2">
+                                                                    <span className="truncate">{p.name} {p.sku ? `(${p.sku})` : ''}</span>
+                                                                    <span className="font-semibold">{p.stock}</span>
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                        <div className="mt-1 text-right">
+                                                            <Link
+                                                                href={route('dashboard')}
+                                                                className="text-[11px] text-yellow-700 underline"
+                                                                onClick={() => setShowingNotifications(false)}
+                                                            >
+                                                                Ver detalle
+                                                            </Link>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {expiredLayaways.count > 0 && (
+                                                    <div className="px-3 py-1.5 border-b border-gray-100 last:border-b-0">
+                                                        <div className="flex items-center justify-between mb-1">
+                                                            <span className="text-xs font-semibold text-red-700">Apartados vencidos</span>
+                                                            <span className="text-[11px] text-red-700">{expiredLayaways.count} apartado{expiredLayaways.count !== 1 ? 's' : ''}</span>
+                                                        </div>
+                                                        <ul className="space-y-0.5 text-xs text-gray-700">
+                                                            {expiredLayaways.items.map((l) => (
+                                                                <li key={l.id} className="flex justify-between gap-2">
+                                                                    <span className="truncate">{l.number} - {l.customer?.name ?? 'Cliente'}</span>
+                                                                    <span className="text-[11px]">{new Date(l.expires_at).toLocaleDateString('es-ES')}</span>
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                        <div className="mt-1 text-right">
+                                                            <Link
+                                                                href={route('admin.layaways.index')}
+                                                                className="text-[11px] text-red-700 underline"
+                                                                onClick={() => setShowingNotifications(false)}
+                                                            >
+                                                                Gestionar apartados
+                                                            </Link>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {totalNotifications === 0 && (
+                                                    <div className="px-3 py-4 text-xs text-gray-500 text-center">
+                                                        No hay alertas por ahora.
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
                             <div className="relative ms-3">
                                 <Dropdown>
                                     <Dropdown.Trigger>
@@ -405,6 +565,39 @@ export default function AutenticateNav() {
                                 >
                                     Roles y permisos
                                 </ResponsiveNavLink>
+                                {canViewAuditLogs && (
+                                    <ResponsiveNavLink
+                                        href={route('admin.audit.index')}
+                                        active={route().current('admin.audit.*')}
+                                    >
+                                        Auditoría
+                                    </ResponsiveNavLink>
+                                )}
+
+                                {/* Grupo Reportes */}
+                                {(canViewSalesReports || canViewInventoryReports) && (
+                                    <>
+                                        <div className="px-4 pt-3 text-xs font-semibold text-gray-500 uppercase">
+                                            Reportes
+                                        </div>
+                                        {canViewSalesReports && (
+                                            <ResponsiveNavLink
+                                                href={route('admin.reports.sales.index')}
+                                                active={route().current('admin.reports.sales.*')}
+                                            >
+                                                Ventas
+                                            </ResponsiveNavLink>
+                                        )}
+                                        {canViewInventoryReports && (
+                                            <ResponsiveNavLink
+                                                href={route('admin.reports.inventory.index')}
+                                                active={route().current('admin.reports.inventory.*')}
+                                            >
+                                                Inventario
+                                            </ResponsiveNavLink>
+                                        )}
+                                    </>
+                                )}
                                 {canViewUsers && (
                                     <ResponsiveNavLink
                                         href={route('admin.users.index')}

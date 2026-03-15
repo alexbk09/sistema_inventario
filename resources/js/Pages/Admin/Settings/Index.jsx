@@ -2,7 +2,7 @@ import React from 'react';
 import { Head, useForm } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.jsx';
 
-export default function SettingsIndex({ general, location, branding, billing, currency, store, inventory, warehouses, security, qr, warehouseOptions = [] }) {
+export default function SettingsIndex({ general, location, branding, billing, currency, store, inventory, warehouses, security, qr, mail, warehouseOptions = [] }) {
     const { data, setData, put, processing, errors } = useForm({
         general: general ?? {},
         location: location ?? {},
@@ -14,6 +14,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
         warehouses: warehouses ?? {},
         security: security ?? {},
         qr: qr ?? {},
+        mail: mail ?? {},
     });
 
     const handleChange = (section, field) => (e) => {
@@ -445,6 +446,68 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                 />
                                 {errors['qr.whatsapp_contact_url'] && (
                                     <p className="mt-1 text-xs text-red-600">{errors['qr.whatsapp_contact_url']}</p>
+                                )}
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* Correo */}
+                    <section className="bg-white shadow-sm rounded-lg p-6 space-y-4">
+                        <h2 className="text-lg font-medium text-slate-900">Correo electrónico</h2>
+                        <p className="text-sm text-slate-600">
+                            Ajusta algunos textos base que se usarán en las plantillas de correo (por ejemplo, facturas).
+                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700">Prefijo de asunto para facturas</label>
+                                <input
+                                    type="text"
+                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                    value={data.mail.invoice_subject_prefix || ''}
+                                    onChange={handleChange('mail', 'invoice_subject_prefix')}
+                                    placeholder="Ej: Factura, Comprobante, Pedido"
+                                />
+                                {errors['mail.invoice_subject_prefix'] && (
+                                    <p className="mt-1 text-xs text-red-600">{errors['mail.invoice_subject_prefix']}</p>
+                                )}
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-medium text-slate-700">Texto introductorio del correo de factura</label>
+                                <textarea
+                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                    rows={2}
+                                    value={data.mail.invoice_intro || ''}
+                                    onChange={handleChange('mail', 'invoice_intro')}
+                                    placeholder="Ej: Gracias por tu compra. A continuación puedes revisar el detalle y estado de tu pedido."
+                                />
+                                {errors['mail.invoice_intro'] && (
+                                    <p className="mt-1 text-xs text-red-600">{errors['mail.invoice_intro']}</p>
+                                )}
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-medium text-slate-700">Texto de pie de correo</label>
+                                <textarea
+                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                    rows={2}
+                                    value={data.mail.footer_text || ''}
+                                    onChange={handleChange('mail', 'footer_text')}
+                                    placeholder="Ej: Gracias por confiar en nosotros. Este mensaje fue generado automáticamente."
+                                />
+                                {errors['mail.footer_text'] && (
+                                    <p className="mt-1 text-xs text-red-600">{errors['mail.footer_text']}</p>
+                                )}
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700">Texto del botón en el correo de factura</label>
+                                <input
+                                    type="text"
+                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                    value={data.mail.invoice_button_text || ''}
+                                    onChange={handleChange('mail', 'invoice_button_text')}
+                                    placeholder="Ej: Ver mi pedido, Ver detalle de la compra"
+                                />
+                                {errors['mail.invoice_button_text'] && (
+                                    <p className="mt-1 text-xs text-red-600">{errors['mail.invoice_button_text']}</p>
                                 )}
                             </div>
                         </div>

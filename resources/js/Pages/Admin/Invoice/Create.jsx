@@ -2,7 +2,7 @@ import { Head, Link, useForm } from '@inertiajs/react';
 import { useMemo, useState, useEffect } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.jsx';
 
-export default function Create({ products, customers, warehouses = [], layaways = [] }) {
+export default function Create({ products, customers, warehouses = [], layaways = [], users = [] }) {
   const { data, setData, post, processing } = useForm({
     customer_id: '',
     document_type: 'invoice',
@@ -12,6 +12,7 @@ export default function Create({ products, customers, warehouses = [], layaways 
     credit_sale: false,
     credit_due_date: '',
     payments: [],
+    seller_id: '',
   });
   const [internal_notes, setInternalNotes] = useState('');
   const [public_notes, setPublicNotes] = useState('');
@@ -229,6 +230,19 @@ export default function Create({ products, customers, warehouses = [], layaways 
                   <option value="">Todas</option>
                   {(warehouses || []).map((w) => (
                     <option key={w.id} value={w.id}>{w.name} ({w.code})</option>
+                  ))}
+                </select>
+              </div>
+              <div className="mt-3">
+                <label className="block text-sm font-semibold text-foreground mb-1">Vendedor (opcional)</label>
+                <select
+                  className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-primary transition"
+                  value={data.seller_id}
+                  onChange={(e) => setData('seller_id', e.target.value)}
+                >
+                  <option value="">Usuario actual</option>
+                  {(users || []).map((u) => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
                   ))}
                 </select>
               </div>

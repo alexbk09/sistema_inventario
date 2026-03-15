@@ -1,9 +1,10 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.jsx';
 import { TrendingUp, AlertTriangle, Package, Clock, CheckCircle, XCircle, Tag, Truck, Receipt, ArrowRight, Users, UserCircle, RotateCcw, Store, CreditCard } from 'lucide-react';
 
-export default function Dashboard({ metrics = {}, counts = {}, topProducts = [], warehouses = [], selected_warehouse = '', rate = 0 }) {
+export default function Dashboard({ metrics = {}, counts = {}, topProducts = [], lowStockProducts = [], expiredLayaways = [], warehouses = [], selected_warehouse = '', rate = 0 }) {
   const selectedWarehouse = selected_warehouse || '';
+  const { props } = usePage();
 
   const handleWarehouseChange = (e) => {
     const id = e.target.value;

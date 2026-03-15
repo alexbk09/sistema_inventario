@@ -7,13 +7,14 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Models\InvoiceStatus;
+use App\Models\User;
 
 class Invoice extends Model
 {
     use HasFactory;
 
     protected $fillable = [
-        'number', 'document_type', 'customer_id', 'credit_account_id', 'layaway_id', 'status', 'internal_notes', 'public_notes', 'invoice_status_id', 'total_usd', 'total_bs', 'warehouse_id', 'cancelled_at', 'cancelled_by', 'cancellation_reason'
+        'number', 'document_type', 'customer_id', 'seller_id', 'credit_account_id', 'layaway_id', 'status', 'internal_notes', 'public_notes', 'invoice_status_id', 'total_usd', 'total_bs', 'warehouse_id', 'cancelled_at', 'cancelled_by', 'cancellation_reason'
     ];
 
     protected $casts = [
@@ -25,6 +26,11 @@ class Invoice extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function seller(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'seller_id');
     }
 
     public function items(): HasMany

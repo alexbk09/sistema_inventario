@@ -58,18 +58,18 @@ Crear un **módulo de configuración** accesible desde el panel admin para que e
 
 ### 3.1. Reportes de ventas
 
-- [ ] Reporte de ventas por rango de fechas (día, semana, mes, personalizado).
-- [ ] Filtros por sucursal/bodega, usuario vendedor, tipo de comprobante y forma de pago.
-- [ ] Métricas: total vendido (USD y BS), cantidad de facturas, ticket promedio.
-- [ ] Ranking de productos más vendidos.
-- [ ] Ventas por categoría.
-- [ ] Exportar a PDF y Excel.
+- [x] Reporte de ventas por rango de fechas (día, semana, mes, personalizado).
+- [x] Filtros por sucursal/bodega, usuario vendedor, tipo de comprobante y forma de pago.
+- [x] Métricas: total vendido (USD y BS), cantidad de facturas, ticket promedio.
+- [x] Ranking de productos más vendidos.
+- [x] Ventas por categoría.
+- [x] Exportar a PDF y Excel.
 
 ### 3.2. Reportes de inventario
 
 - [ ] Reporte de valorización de stock actual (cantidad * costo promedio) por producto y por bodega.
 - [ ] Kardex de cada producto (entradas y salidas con saldo).
-- [ ] Reporte de productos con bajo stock (por debajo de mínimo) con opción de exportar.
+- [x] Reporte de productos con bajo stock (por debajo de mínimo) con opción de exportar.
 - [ ] Reporte de rotación de productos (días de inventario, productos de baja rotación).
 
 ### 3.3. Reportes financieros y de crédito
@@ -147,18 +147,18 @@ Crear un **módulo de configuración** accesible desde el panel admin para que e
 ## 7. Notificaciones y comunicación
 
 - [x] Notificaciones por correo al crear factura/venta importante.
-- [ ] Notificaciones internas al admin por bajo stock o vencimiento de apartados.
+ - [x] Notificaciones internas al admin por bajo stock o vencimiento de apartados.
 - [x] Integración básica con WhatsApp (deep links) desde vista de cliente/factura.
-- [ ] Plantillas de correo configurables (logo, colores, textos).
+- [x] Plantillas de correo configurables (logo, colores, textos).
 
 ---
 
 ## 8. Seguridad, auditoría y permisos
 
-- [ ] Definir roles adicionales (ej: cajero, almacenista, supervisor) además de `admin` y `user`.
-- [ ] Matriz de permisos detallada usando spatie/laravel-permission (crear, ver, editar, borrar por módulo).
-- [ ] Auditoría básica de acciones críticas (quién creó/editó/eliminó facturas, movimientos, RMA, etc.).
-- [ ] Registro de logins/intentros fallidos.
+- [x] Definir roles adicionales (ej: cajero, almacenista, supervisor) además de `admin` y `user`.
+- [x] Matriz de permisos detallada usando spatie/laravel-permission (crear, ver, editar, borrar por módulo) y conexión con navegación/rutas.
+- [x] Auditoría básica de acciones críticas (quién creó/editó facturas y movimientos de inventario, con base para ampliar a otros módulos).
+- [x] Registro de logins/intentros fallidos y logouts en tabla de auditoría.
 - [ ] Opcional: 2FA para administradores.
 
 ---

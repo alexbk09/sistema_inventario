@@ -6,6 +6,7 @@ use App\Models\{Product, MovementType, Provider, Warehouse};
 use App\Services\InventoryService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use InvalidArgumentException;
 
 class ProductInventoryController extends Controller
 {
@@ -63,30 +64,33 @@ class ProductInventoryController extends Controller
             'reference' => ['nullable','string','max:255'],
             'notes' => ['nullable','string','max:500'],
         ]);
-
-        if ($data['type'] === 'entry') {
-            $inventory->registerEntry(
-                $product,
-                $data['quantity'],
-                $data['unit_price_usd'],
-                $data['movement_type_id'],
-                $data['reference'] ?? null,
-                $data['notes'] ?? null,
-                $data['provider_id'] ?? null,
-                $data['warehouse_id'],
-            );
-        } else {
-            $inventory->registerExit(
-                $product,
-                $data['quantity'],
-                $data['unit_price_usd'],
-                $data['movement_type_id'],
-                $data['reference'] ?? null,
-                $data['notes'] ?? null,
-                $data['warehouse_id'],
-            );
+        try {
+            if ($data['type'] === 'entry') {
+                $inventory->registerEntry(
+                    $product,
+                    $data['quantity'],
+                    $data['unit_price_usd'],
+                    $data['movement_type_id'],
+                    $data['reference'] ?? null,
+                    $data['notes'] ?? null,
+                    $data['provider_id'] ?? null,
+                    $data['warehouse_id'],
+                );
+            } else {
+                $inventory->registerExit(
+                    $product,
+                    $data['quantity'],
+                    $data['unit_price_usd'],
+                    $data['movement_type_id'],
+                    $data['reference'] ?? null,
+                    $data['notes'] ?? null,
+                    $data['warehouse_id'],
+                );
+            }
+        } catch (InvalidArgumentException $e) {
+            return redirect()->back()->withInput()->with('error', $e->getMessage());
         }
 
-        return redirect()->back();
+        return redirect()->back()->with('success', 'Movimiento de inventario registrado correctamente.');
     }
 }

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\{Product, InventoryMovement, MovementType};
 use App\Support\Settings;
+use App\Support\Audit;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -69,6 +70,13 @@ class InventoryService
                 $product->save();
             }
 
+            Audit::log('inventory_entry_created', 'inventory', $movement, [
+                'product_id' => $product->id,
+                'quantity' => $quantity,
+                'warehouse_id' => $warehouseId,
+                'movement_type_id' => $movementType?->id,
+            ]);
+
             return $movement;
         });
     }
@@ -126,6 +134,13 @@ class InventoryService
             ]);
 
             $product->decrement('stock', $quantity);
+
+            Audit::log('inventory_exit_created', 'inventory', $movement, [
+                'product_id' => $product->id,
+                'quantity' => $quantity,
+                'warehouse_id' => $warehouseId,
+                'movement_type_id' => $movementType?->id,
+            ]);
 
             return $movement;
         });

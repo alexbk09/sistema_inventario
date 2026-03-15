@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\{Invoice, InvoiceItem, Product, Customer, MovementType, InvoiceStatus, Warehouse, InvoiceAdjustment, CreditAccount, CreditMovement, Layaway};
 use App\Services\{CurrencyService, InventoryService};
-use App\Support\Settings;
+use App\Support\{Settings, Audit};
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -54,6 +54,7 @@ class InvoiceController extends Controller
             'customers' => Customer::select('id','name')->get(),
             'warehouses' => Warehouse::select('id','name','code')->orderBy('name')->get(),
             'layaways' => Layaway::where('status', 'active')->with('customer:id,name')->orderByDesc('id')->get(['id','number','customer_id','total_usd']),
+            'users' => \App\Models\User::select('id','name')->orderBy('name')->get(),
         ]);
     }
 
@@ -62,6 +63,7 @@ class InvoiceController extends Controller
         $data = $request->validate([
             'customer_id' => ['nullable','exists:customers,id'],
             'warehouse_id' => ['nullable','exists:warehouses,id'],
+            'seller_id' => ['nullable','exists:users,id'],
             'layaway_id' => ['nullable','exists:layaways,id'],
             'document_type' => ['required','in:invoice,delivery_note,proforma'],
             'items' => ['required','array','min:1'],
@@ -130,6 +132,7 @@ class InvoiceController extends Controller
         $invoice->number = $prefix.$padded;
         $invoice->document_type = $data['document_type'];
         $invoice->customer_id = $data['customer_id'] ?? null;
+        $invoice->seller_id = $data['seller_id'] ?? $request->user()?->id;
         $invoice->layaway_id = $data['layaway_id'] ?? null;
         $invoice->warehouse_id = $data['warehouse_id'] ?? null;
         $invoice->status = 'pending';
@@ -237,6 +240,12 @@ class InvoiceController extends Controller
                 ]);
             }
         }
+
+        Audit::log('invoice_created', 'invoices', $invoice, [
+            'number' => $invoice->number,
+            'total_usd' => $invoice->total_usd,
+            'customer_id' => $invoice->customer_id,
+        ]);
 
         return redirect()->route('admin.invoices.index');
     }
@@ -398,6 +407,11 @@ class InvoiceController extends Controller
                 }
             }
         }
+
+        Audit::log('invoice_updated', 'invoices', $invoice, [
+            'old_status' => $oldStatus,
+            'new_status' => $invoice->status,
+        ]);
 
         return redirect()->route('admin.invoices.index');
     }

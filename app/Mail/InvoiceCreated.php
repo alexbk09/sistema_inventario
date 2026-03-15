@@ -24,8 +24,19 @@ class InvoiceCreated extends Mailable implements ShouldQueue
         $invoice = $this->invoice;
         $contact = $invoice->contact;
 
+        $general = \App\Support\Settings::get('general', [
+            'company_name' => config('app.name', 'Sistema Inventario'),
+        ]);
+
+        $mail = \App\Support\Settings::get('mail', [
+            'invoice_subject_prefix' => 'Factura',
+        ]);
+
+        $prefix = (string) ($mail['invoice_subject_prefix'] ?? 'Factura');
+        $company = (string) ($general['company_name'] ?? config('app.name', 'Sistema Inventario'));
+
         return $this
-            ->subject('Factura '.$invoice->number)
+            ->subject(trim($prefix.' '.$invoice->number.' · '.$company))
             ->view('emails.invoice_created')
             ->with([
                 'invoice' => $invoice,

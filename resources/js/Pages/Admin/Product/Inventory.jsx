@@ -155,7 +155,7 @@ export default function Inventory({ product, movements, summary, movementTypes, 
               <input type="text" name="reference" value={form.reference} onChange={handleChange} className="w-full border border-border rounded px-3 py-2 text-sm bg-background" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Nota (opcional)</label>
+              <label className="block text-sm font-medium text-foreground mb-1">Motivo del movimiento</label>
               <textarea name="notes" rows="3" value={form.notes} onChange={handleChange} className="w-full border border-border rounded px-3 py-2 text-sm bg-background" />
             </div>
             <button type="submit" className="w-full px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition">

@@ -1,5 +1,23 @@
 @php
   $contactName = $contact->full_name ?? $invoice->customer->name ?? 'Cliente';
+  $general = \App\Support\Settings::get('general', [
+      'company_name' => config('app.name', 'Sistema Inventario'),
+  ]);
+  $branding = \App\Support\Settings::get('branding', [
+      'logo_url' => null,
+      'primary_color' => '#0f172a',
+  ]);
+    $mail = \App\Support\Settings::get('mail', [
+      'footer_text' => null,
+      'invoice_intro' => null,
+      'invoice_button_text' => null,
+    ]);
+  $companyName = $general['company_name'] ?? config('app.name', 'Sistema Inventario');
+  $logoUrl = $branding['logo_url'] ?? null;
+  $primaryColor = $branding['primary_color'] ?? '#0f172a';
+  $footerText = $mail['footer_text'] ?? null;
+  $introText = $mail['invoice_intro'] ?? null;
+  $buttonText = $mail['invoice_button_text'] ?? 'Ver mi pedido';
 @endphp
 
 <!DOCTYPE html>
@@ -15,18 +33,32 @@
           <table width="600" cellpadding="0" cellspacing="0" role="presentation" style="background-color: #ffffff; border-radius: 8px; padding: 24px; text-align: left;">
             <tr>
               <td>
+                @if($logoUrl)
+                  <div style="margin-bottom: 16px;">
+                    <img src="{{ $logoUrl }}" alt="{{ $companyName }}" style="max-height: 40px;">
+                  </div>
+                @else
+                  <h1 style="font-size: 18px; margin: 0 0 12px 0; color: {{ $primaryColor }};">{{ $companyName }}</h1>
+                @endif
+
                 <h1 style="font-size: 20px; margin: 0 0 8px 0; color: #111827;">Hola {{ $contactName }},</h1>
                 <p style="font-size: 14px; margin: 0 0 16px 0; color: #4b5563;">
                   Hemos registrado tu compra con el número de factura <strong>{{ $invoice->number }}</strong>.
                 </p>
 
-                <p style="font-size: 14px; margin: 0 0 16px 0; color: #4b5563;">
-                  Puedes ver el detalle y estado de tu pedido en el siguiente enlace:
-                </p>
+                @if($introText)
+                  <p style="font-size: 14px; margin: 0 0 16px 0; color: #4b5563;">
+                    {{ $introText }}
+                  </p>
+                @else
+                  <p style="font-size: 14px; margin: 0 0 16px 0; color: #4b5563;">
+                    Puedes ver el detalle y estado de tu pedido en el siguiente enlace:
+                  </p>
+                @endif
 
                 <p style="margin: 0 0 24px 0;">
-                  <a href="{{ $publicUrl }}" style="display: inline-block; padding: 10px 18px; background-color: #0f766e; color: #ffffff; text-decoration: none; border-radius: 9999px; font-size: 14px;">
-                    Ver mi pedido
+                  <a href="{{ $publicUrl }}" style="display: inline-block; padding: 10px 18px; background-color: {{ $primaryColor }}; color: #ffffff; text-decoration: none; border-radius: 9999px; font-size: 14px;">
+                    {{ $buttonText }}
                   </a>
                 </p>
 
@@ -60,7 +92,7 @@
                 @endif
 
                 <p style="font-size: 12px; margin: 24px 0 0 0; color: #9ca3af;">
-                  Si no reconoces este correo, puedes ignorarlo.
+                  {{ $footerText ?: 'Si no reconoces este correo, puedes ignorarlo.' }}
                 </p>
               </td>
             </tr>

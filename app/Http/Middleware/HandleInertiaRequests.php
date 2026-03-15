@@ -33,8 +33,64 @@ class HandleInertiaRequests extends Middleware
     {
         $user = $request->user();
 
+        // Notificaciones internas básicas para usuarios autenticados (stock bajo, apartados vencidos)
+        $notifications = [
+            'low_stock' => [
+                'count' => 0,
+                'items' => [],
+            ],
+            'expired_layaways' => [
+                'count' => 0,
+                'items' => [],
+            ],
+        ];
+
+        if ($user) {
+            $inventorySettings = Settings::get('inventory', [
+                'default_min_stock' => 0,
+            ]);
+            $defaultMinStock = (int) ($inventorySettings['default_min_stock'] ?? 0);
+
+            // Productos con stock bajo
+            $lowStockQuery = \App\Models\Product::query()
+                ->where(function ($q) {
+                    $q->whereNotNull('min_stock')
+                      ->whereColumn('stock', '<=', 'min_stock');
+                })
+                ->orWhere(function ($q) use ($defaultMinStock) {
+                    if ($defaultMinStock > 0) {
+                        $q->whereNull('min_stock')
+                          ->where('stock', '<=', $defaultMinStock);
+                    }
+                })
+                ->orWhere('stock', '<=', 0);
+
+            $notifications['low_stock']['count'] = (int) (clone $lowStockQuery)->count();
+            $notifications['low_stock']['items'] = (clone $lowStockQuery)
+                ->orderBy('stock')
+                ->take(5)
+                ->get(['id','name','sku','stock','min_stock']);
+
+            // Apartados vencidos
+            $expiredLayawaysQuery = \App\Models\Layaway::whereIn('status', ['active','pending'])
+                ->whereNotNull('expires_at')
+                ->where('expires_at', '<', now())
+                ->with('customer:id,name');
+
+            $notifications['expired_layaways']['count'] = (int) (clone $expiredLayawaysQuery)->count();
+            $notifications['expired_layaways']['items'] = (clone $expiredLayawaysQuery)
+                ->orderBy('expires_at')
+                ->take(5)
+                ->get(['id','number','customer_id','expires_at','status']);
+        }
+
         return [
             ...parent::share($request),
+            'flash' => [
+                'success' => $request->session()->get('success'),
+                'error' => $request->session()->get('error'),
+            ],
+            'notifications' => $notifications,
             'locale' => app()->getLocale(),
             'translations' => [
                 'app' => Lang::get('app'),

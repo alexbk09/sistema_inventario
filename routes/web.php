@@ -18,16 +18,23 @@ use App\Http\Controllers\RecommendationController;
 use App\Http\Controllers\NewsletterSubscriptionController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\QrController;
-Route::middleware(['auth', 'verified', 'role:admin'])->group(function () {
+use App\Http\Controllers\AuditLogController;
+use App\Http\Controllers\Reports\SalesReportController;
+use App\Http\Controllers\Reports\InventoryReportController;
+Route::middleware(['auth', 'verified', 'role:admin|supervisor|cashier|warehouse'])->group(function () {
     Route::get('/admin/qr', function () {
         return Inertia::render('Admin/QRScanner');
     })->name('admin.qr');
 
     Route::get('/admin/qr-codes', [QrController::class, 'index'])->name('admin.qr.codes');
 
-    // Configuración general del sistema
-    Route::get('/admin/settings', [SettingsController::class, 'index'])->name('admin.settings.index');
-    Route::put('/admin/settings', [SettingsController::class, 'update'])->name('admin.settings.update');
+    // Configuración general del sistema (solo usuarios con permiso de gestionar settings)
+    Route::get('/admin/settings', [SettingsController::class, 'index'])
+        ->middleware('permission:manage settings')
+        ->name('admin.settings.index');
+    Route::put('/admin/settings', [SettingsController::class, 'update'])
+        ->middleware('permission:manage settings')
+        ->name('admin.settings.update');
 
     // Productos
     Route::get('/admin/products', [ProductController::class, 'index'])->name('admin.products.index');
@@ -52,10 +59,54 @@ Route::middleware(['auth', 'verified', 'role:admin'])->group(function () {
     Route::put('/admin/categories/{category}', [CategoryController::class, 'update'])->name('admin.categories.update');
     Route::delete('/admin/categories/{category}', [CategoryController::class, 'destroy'])->name('admin.categories.destroy');
 
-    // Roles y permisos
-    Route::get('/admin/roles', [RolesController::class, 'index'])->name('admin.roles.index');
-    Route::get('/admin/roles/{role}/edit', [RolesController::class, 'edit'])->name('admin.roles.edit');
-    Route::put('/admin/roles/{role}', [RolesController::class, 'update'])->name('admin.roles.update');
+    // Roles y permisos (solo usuarios con permiso de gestionar usuarios/roles)
+    Route::get('/admin/roles', [RolesController::class, 'index'])
+        ->middleware('permission:manage users')
+        ->name('admin.roles.index');
+    Route::get('/admin/roles/{role}/edit', [RolesController::class, 'edit'])
+        ->middleware('permission:manage users')
+        ->name('admin.roles.edit');
+    Route::put('/admin/roles/{role}', [RolesController::class, 'update'])
+        ->middleware('permission:manage users')
+        ->name('admin.roles.update');
+
+    // Auditoría (solo usuarios con permiso de ver logs)
+    Route::get('/admin/audit', [AuditLogController::class, 'index'])
+        ->middleware('permission:view audit logs')
+        ->name('admin.audit.index');
+
+    // Reportes
+    Route::get('/admin/reports/sales', [SalesReportController::class, 'index'])
+        ->middleware('permission:view invoices')
+        ->name('admin.reports.sales.index');
+    Route::get('/admin/reports/sales/top-products', [SalesReportController::class, 'topProducts'])
+        ->middleware('permission:view invoices')
+        ->name('admin.reports.sales.top_products');
+    Route::get('/admin/reports/sales/by-category', [SalesReportController::class, 'salesByCategory'])
+        ->middleware('permission:view invoices')
+        ->name('admin.reports.sales.by_category');
+    Route::get('/admin/reports/sales/export', [SalesReportController::class, 'export'])
+        ->middleware('permission:view invoices')
+        ->name('admin.reports.sales.export');
+    Route::get('/admin/reports/sales/export-excel', [SalesReportController::class, 'exportExcel'])
+        ->middleware('permission:view invoices')
+        ->name('admin.reports.sales.export_excel');
+    Route::get('/admin/reports/sales/export-pdf', [SalesReportController::class, 'exportPdf'])
+        ->middleware('permission:view invoices')
+        ->name('admin.reports.sales.export_pdf');
+
+    Route::get('/admin/reports/inventory', [InventoryReportController::class, 'index'])
+        ->middleware('permission:view products')
+        ->name('admin.reports.inventory.index');
+    Route::get('/admin/reports/inventory/export', [InventoryReportController::class, 'export'])
+        ->middleware('permission:view products')
+        ->name('admin.reports.inventory.export');
+    Route::get('/admin/reports/inventory/export-excel', [InventoryReportController::class, 'exportExcel'])
+        ->middleware('permission:view products')
+        ->name('admin.reports.inventory.export_excel');
+    Route::get('/admin/reports/inventory/export-pdf', [InventoryReportController::class, 'exportPdf'])
+        ->middleware('permission:view products')
+        ->name('admin.reports.inventory.export_pdf');
 
     // Proveedores
     Route::get('/admin/providers', [ProviderController::class, 'index'])->name('admin.providers.index');
@@ -193,6 +244,28 @@ Route::get('/dashboard', function () {
     $rate = $currency->getPromedio('oficial') ?? (float) config('currency.bs_rate', 0);
     $warehouseId = request()->query('warehouse_id');
 
+    // Configuración de inventario para umbral de stock bajo
+    $inventorySettings = \App\Support\Settings::get('inventory', [
+        'default_min_stock' => 0,
+    ]);
+    $defaultMinStock = (int) ($inventorySettings['default_min_stock'] ?? 0);
+
+    // Query base para productos con stock bajo
+    $lowStockQuery = \App\Models\Product::query()
+        ->where(function ($q) {
+            // Productos con min_stock definido: stock <= min_stock
+            $q->whereNotNull('min_stock')
+              ->whereColumn('stock', '<=', 'min_stock');
+        })
+        ->orWhere(function ($q) use ($defaultMinStock) {
+            // Productos sin min_stock pero con umbral global definido
+            if ($defaultMinStock > 0) {
+                $q->whereNull('min_stock')
+                  ->where('stock', '<=', $defaultMinStock);
+            }
+        })
+        ->orWhere('stock', '<=', 0); // Siempre alertar productos en cero o negativos
+
     $todayCompleted = \App\Models\Invoice::where('status', 'paid')
         ->when($warehouseId, fn($q) => $q->where('warehouse_id', $warehouseId))
         ->where('created_at', '>=', $today);
@@ -205,7 +278,7 @@ Route::get('/dashboard', function () {
         'today_sales_count' => (int) $todayCompleted->count(),
         'month_sales_usd' => (float) $monthCompleted->sum('total_usd'),
         'month_sales_count' => (int) $monthCompleted->count(),
-        'low_stock_products' => (int) \App\Models\Product::where('stock', '<=', 5)->count(),
+        'low_stock_products' => (int) (clone $lowStockQuery)->count(),
         'total_stock' => (int) \App\Models\Product::sum('stock'),
         'invoice_pending' => (int) \App\Models\Invoice::where('status', 'pending')->when($warehouseId, fn($q) => $q->where('warehouse_id', $warehouseId))->count(),
         'invoice_paid' => (int) \App\Models\Invoice::where('status', 'paid')->when($warehouseId, fn($q) => $q->where('warehouse_id', $warehouseId))->count(),
@@ -229,10 +302,25 @@ Route::get('/dashboard', function () {
 
     $top = \App\Models\Product::orderByDesc('stock')->take(8)->get(['id','name','stock']);
 
+    $lowStockProducts = (clone $lowStockQuery)
+        ->orderBy('stock')
+        ->take(10)
+        ->get(['id','name','sku','stock','min_stock']);
+
+    $expiredLayaways = \App\Models\Layaway::whereIn('status', ['active','pending'])
+        ->whereNotNull('expires_at')
+        ->where('expires_at', '<', now())
+        ->with('customer:id,name')
+        ->orderBy('expires_at')
+        ->take(10)
+        ->get(['id','number','customer_id','total_usd','expires_at','status']);
+
     return Inertia::render('Admin/Dashboard', [
         'metrics' => $metrics,
         'counts' => $counts,
         'topProducts' => $top,
+        'lowStockProducts' => $lowStockProducts,
+        'expiredLayaways' => $expiredLayaways,
         'warehouses' => \App\Models\Warehouse::orderBy('name')->get(['id','name','code']),
         'selected_warehouse' => $warehouseId,
         'rate' => $rate,

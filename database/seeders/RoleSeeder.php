@@ -22,6 +22,8 @@ class RoleSeeder extends Seeder
             'view rmas', 'manage rmas',
             'view warehouses', 'manage warehouses',
             'view credits', 'manage credits',
+            'manage settings',
+            'view audit logs',
         ];
 
         foreach ($permissions as $name) {
@@ -40,7 +42,49 @@ class RoleSeeder extends Seeder
             'guard_name' => 'web',
         ]);
 
+        $cashier = Role::firstOrCreate([
+            'name' => 'cashier',
+            'guard_name' => 'web',
+        ]);
+
+        $warehouse = Role::firstOrCreate([
+            'name' => 'warehouse',
+            'guard_name' => 'web',
+        ]);
+
+        $supervisor = Role::firstOrCreate([
+            'name' => 'supervisor',
+            'guard_name' => 'web',
+        ]);
+
         $admin->givePermissionTo($permissions);
         $user->givePermissionTo(['view products', 'view invoices']);
+
+        // Cajero: foco en ventas, clientes y créditos
+        $cashier->givePermissionTo([
+            'view products',
+            'view inventory',
+            'view invoices', 'manage invoices',
+            'view orders', 'manage orders',
+            'view customers', 'manage customers',
+            'view providers',
+            'view credits', 'manage credits',
+        ]);
+
+        // Almacenista: foco en inventario, productos, proveedores y bodegas
+        $warehouse->givePermissionTo([
+            'view products', 'manage products',
+            'view inventory', 'manage inventory',
+            'view providers', 'manage providers',
+            'view warehouses', 'manage warehouses',
+        ]);
+
+        // Supervisor: visión amplia operativa sin gestión de usuarios/roles ni configuración
+        $supervisorPermissions = collect($permissions)
+            ->reject(fn ($name) => in_array($name, ['manage users', 'manage settings'], true))
+            ->values()
+            ->all();
+
+        $supervisor->givePermissionTo($supervisorPermissions);
     }
 }
