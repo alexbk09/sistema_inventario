@@ -56,6 +56,13 @@ export default function SalesTopProducts({ items, filters = {}, warehouses = [] 
           >
             Ranking de productos
           </button>
+          <button
+            type="button"
+            onClick={() => router.get(route('admin.reports.sales.by_category'), {}, { replace: true })}
+            className="px-3 py-1.5 text-xs rounded border border-border text-muted-foreground hover:bg-muted"
+          >
+            Ventas por categoría
+          </button>
         </div>
 
         {/* Filtros */}

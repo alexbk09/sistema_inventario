@@ -39,6 +39,37 @@ export default function InventoryKardex({ movements, filters = {}, product, prod
           </div>
         </div>
 
+        {/* Navegación entre vistas de inventario */}
+        <div className="flex gap-2 border-b border-border pb-2">
+          <button
+            type="button"
+            onClick={() => router.get(route('admin.reports.inventory.index'), {}, { replace: true })}
+            className="px-3 py-1.5 text-xs rounded border border-border text-muted-foreground hover:bg-muted"
+          >
+            Valorización global
+          </button>
+          <button
+            type="button"
+            onClick={() => router.get(route('admin.reports.inventory.by_warehouse'), {}, { replace: true })}
+            className="px-3 py-1.5 text-xs rounded border border-border text-muted-foreground hover:bg-muted"
+          >
+            Por producto y bodega
+          </button>
+          <button
+            type="button"
+            className="px-3 py-1.5 text-xs rounded bg-primary text-primary-foreground"
+          >
+            Kardex de inventario
+          </button>
+          <button
+            type="button"
+            onClick={() => router.get(route('admin.reports.inventory.rotation'), {}, { replace: true })}
+            className="px-3 py-1.5 text-xs rounded border border-border text-muted-foreground hover:bg-muted"
+          >
+            Rotación de productos
+          </button>
+        </div>
+
         {/* Filtros */}
         <div className="rounded-lg border border-border bg-white p-4 space-y-3 text-sm">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">

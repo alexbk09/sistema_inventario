@@ -67,24 +67,24 @@ Crear un **módulo de configuración** accesible desde el panel admin para que e
 
 ### 3.2. Reportes de inventario
 
-- [ ] Reporte de valorización de stock actual (cantidad * costo promedio) por producto y por bodega.
+- [x] Reporte de valorización de stock actual (cantidad * costo promedio) por producto y por bodega.
 - [x] Kardex de cada producto (entradas y salidas con saldo).
 - [x] Reporte de productos con bajo stock (por debajo de mínimo) con opción de exportar.
-- [ ] Reporte de rotación de productos (días de inventario, productos de baja rotación).
+- [x] Reporte de rotación de productos (días de inventario, productos de baja rotación).
 
 ### 3.3. Reportes financieros y de crédito
 
 - [ ] Reporte de cuentas por pagar a proveedores (si se usa AccountsPayable).
-- [ ] Reporte de créditos por cliente (saldo actual, límite, morosidad).
-- [ ] Historial de movimientos de crédito y pagos.
-- [ ] Resumen de apartados activos y vencidos.
+- [x] Reporte de créditos por cliente (saldo actual, límite, morosidad).
+- [x] Historial de movimientos de crédito y pagos.
+- [x] Resumen de apartados activos y vencidos.
 
 ### 3.4. Dashboard avanzado
 
-- [ ] Gráficos de ventas por día/mes (Chart.js) con comparación contra período anterior.
-- [ ] Gráfico de top productos y top clientes.
-- [ ] Indicadores clave (KPI): margen estimado, rotación de stock, % ventas a crédito vs contado.
-- [ ] Filtro global por sucursal/bodega en dashboard.
+- [x] Gráficos de ventas por día/mes (Chart.js) con comparación contra período anterior.
+- [x] Gráfico de top productos y top clientes.
+- [x] Indicadores clave (KPI): margen estimado y % ventas a crédito vs contado.
+- [x] Filtro global por sucursal/bodega en dashboard.
 
 ---
 

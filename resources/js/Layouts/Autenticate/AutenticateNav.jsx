@@ -221,7 +221,7 @@ export default function AutenticateNav() {
                                         </div>
 
                                         {/* Grupo Reportes */}
-                                        {(canViewSalesReports || canViewInventoryReports) && (
+                                        {(canViewSalesReports || canViewInventoryReports || canViewCredits) && (
                                             <div className="relative group">
                                                 <button
                                                     type="button"
@@ -259,6 +259,20 @@ export default function AutenticateNav() {
                                                                 Inventario
                                                             </Link>
                                                         )}
+                                                        {canViewCredits && (
+                                                            <Link
+                                                                href={route('admin.reports.credits.index')}
+                                                                className="block px-3 py-1.5 hover:bg-gray-100"
+                                                            >
+                                                                Créditos
+                                                            </Link>
+                                                        )}
+                                                           <Link
+                                                               href={route('admin.reports.layaways.index')}
+                                                               className="block px-3 py-1.5 hover:bg-gray-100"
+                                                           >
+                                                               Apartados
+                                                           </Link>
                                                     </div>
                                                 </div>
                                             </div>
@@ -575,7 +589,7 @@ export default function AutenticateNav() {
                                 )}
 
                                 {/* Grupo Reportes */}
-                                {(canViewSalesReports || canViewInventoryReports) && (
+                                {(canViewSalesReports || canViewInventoryReports || canViewCredits) && (
                                     <>
                                         <div className="px-4 pt-3 text-xs font-semibold text-gray-500 uppercase">
                                             Reportes
@@ -594,6 +608,14 @@ export default function AutenticateNav() {
                                                 active={route().current('admin.reports.inventory.*')}
                                             >
                                                 Inventario
+                                            </ResponsiveNavLink>
+                                        )}
+                                        {canViewCredits && (
+                                            <ResponsiveNavLink
+                                                href={route('admin.reports.credits.index')}
+                                                active={route().current('admin.reports.credits.*')}
+                                            >
+                                                Créditos
                                             </ResponsiveNavLink>
                                         )}
                                     </>

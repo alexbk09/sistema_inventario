@@ -19,10 +19,17 @@ use App\Http\Controllers\NewsletterSubscriptionController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\QrController;
 use App\Http\Controllers\AuditLogController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Reports\SalesReportController;
 use App\Http\Controllers\Reports\InventoryReportController;
 use App\Http\Controllers\Reports\InventoryKardexController;
+use App\Http\Controllers\Reports\InventoryByWarehouseController;
+use App\Http\Controllers\Reports\CreditReportController;
+use App\Http\Controllers\Reports\CreditMovementsReportController;
+use App\Http\Controllers\Reports\LayawayReportController;
+use App\Http\Controllers\Reports\InventoryRotationController;
 Route::middleware(['auth', 'verified', 'role:admin|supervisor|cashier|warehouse'])->group(function () {
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/admin/qr', function () {
         return Inertia::render('Admin/QRScanner');
     })->name('admin.qr');
@@ -112,6 +119,26 @@ Route::middleware(['auth', 'verified', 'role:admin|supervisor|cashier|warehouse'
     Route::get('/admin/reports/inventory/kardex', [InventoryKardexController::class, 'index'])
         ->middleware('permission:view products')
         ->name('admin.reports.inventory.kardex');
+
+    Route::get('/admin/reports/inventory/by-warehouse', [InventoryByWarehouseController::class, 'index'])
+        ->middleware('permission:view products')
+        ->name('admin.reports.inventory.by_warehouse');
+
+    Route::get('/admin/reports/inventory/rotation', [InventoryRotationController::class, 'index'])
+        ->middleware('permission:view products')
+        ->name('admin.reports.inventory.rotation');
+
+    Route::get('/admin/reports/credits', [CreditReportController::class, 'index'])
+        ->middleware('permission:view credits')
+        ->name('admin.reports.credits.index');
+
+    Route::get('/admin/reports/credits/movements', [CreditMovementsReportController::class, 'index'])
+        ->middleware('permission:view credits')
+        ->name('admin.reports.credits.movements');
+
+    Route::get('/admin/reports/layaways', [LayawayReportController::class, 'index'])
+        ->middleware('permission:view credits')
+        ->name('admin.reports.layaways.index');
 
     // Proveedores
     Route::get('/admin/providers', [ProviderController::class, 'index'])->name('admin.providers.index');
