@@ -1,3 +1,19 @@
+
+## Últimas Actualizaciones (marzo 2026)
+
+- Unificada la lógica de imágenes de productos en Home y Tienda: ahora el campo `image` siempre entrega la primera imagen del carrusel (si existe) o el `image_url` de respaldo, igual que en carrito y recomendaciones. Esto asegura visualización consistente en todos los módulos del frontend (carrusel, listado, recomendaciones, carrito).
+
+---
+
+## Dashboard de Clientes
+
+Ruta: `/mi-panel` (solo usuarios con rol cliente)
+
+Incluye:
+- Resumen de compras (total gastado, compras, última compra)
+- Historial de compras
+- Productos más comprados
+- Datos de perfil
 # Sistema de Inventario
 
 Aplicación web de gestión de inventario, ventas y clientes pensada para comercios que venden en USD y BS. Está construida con **Laravel 12**, **Inertia.js + React** y **Tailwind CSS**, e incluye panel administrativo, tienda pública y módulos avanzados como créditos, apartados, multi‑bodega y RMA.
@@ -27,6 +43,20 @@ Rutas públicas y del panel más usadas (ver detalle en [routes/web.php](routes/
 - `/checkout` / `/confirmacion` – Flujo de compra pública.
 - `/dashboard` – Dashboard administrativo (requiere usuario autenticado con rol `admin`).
 - `/admin/...` – Gestión de productos, inventario, bodegas, facturas, clientes, proveedores, créditos, apartados, RMA y escáner QR.
+
+---
+
+
+
+## Últimas Actualizaciones
+
+- **28/03/2026:**
+   - Se unificaron los módulos de cliente y usuario: ahora los clientes se registran como usuarios con rol `cliente` y pueden acceder a su propio dashboard en `/mi-panel`.
+   - Se implementó el dashboard de clientes con resumen de compras, historial y productos más comprados.
+   - La navegación y el menú admin ahora se adaptan dinámicamente según el rol y permisos del usuario (cliente, admin, etc.).
+   - Se mejoró el feedback visual de errores en formularios (registro, login, checkout) usando notificaciones (react-hot-toast).
+   - Se escribieron y ajustaron tests feature para los nuevos flujos de registro, login, checkout y dashboard, asegurando la correcta gestión de permisos y roles (Spatie Permission).
+   - El checkout ahora muestra los productos con el mismo diseño visual que el carrito de compra: tarjetas con imagen, nombre, categoría, precio editable, cantidad (+/−) y botón eliminar. Esto mejora la experiencia de usuario y la consistencia visual en el flujo de compra.
 
 ---
 

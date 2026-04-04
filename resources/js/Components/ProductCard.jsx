@@ -81,93 +81,106 @@ export default function ProductCard({
   }, [images.length, isHovered])
 
   return (
-    <Link
-      href={route('product.show', product.id)}
-      className="bg-card border border-border rounded-lg overflow-hidden hover:border-primary hover:shadow-lg transition-all duration-300 group block"
+    <div
+      className="bg-card border border-border rounded-lg overflow-hidden hover:border-primary hover:shadow-lg transition-all duration-300 group flex flex-col h-full"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Image Container */}
-      <div className="relative w-full h-48 bg-muted overflow-hidden">
-        {currentImage ? (
-          <img
-            src={currentImage.url}
-            alt={product.name}
-            className="object-cover w-full h-full group-hover:scale-110 transition-transform duration-300"
-          />
-        ) : (
-          <img
-            src="/placeholder.svg"
-            alt={product.name}
-            className="object-cover w-full h-full group-hover:scale-110 transition-transform duration-300"
-          />
-        )}
-        {images.length > 1 && (
-          <>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-                setImageIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1))
-              }}
-              className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40 text-white rounded-full p-1 hover:bg-black/60"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-                setImageIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1))
-              }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 text-white rounded-full p-1 hover:bg-black/60"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </>
-        )}
-        {images.length > 1 && (
-          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
-            {images.map((img, index) => (
+      {/* Imagen y link al detalle */}
+      <Link
+        href={route('product.show', product.id)}
+        className="block"
+        tabIndex={-1}
+        aria-label={product.name}
+      >
+        <div className="relative w-full h-48 bg-muted overflow-hidden">
+          {currentImage ? (
+            <img
+              src={currentImage.url}
+              alt={product.name}
+              className="object-cover w-full h-full group-hover:scale-110 transition-transform duration-300"
+              loading="lazy"
+            />
+          ) : (
+            <img
+              src="/placeholder.svg"
+              alt={product.name}
+              className="object-cover w-full h-full group-hover:scale-110 transition-transform duration-300"
+              loading="lazy"
+            />
+          )}
+          {images.length > 1 && (
+            <>
               <button
-                key={img.id ?? index}
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation()
-                  setImageIndex(index)
+                  setImageIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1))
                 }}
-                className={`w-2 h-2 rounded-full border border-white transition-all ${
-                  index === imageIndex ? 'bg-white scale-110' : 'bg-white/40'
-                }`}
-              />
-            ))}
-          </div>
-        )}
-        {isOutOfStock && (
-          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-            <span className="text-white font-bold text-lg">
-              {t('product.out_of_stock', 'Sin Stock')}
-            </span>
-          </div>
-        )}
-        {product.stock > 0 && (
-          <div className="absolute top-2 right-2 bg-destructive text-destructive-foreground px-3 py-1 rounded-full text-xs font-semibold text-white">
-            {t('product.stock_label', `${product.stock} disponibles`, { count: product.stock })}
-          </div>
-        )}
-      </div>
+                className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40 text-white rounded-full p-1 hover:bg-black/60"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setImageIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1))
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 text-white rounded-full p-1 hover:bg-black/60"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </>
+          )}
+          {images.length > 1 && (
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
+              {images.map((img, index) => (
+                <button
+                  key={img.id ?? index}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setImageIndex(index)
+                  }}
+                  className={`w-2 h-2 rounded-full border border-white transition-all ${
+                    index === imageIndex ? 'bg-white scale-110' : 'bg-white/40'
+                  }`}
+                />
+              ))}
+            </div>
+          )}
+          {isOutOfStock && (
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+              <span className="text-white font-bold text-lg">
+                {t('product.out_of_stock', 'Sin Stock')}
+              </span>
+            </div>
+          )}
+          {product.stock > 0 && (
+            <div className="absolute top-2 right-2 bg-destructive text-destructive-foreground px-3 py-1 rounded-full text-xs font-semibold text-white">
+              {t('product.stock_label', `${product.stock} disponibles`, { count: product.stock })}
+            </div>
+          )}
+        </div>
+      </Link>
 
-      {/* Content */}
-      <div className="p-4 flex flex-col h-full">
-        {/* Category */}
+      {/* Contenido */}
+      <div className="p-4 flex flex-col h-full flex-1">
+        {/* Categoría */}
         <p className="text-xs text-accent font-semibold uppercase mb-1 tracking-wide">
           {product.category ?? (Array.isArray(product.categories) ? (product.categories[0]?.name ?? product.categories[0]) : '')}
         </p>
 
-        {/* Name */}
-        <h3 className="text-lg font-bold text-foreground mb-2 line-clamp-2 group-hover:text-primary transition">
-          {product.name}
-        </h3>
+        {/* Nombre (link al detalle) */}
+        <Link
+          href={route('product.show', product.id)}
+          className="block focus:outline-none"
+        >
+          <h3 className="text-lg font-bold text-foreground mb-2 line-clamp-2 group-hover:text-primary transition">
+            {product.name}
+          </h3>
+        </Link>
 
         {/* Rating */}
         <div className="flex items-center gap-2 mb-3">
@@ -188,14 +201,14 @@ export default function ProductCard({
           </span>
         </div>
 
-        {/* Description */}
+        {/* Descripción */}
         {product.description && (
           <p className="text-sm text-muted-foreground">
             {product.description}
           </p>
         )}
 
-        {/* Price */}
+        {/* Precio */}
         <div>
           {displayCurrency === (secondaryCurrency || 'VES') ? (
             <>
@@ -220,11 +233,14 @@ export default function ProductCard({
           )}
         </div>
 
-        {/* Button */}
+        {/* Botón Agregar al carrito */}
         <button
-          onClick={handleAddToCart}
+          onClick={(e) => {
+            e.stopPropagation()
+            handleAddToCart()
+          }}
           disabled={isAdding || isOutOfStock}
-          className={`w-full py-2 px-4 rounded-lg font-semibold transition-all duration-300 flex items-center justify-center gap-2 border border-primary shadow-sm focus:outline-none focus:ring-2 focus:ring-primary ${
+          className={`w-full mt-4 py-2 px-4 rounded-lg font-semibold transition-all duration-300 flex items-center justify-center gap-2 border border-primary shadow-sm focus:outline-none focus:ring-2 focus:ring-primary ${
             isOutOfStock
               ? 'bg-muted text-foreground cursor-not-allowed opacity-100'
               : 'bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95'
@@ -236,13 +252,13 @@ export default function ProductCard({
             : t('product.add_to_cart', 'Agregar al Carrito')}
         </button>
 
-        {/* Notification */}
+        {/* Notificación */}
         {showNotification && (
           <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-700 text-center animate-fade-in">
             {t('cart.added', '✓ Agregado al carrito')}
           </div>
         )}
       </div>
-    </Link>
+    </div>
   )
 }

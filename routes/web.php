@@ -28,6 +28,16 @@ use App\Http\Controllers\Reports\CreditReportController;
 use App\Http\Controllers\Reports\CreditMovementsReportController;
 use App\Http\Controllers\Reports\LayawayReportController;
 use App\Http\Controllers\Reports\InventoryRotationController;
+
+// Dashboard y módulos para clientes
+Route::middleware(['auth', 'verified', 'role:cliente', 'permission:view customer dashboard'])->group(function () {
+    Route::get('/mi-panel', [\App\Http\Controllers\CustomerDashboardController::class, 'index'])->name('customer.dashboard');
+    Route::patch('/mi-panel/perfil', [\App\Http\Controllers\CustomerProfileController::class, 'update'])->name('customer.profile.update');
+    Route::get('/mi-panel/tipos-identificacion', [\App\Http\Controllers\CustomerProfileController::class, 'identificationTypes'])->name('customer.profile.identification_types');
+});
+
+// Las rutas de login y registro están en routes/auth.php y solo usan el middleware 'guest'. No requieren protección de permisos ni roles.
+
 Route::middleware(['auth', 'verified', 'role:admin|supervisor|cashier|warehouse'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/admin/qr', function () {
@@ -44,7 +54,8 @@ Route::middleware(['auth', 'verified', 'role:admin|supervisor|cashier|warehouse'
         ->middleware('permission:manage settings')
         ->name('admin.settings.update');
 
-    // Productos
+    // Productos (solo para admin, supervisor, cashier, warehouse)
+    // Los clientes no pueden acceder a estas rutas
     Route::get('/admin/products', [ProductController::class, 'index'])->name('admin.products.index');
     Route::get('/admin/products/create', [ProductController::class, 'create'])->name('admin.products.create');
     Route::post('/admin/products', [ProductController::class, 'store'])->name('admin.products.store');
@@ -248,11 +259,11 @@ Route::get('/product/{product}', function (\App\Models\Product $product) {
     ]);
 })->name('product.show');
 
-// Checkout público
-Route::get('/checkout', [CheckoutController::class, 'index'])->name('checkout.index');
-
-// Guardar checkout
-Route::post('/checkout', [CheckoutController::class, 'store'])->name('checkout.store');
+// Checkout protegido (requiere autenticación)
+Route::middleware('auth')->group(function () {
+    Route::get('/checkout', [CheckoutController::class, 'index'])->name('checkout.index');
+    Route::post('/checkout', [CheckoutController::class, 'store'])->name('checkout.store');
+});
 Route::get('/confirmacion', [CheckoutController::class, 'confirmation'])->name('checkout.confirmation');
 
 // Ruta pública simple para seguimiento de pedido/factura

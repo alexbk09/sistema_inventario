@@ -3,11 +3,13 @@ import ProductCard from '@/Components/ProductCard.jsx'
 import ProductFilters from '@/Components/shop/ProductFilters.jsx'
 import ShoppingCart from '@/Components/shop/ShoppingCart.jsx'
 import { useState, useMemo } from 'react'
-import { ShoppingBag } from 'lucide-react'
+import { ShoppingBag, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useCart } from '@/Hooks/useCart'
 import { useI18n } from '@/Hooks/useI18n'
+import { router } from '@inertiajs/react'
+import { useEffect } from 'react'
 
-export default function ShopIndex({ products = [], categories = [], canLogin }) {
+export default function ShopIndex({ products = {}, categories = [], canLogin }) {
   const { t } = useI18n()
   const [filters, setFilters] = useState({
     categories: [],
@@ -19,10 +21,21 @@ export default function ShopIndex({ products = [], categories = [], canLogin }) 
   })
   const [isCartOpen, setIsCartOpen] = useState(false)
   const { itemCount } = useCart()
+  const [productList, setProductList] = useState(products.data || [])
+  const [page, setPage] = useState(products.current_page || 1)
+  const [lastPage, setLastPage] = useState(products.last_page || 1)
+  const [loadingMore, setLoadingMore] = useState(false)
 
-  // Filtrar y ordenar productos
+  // Cuando cambian los productos (por navegación o filtros), actualiza el listado
+  useEffect(() => {
+    setProductList(products.data || [])
+    setPage(products.current_page || 1)
+    setLastPage(products.last_page || 1)
+  }, [products])
+
+  // Filtrar y ordenar productos (solo sobre los cargados)
   const filteredProducts = useMemo(() => {
-    let result = [...products]
+    let result = [...productList]
 
     // Filtro por búsqueda (nombre, descripción, SKU, código de barras)
     if (filters.search) {
@@ -90,7 +103,83 @@ export default function ShopIndex({ products = [], categories = [], canLogin }) 
     }
 
     return result
-  }, [filters, products])
+  }, [filters, productList])
+
+  // Cargar más productos (siguiente página)
+  const handleLoadMore = () => {
+    if (page >= lastPage) return
+    setLoadingMore(true)
+    router.get(route('shop.index'), { page: page + 1 }, {
+      preserveScroll: true,
+      preserveState: true,
+      onSuccess: (pageData) => {
+        // Concatenar productos
+        setProductList((prev) => [...prev, ...(pageData.props.products.data || [])])
+        setPage(pageData.props.products.current_page || page + 1)
+        setLastPage(pageData.props.products.last_page || lastPage)
+        setLoadingMore(false)
+      },
+      onError: () => setLoadingMore(false)
+    })
+  }
+
+  // Paginador clásico
+  const renderPaginator = () => {
+    if (lastPage <= 1) return null
+    const pages = []
+    for (let i = 1; i <= lastPage; i++) {
+      pages.push(i)
+    }
+    return (
+      <div className="flex justify-center items-center gap-2 mt-8">
+        <button
+          onClick={() => handlePageChange(page - 1)}
+          disabled={page <= 1}
+          className="px-3 py-2 rounded-lg border border-border bg-background text-foreground hover:bg-muted transition disabled:opacity-50 flex items-center"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        {pages.map((p) => (
+          <button
+            key={p}
+            onClick={() => handlePageChange(p)}
+            className={`px-3 py-2 rounded-lg border font-semibold transition-all duration-150 ${
+              p === page
+                ? 'bg-primary text-primary-foreground border-primary shadow'
+                : 'bg-background text-foreground border-border hover:bg-muted'
+            }`}
+            disabled={p === page}
+          >
+            {p}
+          </button>
+        ))}
+        <button
+          onClick={() => handlePageChange(page + 1)}
+          disabled={page >= lastPage}
+          className="px-3 py-2 rounded-lg border border-border bg-background text-foreground hover:bg-muted transition disabled:opacity-50 flex items-center"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+    )
+  }
+
+  // Cambiar de página
+  const handlePageChange = (newPage) => {
+    if (newPage < 1 || newPage > lastPage || newPage === page) return
+    setLoadingMore(true)
+    router.get(route('shop.index'), { page: newPage }, {
+      preserveScroll: true,
+      preserveState: true,
+      onSuccess: (pageData) => {
+        setProductList(pageData.props.products.data || [])
+        setPage(pageData.props.products.current_page || newPage)
+        setLastPage(pageData.props.products.last_page || lastPage)
+        setLoadingMore(false)
+      },
+      onError: () => setLoadingMore(false)
+    })
+  }
 
   return (
     <GuestLayout>
@@ -154,15 +243,18 @@ export default function ShopIndex({ products = [], categories = [], canLogin }) 
                   </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredProducts.map((product) => (
-                    <ProductCard
-                      key={product.id}
-                      product={product}
-                      onAddedToCart={() => setIsCartOpen(true)}
-                    />
-                  ))}
-                </div>
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredProducts.map((product) => (
+                      <ProductCard
+                        key={product.id}
+                        product={product}
+                        onAddedToCart={() => setIsCartOpen(true)}
+                      />
+                    ))}
+                  </div>
+                  {renderPaginator()}
+                </>
               )}
             </div>
           </div>

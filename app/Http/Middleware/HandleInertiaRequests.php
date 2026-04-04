@@ -101,12 +101,7 @@ class HandleInertiaRequests extends Middleware
                     'name' => $user->name,
                     'email' => $user->email,
                     'type' => $user->type,
-                    'roles' => method_exists($user, 'roles') ? $user->roles->map(function ($role) {
-                        return [
-                            'id' => $role->id,
-                            'name' => $role->name,
-                        ];
-                    }) : [],
+                    'roles' => method_exists($user, 'roles') ? $user->roles->pluck('name')->toArray() : [],
                     'permissions' => method_exists($user, 'getAllPermissions')
                         ? $user->getAllPermissions()->pluck('name')->values()
                         : [],

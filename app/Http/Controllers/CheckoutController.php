@@ -17,8 +17,23 @@ class CheckoutController extends Controller
     {
         $rate = $currency->getPromedio('oficial') ?? (float) config('currency.bs_rate', 0);
 
+        $customer = null;
+        if (auth()->check()) {
+            $customer = \App\Models\Customer::where('user_id', auth()->id())->first();
+        }
+
         return Inertia::render('Checkout/Index', [
             'rate' => $rate,
+            'customer' => $customer ? [
+                'fullName' => $customer->name,
+                'identification_type_id' => $customer->identification_type_id,
+                'identification' => $customer->identification,
+                'email' => $customer->email,
+                'phone' => $customer->phone,
+                'address' => $customer->address,
+                'city' => $customer->city ?? '',
+                'postal_code' => $customer->postal_code ?? '',
+            ] : null,
         ]);
     }
 

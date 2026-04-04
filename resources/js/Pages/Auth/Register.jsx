@@ -1,6 +1,7 @@
 import InputError from '@/Components/InputError';
 import GuestLayout from '@/Layouts/GuestLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
+import { toast } from 'react-hot-toast';
 import { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff, User } from 'lucide-react'
 
@@ -8,6 +9,8 @@ export default function Register() {
     const { data, setData, post, processing, errors, reset } = useForm({
         name: '',
         email: '',
+        phone: '',
+        address: '',
         password: '',
         password_confirmation: '',
     });
@@ -18,8 +21,17 @@ export default function Register() {
 
     const submit = (e) => {
         e.preventDefault();
-
+        setErrorMessage('');
         post(route('register'), {
+            onError: (errors) => {
+                const firstKey = Object.keys(errors || {})[0];
+                const msg = errors?.[firstKey] || 'Error al registrar. Revisa los campos.';
+                setErrorMessage(msg);
+                toast.error(msg);
+            },
+            onSuccess: () => {
+                toast.success('¡Registro exitoso!');
+            },
             onFinish: () => reset('password', 'password_confirmation'),
         });
     };
@@ -86,6 +98,44 @@ export default function Register() {
                                 />
                             </div>
                             <InputError message={errors.email} className="mt-2" />
+                        </div>
+
+                        {/* Teléfono */}
+                        <div>
+                            <label htmlFor="phone" className="block text-sm font-medium text-foreground mb-2">
+                                Teléfono
+                            </label>
+                            <div className="relative">
+                                <input
+                                    id="phone"
+                                    type="tel"
+                                    value={data.phone}
+                                    onChange={(e) => setData('phone', e.target.value)}
+                                    placeholder="Tu número de teléfono"
+                                    required
+                                    className="w-full pl-4 pr-4 py-2 border border-border rounded-lg bg-card text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition"
+                                />
+                            </div>
+                            <InputError message={errors.phone} className="mt-2" />
+                        </div>
+
+                        {/* Dirección */}
+                        <div>
+                            <label htmlFor="address" className="block text-sm font-medium text-foreground mb-2">
+                                Dirección
+                            </label>
+                            <div className="relative">
+                                <input
+                                    id="address"
+                                    type="text"
+                                    value={data.address}
+                                    onChange={(e) => setData('address', e.target.value)}
+                                    placeholder="Tu dirección"
+                                    required
+                                    className="w-full pl-4 pr-4 py-2 border border-border rounded-lg bg-card text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition"
+                                />
+                            </div>
+                            <InputError message={errors.address} className="mt-2" />
                         </div>
 
                         {/* Contraseña */}

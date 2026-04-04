@@ -48,12 +48,15 @@ class RecommendationController extends Controller
         }
 
         $items = $products->take(8)->map(function ($p) use ($rate) {
+            // Buscar imagen principal (ProductImage) o fallback a image_url
+            $primaryImage = $p->images->sortBy('sort_order')->first();
+            $imageUrl = $primaryImage ? asset('storage/' . $primaryImage->path) : ($p->image_url ?: null);
             return [
                 'id' => $p->id,
                 'name' => $p->name,
                 'price' => (float) $p->price_usd,
                 'price_bs' => round((float) $p->price_usd * ($rate ?: 0), 2),
-                'image' => $p->image_url,
+                'image' => $imageUrl,
                 'category' => optional($p->categories->first())->name ?? null,
                 'stock' => (int) $p->stock,
             ];

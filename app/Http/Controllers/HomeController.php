@@ -27,6 +27,8 @@ class HomeController extends Controller
             ->take(8)
             ->get()
             ->map(function ($p) use ($rate) {
+                $primaryImage = $p->images->sortBy('sort_order')->first();
+                $imageUrl = $primaryImage ? asset('storage/' . $primaryImage->path) : ($p->image_url ?: null);
                 return [
                     'id' => $p->id,
                     'name' => $p->name,
@@ -36,7 +38,7 @@ class HomeController extends Controller
                         'id' => $img->id,
                         'url' => asset('storage/'.$img->path),
                     ]),
-                    'image' => $p->image_url,
+                    'image' => $imageUrl,
                     'category' => optional($p->categories->first())->name ?? null,
                     'categories' => $p->categories->pluck('name'),
                     'stock' => (int) $p->stock,

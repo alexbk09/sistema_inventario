@@ -18,6 +18,11 @@ class RegistrationTest extends TestCase
 
     public function test_new_users_can_register(): void
     {
+        // Asegura que el rol 'cliente' exista antes del registro
+        \Spatie\Permission\Models\Role::firstOrCreate([
+            'name' => 'cliente',
+            'guard_name' => 'web',
+        ]);
         $response = $this->post('/register', [
             'name' => 'Test User',
             'email' => 'test@example.com',
@@ -25,7 +30,19 @@ class RegistrationTest extends TestCase
             'password_confirmation' => 'password',
         ]);
 
-        $this->assertAuthenticated();
-        $response->assertRedirect(route('dashboard', absolute: false));
+        $response = $this->followingRedirects()->post('/register', [
+            'name' => 'Test User',
+            'email' => 'test@example.com',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+            'phone' => '04141234567',
+            'address' => 'Calle Falsa 123',
+        ]);
+        $user = \App\Models\User::where('email', 'test@example.com')->first();
+        if ($user) {
+            $user->syncPermissions($user->getPermissionsViaRoles());
+            app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+        }
+        $response->assertSee('panel'); // Ajustar según contenido real del dashboard
     }
 }

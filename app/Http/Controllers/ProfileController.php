@@ -18,9 +18,21 @@ class ProfileController extends Controller
      */
     public function edit(Request $request): Response
     {
+        $customer = \App\Models\Customer::where('user_id', $request->user()->id)->first();
+        $profile = $customer ? [
+            'name' => $customer->name,
+            'email' => $customer->email,
+            'phone' => $customer->phone,
+            'address' => $customer->address,
+            'city' => $customer->city,
+            'postal_code' => $customer->postal_code,
+            'identification' => $customer->identification,
+            'identification_type_id' => $customer->identification_type_id,
+        ] : null;
         return Inertia::render('Profile/Edit', [
             'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
             'status' => session('status'),
+            'profile' => $profile,
         ]);
     }
 

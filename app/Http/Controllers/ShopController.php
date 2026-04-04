@@ -11,7 +11,13 @@ use Inertia\Inertia;
 
 class ShopController extends Controller
 {
-    public function index()
+    /**
+     * Muestra la lista paginada de productos para la tienda.
+     *
+     * @param \Illuminate\Http\Request $request
+     * @return \Inertia\Response
+     */
+    public function index(\Illuminate\Http\Request $request)
     {
         $currency = app(CurrencyService::class);
         $rate = $currency->getPromedio('oficial') ?? (float) config('currency.bs_rate', 0);
@@ -25,6 +31,10 @@ class ShopController extends Controller
             ->groupBy('product_id')
             ->pluck('total_sold', 'product_id');
 
+
+        // Obtener el número de página desde la request (por defecto 1)
+        $page = (int) $request->input('page', 1);
+
         $products = Product::with([
                 'categories:id,name',
                 'images' => function ($q) {
@@ -32,32 +42,40 @@ class ShopController extends Controller
                 },
             ])
             ->latest()
-            ->take(48)
-            ->get()
-            ->map(function ($p) use ($rate, $salesByProduct) {
-                return [
-                    'id' => $p->id,
-                    'name' => $p->name,
-                    'sku' => $p->sku,
-                    'barcode' => $p->barcode,
-                    'price' => (float) $p->price_usd,
-                    'price_bs' => round((float) $p->price_usd * ($rate ?: 0), 2),
-                    'images' => $p->images->map(fn ($img) => [
-                        'id' => $img->id,
-                        'url' => asset('storage/'.$img->path),
-                    ]),
-                    'image' => $p->image_url,
-                    'category' => optional($p->categories->first())->name ?? null,
-                    'categories' => $p->categories->pluck('name'),
-                    'stock' => (int) $p->stock,
-                    'description' => $p->description,
-                    'is_featured' => (bool) $p->is_featured,
-                    'created_at' => $p->created_at?->toIso8601String(),
-                    'sold_quantity' => (int) ($salesByProduct[$p->id] ?? 0),
-                    'rating' => 5,
-                    'reviews' => 0,
-                ];
-            });
+            ->paginate(10, ['*'], 'page', $page);
+
+        // Si la página solicitada no tiene productos y no es la primera, redirigir a la primera página
+        if ($products->isEmpty() && $page > 1) {
+            return redirect()->route('shop.index', ['page' => 1]);
+        }
+
+        // Mapear los productos para mantener compatibilidad de campos
+        $products->getCollection()->transform(function ($p) use ($rate, $salesByProduct) {
+            $images = $p->images->map(fn ($img) => [
+                'id' => $img->id,
+                'url' => asset('storage/'.$img->path),
+            ]);
+            $mainImage = $images->first()['url'] ?? $p->image_url;
+            return [
+                'id' => $p->id,
+                'name' => $p->name,
+                'sku' => $p->sku,
+                'barcode' => $p->barcode,
+                'price' => (float) $p->price_usd,
+                'price_bs' => round((float) $p->price_usd * ($rate ?: 0), 2),
+                'images' => $images,
+                'image' => $mainImage,
+                'category' => optional($p->categories->first())->name ?? null,
+                'categories' => $p->categories->pluck('name'),
+                'stock' => (int) $p->stock,
+                'description' => $p->description,
+                'is_featured' => (bool) $p->is_featured,
+                'created_at' => $p->created_at?->toIso8601String(),
+                'sold_quantity' => (int) ($salesByProduct[$p->id] ?? 0),
+                'rating' => 5,
+                'reviews' => 0,
+            ];
+        });
 
         $categories = Category::orderBy('name')->get(['id', 'name']);
 

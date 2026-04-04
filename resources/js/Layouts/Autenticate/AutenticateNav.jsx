@@ -26,7 +26,12 @@ export default function AutenticateNav() {
     const lowStock = notifications.low_stock || { count: 0, items: [] };
     const expiredLayaways = notifications.expired_layaways || { count: 0, items: [] };
     const totalNotifications = (lowStock.count || 0) + (expiredLayaways.count || 0);
-    return (
+        // Detectar si el usuario tiene el rol 'cliente' (puede ser string o {name})
+        const userRoles = user?.roles?.map?.(r => typeof r === 'string' ? r : r.name) || [];
+        const isCliente = userRoles.includes('cliente');
+        // Definir ruta de dashboard según rol
+        const dashboardRoute = isCliente ? '/mi-panel' : route('dashboard');
+        return (
             <nav className="border-b border-gray-100 bg-white">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                     <div className="flex h-16 justify-between">
@@ -39,186 +44,195 @@ export default function AutenticateNav() {
 
                             <div className="hidden space-x-6 sm:-my-px sm:ms-10 sm:flex items-center">
                                 <NavLink
-                                    href={route('dashboard')}
-                                    active={route().current('dashboard')}
+                                    href={dashboardRoute}
+                                    active={isCliente ? window.location.pathname === '/mi-panel' : route().current('dashboard')}
                                 >
                                     Dashboard
                                 </NavLink>
-                                {isAdmin && (
+                                {/* Menú de administración según permisos */}
+                                {(canViewCustomers || canViewUsers || canViewRmas || canViewWarehouses || canViewCredits || canManageSettings || canViewAuditLogs || canViewSalesReports || canViewInventoryReports || userRoles.includes('admin')) && (
                                     <>
                                         {/* Grupo Productos: Productos + Categorías */}
-                                        <div className="relative group">
-                                            <button
-                                                type="button"
-                                                className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent group-hover:border-gray-300"
-                                            >
-                                                Productos
-                                                <svg
-                                                    className="ms-1 h-4 w-4"
-                                                    xmlns="http://www.w3.org/2000/svg"
-                                                    viewBox="0 0 20 20"
-                                                    fill="currentColor"
+                                        {(userRoles.includes('admin') || canViewInventoryReports) && (
+                                            <div className="relative group">
+                                                <button
+                                                    type="button"
+                                                    className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent group-hover:border-gray-300"
                                                 >
-                                                    <path
-                                                        fillRule="evenodd"
-                                                        d="M5.23 7.21a.75.75 0 011.06.02L10 11.085l3.71-3.854a.75.75 0 111.08 1.04l-4.25 4.417a.75.75 0 01-1.08 0L5.25 8.27a.75.75 0 01-.02-1.06z"
-                                                        clipRule="evenodd"
-                                                    />
-                                                </svg>
-                                            </button>
-                                            <div className="absolute left-0 mt-0 w-44 rounded-md bg-white shadow-lg ring-1 ring-black/5 z-20 hidden group-hover:block">
-                                                <div className="py-1 text-sm text-gray-700">
-                                                    <Link
-                                                        href={route('admin.products.index')}
-                                                        className="block px-3 py-1.5 hover:bg-gray-100"
+                                                    Productos
+                                                    <svg
+                                                        className="ms-1 h-4 w-4"
+                                                        xmlns="http://www.w3.org/2000/svg"
+                                                        viewBox="0 0 20 20"
+                                                        fill="currentColor"
                                                     >
-                                                        Productos
-                                                    </Link>
-                                                    <Link
-                                                        href={route('admin.categories.index')}
-                                                        className="block px-3 py-1.5 hover:bg-gray-100"
-                                                    >
-                                                        Categorías
-                                                    </Link>
+                                                        <path
+                                                            fillRule="evenodd"
+                                                            d="M5.23 7.21a.75.75 0 011.06.02L10 11.085l3.71-3.854a.75.75 0 111.08 1.04l-4.25 4.417a.75.75 0 01-1.08 0L5.25 8.27a.75.75 0 01-.02-1.06z"
+                                                            clipRule="evenodd"
+                                                        />
+                                                    </svg>
+                                                </button>
+                                                <div className="absolute left-0 mt-0 w-44 rounded-md bg-white shadow-lg ring-1 ring-black/5 z-20 hidden group-hover:block">
+                                                    <div className="py-1 text-sm text-gray-700">
+                                                        <Link
+                                                            href={route('admin.products.index')}
+                                                            className="block px-3 py-1.5 hover:bg-gray-100"
+                                                        >
+                                                            Productos
+                                                        </Link>
+                                                        <Link
+                                                            href={route('admin.categories.index')}
+                                                            className="block px-3 py-1.5 hover:bg-gray-100"
+                                                        >
+                                                            Categorías
+                                                        </Link>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
+                                        )}
 
                                         {/* Grupo Ventas: Facturas, Devoluciones, Créditos */}
-                                        <div className="relative group">
-                                            <button
-                                                type="button"
-                                                className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent group-hover:border-gray-300"
-                                            >
-                                                Ventas
-                                                <svg
-                                                    className="ms-1 h-4 w-4"
-                                                    xmlns="http://www.w3.org/2000/svg"
-                                                    viewBox="0 0 20 20"
-                                                    fill="currentColor"
+                                        {(userRoles.includes('admin') || canViewSalesReports || canViewRmas || canViewCredits) && (
+                                            <div className="relative group">
+                                                <button
+                                                    type="button"
+                                                    className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent group-hover:border-gray-300"
                                                 >
-                                                    <path
-                                                        fillRule="evenodd"
-                                                        d="M5.23 7.21a.75.75 0 011.06.02L10 11.085l3.71-3.854a.75.75 0 111.08 1.04l-4.25 4.417a.75.75 0 01-1.08 0L5.25 8.27a.75.75 0 01-.02-1.06z"
-                                                        clipRule="evenodd"
-                                                    />
-                                                </svg>
-                                            </button>
-                                            <div className="absolute left-0 mt-0 w-48 rounded-md bg-white shadow-lg ring-1 ring-black/5 z-20 hidden group-hover:block">
-                                                <div className="py-1 text-sm text-gray-700">
-                                                    <Link
-                                                        href={route('admin.invoices.index')}
-                                                        className="block px-3 py-1.5 hover:bg-gray-100"
+                                                    Ventas
+                                                    <svg
+                                                        className="ms-1 h-4 w-4"
+                                                        xmlns="http://www.w3.org/2000/svg"
+                                                        viewBox="0 0 20 20"
+                                                        fill="currentColor"
                                                     >
-                                                        Facturas
-                                                    </Link>
-                                                    {canViewRmas && (
+                                                        <path
+                                                            fillRule="evenodd"
+                                                            d="M5.23 7.21a.75.75 0 011.06.02L10 11.085l3.71-3.854a.75.75 0 111.08 1.04l-4.25 4.417a.75.75 0 01-1.08 0L5.25 8.27a.75.75 0 01-.02-1.06z"
+                                                            clipRule="evenodd"
+                                                        />
+                                                    </svg>
+                                                </button>
+                                                <div className="absolute left-0 mt-0 w-48 rounded-md bg-white shadow-lg ring-1 ring-black/5 z-20 hidden group-hover:block">
+                                                    <div className="py-1 text-sm text-gray-700">
                                                         <Link
-                                                            href={route('admin.rmas.index')}
+                                                            href={route('admin.invoices.index')}
                                                             className="block px-3 py-1.5 hover:bg-gray-100"
                                                         >
-                                                            Devoluciones
+                                                            Facturas
                                                         </Link>
-                                                    )}
-                                                    {canViewCredits && (
-                                                        <Link
-                                                            href={route('admin.credits.index')}
-                                                            className="block px-3 py-1.5 hover:bg-gray-100"
-                                                        >
-                                                            Créditos
-                                                        </Link>
-                                                    )}
+                                                        {canViewRmas && (
+                                                            <Link
+                                                                href={route('admin.rmas.index')}
+                                                                className="block px-3 py-1.5 hover:bg-gray-100"
+                                                            >
+                                                                Devoluciones
+                                                            </Link>
+                                                        )}
+                                                        {canViewCredits && (
+                                                            <Link
+                                                                href={route('admin.credits.index')}
+                                                                className="block px-3 py-1.5 hover:bg-gray-100"
+                                                            >
+                                                                Créditos
+                                                            </Link>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
+                                        )}
 
                                         {/* Grupo Personas: Clientes + Proveedores */}
-                                        <div className="relative group">
-                                            <button
-                                                type="button"
-                                                className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent group-hover:border-gray-300"
-                                            >
-                                                Relaciones
-                                                <svg
-                                                    className="ms-1 h-4 w-4"
-                                                    xmlns="http://www.w3.org/2000/svg"
-                                                    viewBox="0 0 20 20"
-                                                    fill="currentColor"
+                                        {(userRoles.includes('admin') || canViewCustomers) && (
+                                            <div className="relative group">
+                                                <button
+                                                    type="button"
+                                                    className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent group-hover:border-gray-300"
                                                 >
-                                                    <path
-                                                        fillRule="evenodd"
-                                                        d="M5.23 7.21a.75.75 0 011.06.02L10 11.085l3.71-3.854a.75.75 0 111.08 1.04l-4.25 4.417a.75.75 0 01-1.08 0L5.25 8.27a.75.75 0 01-.02-1.06z"
-                                                        clipRule="evenodd"
-                                                    />
-                                                </svg>
-                                            </button>
-                                            <div className="absolute left-0 mt-0 w-52 rounded-md bg-white shadow-lg ring-1 ring-black/5 z-20 hidden group-hover:block">
-                                                <div className="py-1 text-sm text-gray-700">
-                                                    {canViewCustomers && (
+                                                    Relaciones
+                                                    <svg
+                                                        className="ms-1 h-4 w-4"
+                                                        xmlns="http://www.w3.org/2000/svg"
+                                                        viewBox="0 0 20 20"
+                                                        fill="currentColor"
+                                                    >
+                                                        <path
+                                                            fillRule="evenodd"
+                                                            d="M5.23 7.21a.75.75 0 011.06.02L10 11.085l3.71-3.854a.75.75 0 111.08 1.04l-4.25 4.417a.75.75 0 01-1.08 0L5.25 8.27a.75.75 0 01-.02-1.06z"
+                                                            clipRule="evenodd"
+                                                        />
+                                                    </svg>
+                                                </button>
+                                                <div className="absolute left-0 mt-0 w-52 rounded-md bg-white shadow-lg ring-1 ring-black/5 z-20 hidden group-hover:block">
+                                                    <div className="py-1 text-sm text-gray-700">
+                                                        {canViewCustomers && (
+                                                            <Link
+                                                                href={route('admin.customers.index')}
+                                                                className="block px-3 py-1.5 hover:bg-gray-100"
+                                                            >
+                                                                Clientes
+                                                            </Link>
+                                                        )}
                                                         <Link
-                                                            href={route('admin.customers.index')}
+                                                            href={route('admin.providers.index')}
                                                             className="block px-3 py-1.5 hover:bg-gray-100"
                                                         >
-                                                            Clientes
+                                                            Proveedores
                                                         </Link>
-                                                    )}
-                                                    <Link
-                                                        href={route('admin.providers.index')}
-                                                        className="block px-3 py-1.5 hover:bg-gray-100"
-                                                    >
-                                                        Proveedores
-                                                    </Link>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
+                                        )}
 
                                         {/* Grupo Usuarios: Roles + Usuarios */}
-                                        <div className="relative group">
-                                            <button
-                                                type="button"
-                                                className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent group-hover:border-gray-300"
-                                            >
-                                                Usuarios
-                                                <svg
-                                                    className="ms-1 h-4 w-4"
-                                                    xmlns="http://www.w3.org/2000/svg"
-                                                    viewBox="0 0 20 20"
-                                                    fill="currentColor"
+                                        {(userRoles.includes('admin') || canViewUsers || canViewAuditLogs) && (
+                                            <div className="relative group">
+                                                <button
+                                                    type="button"
+                                                    className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent group-hover:border-gray-300"
                                                 >
-                                                    <path
-                                                        fillRule="evenodd"
-                                                        d="M5.23 7.21a.75.75 0 011.06.02L10 11.085l3.71-3.854a.75.75 0 111.08 1.04l-4.25 4.417a.75.75 0 01-1.08 0L5.25 8.27a.75.75 0 01-.02-1.06z"
-                                                        clipRule="evenodd"
-                                                    />
-                                                </svg>
-                                            </button>
-                                            <div className="absolute left-0 mt-0 w-44 rounded-md bg-white shadow-lg ring-1 ring-black/5 z-20 hidden group-hover:block">
-                                                <div className="py-1 text-sm text-gray-700">
-                                                    <Link
-                                                        href={route('admin.roles.index')}
-                                                        className="block px-3 py-1.5 hover:bg-gray-100"
+                                                    Usuarios
+                                                    <svg
+                                                        className="ms-1 h-4 w-4"
+                                                        xmlns="http://www.w3.org/2000/svg"
+                                                        viewBox="0 0 20 20"
+                                                        fill="currentColor"
                                                     >
-                                                        Roles y permisos
-                                                    </Link>
-                                                    {canViewAuditLogs && (
+                                                        <path
+                                                            fillRule="evenodd"
+                                                            d="M5.23 7.21a.75.75 0 011.06.02L10 11.085l3.71-3.854a.75.75 0 111.08 1.04l-4.25 4.417a.75.75 0 01-1.08 0L5.25 8.27a.75.75 0 01-.02-1.06z"
+                                                            clipRule="evenodd"
+                                                        />
+                                                    </svg>
+                                                </button>
+                                                <div className="absolute left-0 mt-0 w-44 rounded-md bg-white shadow-lg ring-1 ring-black/5 z-20 hidden group-hover:block">
+                                                    <div className="py-1 text-sm text-gray-700">
                                                         <Link
-                                                            href={route('admin.audit.index')}
+                                                            href={route('admin.roles.index')}
                                                             className="block px-3 py-1.5 hover:bg-gray-100"
                                                         >
-                                                            Auditoría
+                                                            Roles y permisos
                                                         </Link>
-                                                    )}
-                                                    {canViewUsers && (
-                                                        <Link
-                                                            href={route('admin.users.index')}
-                                                            className="block px-3 py-1.5 hover:bg-gray-100"
-                                                        >
-                                                            Usuarios
-                                                        </Link>
-                                                    )}
+                                                        {canViewAuditLogs && (
+                                                            <Link
+                                                                href={route('admin.audit.index')}
+                                                                className="block px-3 py-1.5 hover:bg-gray-100"
+                                                            >
+                                                                Auditoría
+                                                            </Link>
+                                                        )}
+                                                        {canViewUsers && (
+                                                            <Link
+                                                                href={route('admin.users.index')}
+                                                                className="block px-3 py-1.5 hover:bg-gray-100"
+                                                            >
+                                                                Usuarios
+                                                            </Link>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
+                                        )}
 
                                         {/* Grupo Reportes */}
                                         {(canViewSalesReports || canViewInventoryReports || canViewCredits) && (
@@ -499,8 +513,8 @@ export default function AutenticateNav() {
                 >
                     <div className="space-y-1 pb-3 pt-2">
                         <ResponsiveNavLink
-                            href={route('dashboard')}
-                            active={route().current('dashboard')}
+                            href={dashboardRoute}
+                            active={isCliente ? window.location.pathname === '/mi-panel' : route().current('dashboard')}
                         >
                             Dashboard
                         </ResponsiveNavLink>

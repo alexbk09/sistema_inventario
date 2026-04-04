@@ -1,24 +1,30 @@
 'use client'
 
 import React, { useEffect, useState } from "react"
+import { toast } from 'react-hot-toast'
 import GuestLayout from '@/Layouts/GuestLayout.jsx'
 import { useCart } from '@/Hooks/useCart'
 import { router } from '@inertiajs/react'
 import { ChevronRight, Lock, ShoppingCart as ShoppingCartIcon } from 'lucide-react'
+import ProductCartItem from '@/Components/shop/ProductCartItem'
 import { useDisplayCurrency } from '@/Hooks/useDisplayCurrency'
 import { useI18n } from '@/Hooks/useI18n'
 
+import { usePage } from '@inertiajs/react'
+
 export default function CheckoutPage() {
   const { cart, clearCart, itemCount, updateQuantity, updatePrice, addToCart } = useCart()
-  const [formData, setFormData] = useState({
-    fullName: '',
-    identification_type_id: '',
-    identification: '',
-    email: '',
-    phone: '',
-    address: '',
-    city: '',
-    zipCode: '',
+  const { props } = usePage();
+  const customer = props.customer;
+  const [formData, setFormData] = useState(() => ({
+    fullName: customer?.fullName || '',
+    identification_type_id: customer?.identification_type_id || '',
+    identification: customer?.identification || '',
+    email: customer?.email || '',
+    phone: customer?.phone || '',
+    address: customer?.address || '',
+    city: customer?.city || '',
+    postal_code: customer?.postal_code || '',
     paymentMethod: 'transferencia',
     bank: '',
     originBank: '',
@@ -29,7 +35,7 @@ export default function CheckoutPage() {
     cardNumber: '',
     cardExpiry: '',
     cardCVC: '',
-  })
+  }))
   const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState('')
   const [rateBs, setRateBs] = useState(null)
@@ -96,12 +102,16 @@ export default function CheckoutPage() {
 
     // Validaciones básicas
     if (!formData.fullName || !formData.email || !formData.address || !formData.identification_type_id || !formData.identification) {
-      setError(t('checkout.error_required', 'Por favor completa todos los campos requeridos'))
+      const msg = t('checkout.error_required', 'Por favor completa todos los campos requeridos');
+      setError(msg)
+      toast.error(msg)
       return
     }
 
     if (cart.items.length === 0) {
-      setError(t('checkout.error_empty_cart', 'Tu carrito está vacío'))
+      const msg = t('checkout.error_empty_cart', 'Tu carrito está vacío');
+      setError(msg)
+      toast.error(msg)
       return
     }
 
@@ -121,18 +131,21 @@ export default function CheckoutPage() {
         preserveScroll: true,
         onError: (errors) => {
           const firstKey = Object.keys(errors || {})[0]
-          setError(
-            errors?.[firstKey] || t('checkout.error_processing', 'Error al procesar el pago. Intenta nuevamente.')
-          )
+          const msg = errors?.[firstKey] || t('checkout.error_processing', 'Error al procesar el pago. Intenta nuevamente.');
+          setError(msg)
+          toast.error(msg)
         },
         onSuccess: () => {
           clearCart()
+          toast.success(t('checkout.success', '¡Compra realizada con éxito!'))
           router.visit('/confirmacion')
         },
         onFinish: () => setIsProcessing(false),
       })
     } catch (err) {
-      setError(t('checkout.error_processing', 'Error al procesar el pago. Intenta nuevamente.'))
+      const msg = t('checkout.error_processing', 'Error al procesar el pago. Intenta nuevamente.');
+      setError(msg)
+      toast.error(msg)
       setIsProcessing(false)
     }
   }
@@ -299,7 +312,7 @@ export default function CheckoutPage() {
                         name="city"
                         value={formData.city}
                         onChange={handleInputChange}
-                        className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-primary transition"
+                        className="w-full px-6 py-3 text-lg bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-primary transition"
                       />
                     </div>
                     <div>
@@ -308,10 +321,10 @@ export default function CheckoutPage() {
                       </label>
                       <input
                         type="text"
-                        name="zipCode"
-                        value={formData.zipCode}
+                        name="postal_code"
+                        value={formData.postal_code}
                         onChange={handleInputChange}
-                        className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-primary transition"
+                        className="w-full px-6 py-3 text-lg bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-primary transition"
                       />
                     </div>
                   </div>
@@ -452,42 +465,14 @@ export default function CheckoutPage() {
                 {/* Items */}
                 <div className="space-y-4 mb-6 border-b border-border pb-6">
                   {cart.items.map((item) => (
-                    <div key={item.id} className="flex justify-between items-center gap-3">
-                      <div className="flex-1">
-                        <p className="font-semibold text-foreground">{item.name}</p>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <div>{t('checkout.summary_qty_label', 'Qty:')}</div>
-                          <input
-                            type="number"
-                            min={1}
-                            value={item.quantity}
-                            onChange={(e) => updateQuantity(item.id, Math.max(1, Number(e.target.value) || 1))}
-                            className="w-20 border border-border rounded px-2 py-1 text-xs bg-background"
-                          />
-                          {typeof item.stock !== 'undefined' && (
-                            <div className="text-xs">
-                              {t('checkout.summary_stock_label', `Stock: ${item.stock}`)}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm text-muted-foreground mb-1">
-                          {t('checkout.summary_price_label', 'Precio USD')}
-                        </div>
-                        <input
-                          type="number"
-                          min={0}
-                          step={0.01}
-                          value={item.price}
-                          onChange={(e) => updatePrice(item.id, Number(e.target.value) || 0)}
-                          className="w-32 border border-border rounded px-2 py-1 text-sm bg-background text-right"
-                        />
-                        <div className="font-semibold mt-1">
-                          ${ (item.price * item.quantity).toLocaleString('es-AR') }
-                        </div>
-                      </div>
-                    </div>
+                    <ProductCartItem
+                      key={item.id}
+                      item={item}
+                      t={t}
+                      onRemove={(id) => updateQuantity(id, 0)}
+                      onQuantityChange={(id, q) => updateQuantity(id, q)}
+                      onPriceChange={(id, price) => updatePrice(id, price)}
+                    />
                   ))}
                 </div>
 

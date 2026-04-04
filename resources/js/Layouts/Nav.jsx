@@ -8,14 +8,21 @@ import { useDisplayCurrency } from '@/Hooks/useDisplayCurrency'
 import { useI18n } from '@/Hooks/useI18n'
 
 export default function NavLayout() {
-      const [isOpen, setIsOpen] = useState(false)
-      const [isCartOpen, setIsCartOpen] = useState(false)
-      const { cart } = useCart()
-  const { displayCurrency, setDisplayCurrency, baseCurrency, secondaryCurrency } = useDisplayCurrency()
-  const page = usePage()
-  const currentLocale = page.props?.locale || 'es'
-  const { post, processing, setData } = useForm({})
-      const { t } = useI18n()
+    const [isOpen, setIsOpen] = useState(false)
+    const [isCartOpen, setIsCartOpen] = useState(false)
+    const { cart } = useCart()
+    const { displayCurrency, setDisplayCurrency, baseCurrency, secondaryCurrency } = useDisplayCurrency()
+    const page = usePage()
+    const currentLocale = page.props?.locale || 'es'
+    const { post, processing, setData } = useForm({})
+    const { t } = useI18n()
+    const isAuthenticated = !!page.props?.auth?.user;
+    const userRoles = page.props?.auth?.roles || [];
+    const isCliente = userRoles.includes('cliente');
+    const handleLogout = (e) => {
+      e.preventDefault();
+      post(route('logout'));
+    };
     return (
 <>
 <nav className="bg-white shadow-md sticky top-0 z-50">
@@ -36,6 +43,14 @@ export default function NavLayout() {
           <Link href={route('shop.index')} className="text-foreground hover:text-primary transition">
             {t('nav.shop', 'Tienda')}
           </Link>
+          {isAuthenticated && (
+            <Link
+              href={isCliente ? '/mi-panel' : '/dashboard'}
+              className="text-foreground hover:text-primary transition"
+            >
+              {t('nav.dashboard', isCliente ? (currentLocale === 'en' ? 'My Panel' : 'Mi Panel') : 'Dashboard')}
+            </Link>
+          )}
         </div>
 
         {/* Selector de idioma + moneda + Carrito y Auth */}
@@ -85,20 +100,30 @@ export default function NavLayout() {
             </span>
           </button>
 
-          <div className="hidden md:flex gap-2">
-            <Link
-              href="/login"
-              className="px-4 py-2 text-primary hover:bg-secondary rounded-lg transition"
+          {!isAuthenticated && (
+            <div className="hidden md:flex gap-2">
+              <Link
+                href="/login"
+                className="px-4 py-2 text-primary hover:bg-secondary rounded-lg transition"
+              >
+                {t('nav.login', 'Login')}
+              </Link>
+              <Link
+                href="/registro"
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition"
+              >
+                {t('nav.register', 'Registro')}
+              </Link>
+            </div>
+          )}
+          {isAuthenticated && (
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 bg-destructive text-white rounded-lg hover:bg-destructive/90 transition"
             >
-              {t('nav.login', 'Login')}
-            </Link>
-            <Link
-              href="/registro"
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition"
-            >
-              {t('nav.register', 'Registro')}
-            </Link>
-          </div>
+              {t('nav.logout', currentLocale === 'en' ? 'Logout' : 'Cerrar sesión')}
+            </button>
+          )}
 
           {/* Menu móvil */}
           <button
@@ -124,20 +149,38 @@ export default function NavLayout() {
             <Link  href={route('shop.index')} className="text-foreground hover:text-primary transition">
               {t('nav.shop', 'Tienda')}
             </Link>
-            <div className="flex gap-2 pt-2">
+            {isAuthenticated && (
               <Link
-                href="/login"
-                className="flex-1 px-4 py-2 text-center text-primary border border-primary rounded-lg hover:bg-secondary transition"
+                href={isCliente ? '/mi-panel' : '/dashboard'}
+                className="text-foreground hover:text-primary transition"
               >
-                {t('nav.login', 'Login')}
+                {t('nav.dashboard', isCliente ? (currentLocale === 'en' ? 'My Panel' : 'Mi Panel') : 'Dashboard')}
               </Link>
-              <Link
-                href="/registro"
-                className="flex-1 px-4 py-2 text-center bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition"
+            )}
+            {!isAuthenticated && (
+              <div className="flex gap-2 pt-2">
+                <Link
+                  href="/login"
+                  className="flex-1 px-4 py-2 text-center text-primary border border-primary rounded-lg hover:bg-secondary transition"
+                >
+                  {t('nav.login', 'Login')}
+                </Link>
+                <Link
+                  href="/registro"
+                  className="flex-1 px-4 py-2 text-center bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition"
+                >
+                  {t('nav.register', 'Registro')}
+                </Link>
+              </div>
+            )}
+            {isAuthenticated && (
+              <button
+                onClick={handleLogout}
+                className="w-full mt-2 px-4 py-2 bg-destructive text-white rounded-lg hover:bg-destructive/90 transition"
               >
-                {t('nav.register', 'Registro')}
-              </Link>
-            </div>
+                {t('nav.logout', 'Cerrar sesión')}
+              </button>
+            )}
           </div>
         </div>
       )}

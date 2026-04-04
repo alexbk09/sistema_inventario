@@ -1,3 +1,23 @@
+    /**
+     * Devuelve la URL absoluta de la imagen principal del producto.
+     * Si hay imágenes asociadas, retorna la primera; si no, usa image_url como fallback.
+     * Siempre usa asset() para asegurar compatibilidad con cambios de storage o servidor.
+     */
+    public function getMainImageUrl(): string
+    {
+        $img = $this->images()->orderBy('sort_order')->first();
+        if ($img && $img->path) {
+            return asset('storage/' . $img->path);
+        }
+        if ($this->image_url) {
+            // Si image_url ya es absoluta, la retorna; si es relativa, la convierte
+            return str_starts_with($this->image_url, ['http://', 'https://', '//'])
+                ? $this->image_url
+                : asset('storage/' . ltrim($this->image_url, '/'));
+        }
+        // Fallback global (puedes cambiarlo por un placeholder genérico)
+        return asset('images/placeholder.svg');
+    }
 <?php
 
 namespace App\Models;

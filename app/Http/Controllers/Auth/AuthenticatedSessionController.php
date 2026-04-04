@@ -38,7 +38,14 @@ class AuthenticatedSessionController extends Controller
             'email' => $request->user()?->email,
         ]);
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        $user = $request->user();
+        if ($user->hasRole('cliente')) {
+            return redirect()->intended(route('customer.dashboard', absolute: false));
+        }
+        if ($user->hasAnyRole(['admin', 'supervisor', 'cashier', 'warehouse'])) {
+            return redirect()->intended(route('dashboard', absolute: false));
+        }
+        return redirect()->intended(route('home', absolute: false));
     }
 
     /**

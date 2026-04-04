@@ -1,4 +1,5 @@
 import InputError from '@/Components/InputError';
+import { toast } from 'react-hot-toast';
 import GuestLayout from '@/Layouts/GuestLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { useState } from 'react';
@@ -13,10 +14,22 @@ export default function Login({ status, canResetPassword }) {
 
     const [showPassword, setShowPassword] = useState(false);
 
+    const [errorMessage, setErrorMessage] = useState('');
+
     const submit = (e) => {
         e.preventDefault();
-
+        setErrorMessage('');
         post(route('login'), {
+            onError: (errors) => {
+                // Si hay errores de validación
+                const firstKey = Object.keys(errors || {})[0];
+                const msg = errors?.[firstKey] || 'Error al iniciar sesión. Revisa los campos.';
+                setErrorMessage(msg);
+                toast.error(msg);
+            },
+            onSuccess: () => {
+                toast.success('¡Bienvenido! Inicio de sesión exitoso.');
+            },
             onFinish: () => reset('password'),
         });
     };
@@ -26,6 +39,12 @@ export default function Login({ status, canResetPassword }) {
             {status && (
                 <div className="mb-4 text-sm font-medium text-green-600">
                     {status}
+                </div>
+            )}
+            {/* Error message visual */}
+            {errorMessage && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm mb-4">
+                    {errorMessage}
                 </div>
             )}
             <main className="flex flex-col pt-16 bg-background">

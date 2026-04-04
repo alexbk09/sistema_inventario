@@ -24,6 +24,7 @@ class RoleSeeder extends Seeder
             'view credits', 'manage credits',
             'manage settings',
             'view audit logs',
+            'view customer dashboard',
         ];
 
         foreach ($permissions as $name) {
@@ -33,6 +34,7 @@ class RoleSeeder extends Seeder
             ]);
         }
 
+
         $admin = Role::firstOrCreate([
             'name' => 'admin',
             'guard_name' => 'web',
@@ -41,17 +43,18 @@ class RoleSeeder extends Seeder
             'name' => 'user',
             'guard_name' => 'web',
         ]);
-
+        $cliente = Role::firstOrCreate([
+            'name' => 'cliente',
+            'guard_name' => 'web',
+        ]);
         $cashier = Role::firstOrCreate([
             'name' => 'cashier',
             'guard_name' => 'web',
         ]);
-
         $warehouse = Role::firstOrCreate([
             'name' => 'warehouse',
             'guard_name' => 'web',
         ]);
-
         $supervisor = Role::firstOrCreate([
             'name' => 'supervisor',
             'guard_name' => 'web',
@@ -59,6 +62,11 @@ class RoleSeeder extends Seeder
 
         $admin->givePermissionTo($permissions);
         $user->givePermissionTo(['view products', 'view invoices']);
+        $cliente->givePermissionTo([
+            'view invoices',
+            'view customers',
+            'view customer dashboard',
+        ]);
 
         // Cajero: foco en ventas, clientes y créditos
         $cashier->givePermissionTo([

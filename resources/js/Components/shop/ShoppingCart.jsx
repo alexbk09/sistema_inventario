@@ -1,6 +1,7 @@
 import { useCart } from '@/Hooks/useCart'
 import { usePage, router } from '@inertiajs/react'
-import { Trash2, X, ShoppingBag, ShoppingCart as ShoppingCartIcon } from 'lucide-react'
+import { X, ShoppingBag, ShoppingCart as ShoppingCartIcon } from 'lucide-react'
+import ProductCartItem from './ProductCartItem'
 import { useState, useEffect } from 'react'
 import NavLink from '@/Components/NavLink';
 import { useDisplayCurrency } from '@/Hooks/useDisplayCurrency'
@@ -94,90 +95,31 @@ export default function ShoppingCart({ isOpen, onClose }) {
             <div className="space-y-6">
               <div className="space-y-4">
                 {cart.items.map((item) => (
-                  <div
+                  <ProductCartItem
                     key={item.id}
-                    className="flex gap-4 p-4 bg-card border border-border rounded-lg hover:border-primary transition"
-                  >
-                    {/* Imagen */}
-                    <div className="relative w-20 h-20 flex-shrink-0 bg-muted rounded-lg overflow-hidden">
-                      <img
-                        src={item.image || "/placeholder.svg"}
-                        alt={item.name}
-                        className="object-cover w-full h-full"
-                      />
-                    </div>
-
-                    {/* Info */}
-                    <div className="flex-1 flex flex-col justify-between">
-                      <div>
-                        <h3 className="font-semibold text-foreground line-clamp-2">
-                          {item.name}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">{item.category}</p>
-                      </div>
-                      <p className="font-bold text-primary">
-                        ${item.price.toLocaleString('es-AR')}
-                      </p>
-                    </div>
-
-                    {/* Cantidad y eliminar */}
-                    <div className="flex flex-col justify-between items-end">
-                      <button
-                        onClick={() => {
-                          removeFromCart(item.id)
-                          if (user) {
-                            try {
-                              router.post(route('cart.remove'), { product_id: Number(item.id) }, { preserveScroll: true })
-                            } catch (e) {
-                              console.warn('No se pudo sincronizar eliminar en servidor:', e)
-                            }
-                          }
-                        }}
-                        className="text-muted-foreground hover:text-destructive transition"
-                        aria-label="Eliminar producto"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-
-                      <div className="flex items-center gap-1 bg-muted rounded-lg">
-                        <button
-                          onClick={() => {
-                            const q = Math.max(1, item.quantity - 1)
-                            updateQuantity(item.id, q)
-                            if (user) {
-                              try {
-                                router.post(route('cart.update'), { product_id: Number(item.id), quantity: q }, { preserveScroll: true })
-                              } catch (e) {
-                                console.warn('No se pudo sincronizar cantidad en servidor:', e)
-                              }
-                            }
-                          }}
-                          className="px-2 py-1 hover:bg-border transition"
-                        >
-                          −
-                        </button>
-                        <span className="px-2 py-1 font-semibold min-w-8 text-center">
-                          {item.quantity}
-                        </span>
-                        <button
-                          onClick={() => {
-                            const q = item.quantity + 1
-                            updateQuantity(item.id, q)
-                            if (user) {
-                              try {
-                                router.post(route('cart.update'), { product_id: Number(item.id), quantity: q }, { preserveScroll: true })
-                              } catch (e) {
-                                console.warn('No se pudo sincronizar cantidad en servidor:', e)
-                              }
-                            }
-                          }}
-                          className="px-2 py-1 hover:bg-border transition"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                    item={item}
+                    t={t}
+                    onRemove={(id) => {
+                      removeFromCart(id)
+                      if (user) {
+                        try {
+                          router.post(route('cart.remove'), { product_id: Number(id) }, { preserveScroll: true })
+                        } catch (e) {
+                          console.warn('No se pudo sincronizar eliminar en servidor:', e)
+                        }
+                      }
+                    }}
+                    onQuantityChange={(id, q) => {
+                      updateQuantity(id, q)
+                      if (user) {
+                        try {
+                          router.post(route('cart.update'), { product_id: Number(id), quantity: q }, { preserveScroll: true })
+                        } catch (e) {
+                          console.warn('No se pudo sincronizar cantidad en servidor:', e)
+                        }
+                      }
+                    }}
+                  />
                 ))}
               </div>
 
