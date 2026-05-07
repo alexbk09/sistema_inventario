@@ -1,5 +1,5 @@
 import { Filter, X } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useI18n } from '@/Hooks/useI18n'
 
 
@@ -31,7 +31,7 @@ export default function ProductFilters({
     )
   }
 
-  const handleFilterChange = () => {
+  useEffect(() => {
     onFilterChange({
       search,
       categories: selectedCategories,
@@ -40,7 +40,7 @@ export default function ProductFilters({
       inStockOnly,
       tags,
     })
-  }
+  }, [inStockOnly, onFilterChange, priceRange, search, selectedCategories, sortBy, tags])
 
   const handleReset = () => {
     setSearch('')
@@ -112,7 +112,6 @@ export default function ProductFilters({
               placeholder={t('shop.filters.search_placeholder', 'Busca un producto...')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              onBlur={handleFilterChange}
               className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:border-primary transition"
             />
           </div>
@@ -134,7 +133,6 @@ export default function ProductFilters({
                     onChange={() => {
                       handleCategoryToggle(category.name ?? category)
                     }}
-                    onBlur={handleFilterChange}
                     className="w-4 h-4 accent-primary rounded cursor-pointer"
                   />
                   <span className="text-sm text-muted-foreground group-hover:text-foreground transition">
@@ -160,7 +158,6 @@ export default function ProductFilters({
                   const newRange = [priceRange[0], Number(e.target.value)]
                   setPriceRange(newRange)
                 }}
-                onBlur={handleFilterChange}
                 className="w-full accent-primary"
               />
               <div className="flex items-center justify-between text-sm">
@@ -183,8 +180,6 @@ export default function ProductFilters({
                 checked={inStockOnly}
                 onChange={(e) => {
                   setInStockOnly(e.target.checked)
-                  // Aplicar filtros inmediatamente para mejor UX
-                  setTimeout(handleFilterChange, 0)
                 }}
                 className="w-4 h-4 accent-primary rounded cursor-pointer"
               />
@@ -210,7 +205,6 @@ export default function ProductFilters({
                         ? prev.filter((t) => t !== 'featured')
                         : [...prev, 'featured']
                     )
-                    setTimeout(handleFilterChange, 0)
                   }}
                   className="w-4 h-4 accent-primary rounded cursor-pointer"
                 />
@@ -231,7 +225,6 @@ export default function ProductFilters({
               onChange={(e) => {
                 setSortBy(e.target.value)
               }}
-              onBlur={handleFilterChange}
               className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-primary transition"
             >
               {SORT_OPTIONS.map((option) => (

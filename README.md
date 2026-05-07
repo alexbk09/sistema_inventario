@@ -24,23 +24,16 @@ Para una descripción técnica más profunda de modelos, servicios y flujos de n
 
 ## Características principales
 
-- Catálogo de productos y categorías con múltiples imágenes, códigos de barras y destacados.
-- Gestión de inventario con historial de movimientos (entradas, salidas, ajustes).
-- Multi‑sucursal / multi‑bodega y transferencias internas de stock.
-- Ventas y facturación (USD/BS) con detalle por items y estados de factura.
-- Clientes (CRM básico), proveedores y base de usuarios internos con roles y permisos.
-- Sistema de **apartados (layaway)** y **créditos** al cliente con control de saldo.
-- Módulo de devoluciones y garantías (RMA) vinculado a facturas y productos.
-- Tienda pública con carrito, checkout y confirmación de compra.
-- Dashboard administrativo con métricas, productos con bajo stock y top productos.
-- Conversión dinámica USD → BS usando un servicio de tasas de cambio.
-- Integración opcional con un servicio de **IA local** para procesar imágenes de productos.
 
-Rutas públicas y del panel más usadas (ver detalle en [routes/web.php](routes/web.php)):
+
+# ⚠️ NOTA IMPORTANTE (abril 2026)
+
+El servicio de IA para procesamiento de imágenes y todas sus referencias han sido **deshabilitadas temporalmente** en Docker y en el backend (jobs y controladores) para acelerar el build y evitar errores mientras se resuelven problemas con los contenedores Python/IA.
+
+Si necesitas reactivar la funcionalidad de IA, descomenta las secciones correspondientes en `docker-compose.yml`, `ProcessProductImage.php` y `ProductController.php`.
 
 - `/` – Home con productos destacados y tasa de cambio.
 - `/shop` – Tienda pública con listado de productos y filtros.
-- `/checkout` / `/confirmacion` – Flujo de compra pública.
 - `/dashboard` – Dashboard administrativo (requiere usuario autenticado con rol `admin`).
 - `/admin/...` – Gestión de productos, inventario, bodegas, facturas, clientes, proveedores, créditos, apartados, RMA y escáner QR.
 
@@ -49,6 +42,13 @@ Rutas públicas y del panel más usadas (ver detalle en [routes/web.php](routes/
 
 
 ## Últimas Actualizaciones
+
+- **30/04/2026:**
+   - Se corrigió el arranque Docker de `app` reescribiendo la configuración de Supervisor para administrar explícitamente `php-fpm` y `queue-worker`.
+   - Se eliminó el fallo de permisos `EACCES` del worker de colas y el socket de Supervisor quedó operativo con configuración consistente.
+   - El `entrypoint` ahora arranca Supervisor con archivo de configuración explícito y ajusta permisos mínimos para Laravel (`storage` y `bootstrap/cache`).
+   - Se optimizó el build Docker agregando `.dockerignore`, usando capas cacheables para Composer y npm, y sustituyendo `npm install` por `npm ci`.
+   - Se eliminó la clave obsoleta `version` de `docker-compose.yml` para evitar warnings innecesarios.
 
 - **28/03/2026:**
    - Se unificaron los módulos de cliente y usuario: ahora los clientes se registran como usuarios con rol `cliente` y pueden acceder a su propio dashboard en `/mi-panel`.
@@ -118,6 +118,63 @@ php artisan key:generate
 
 ## Instalación y arranque en desarrollo
 
+---
+
+## 🚀 Arranque rápido con Docker
+
+El sistema puede ejecutarse completamente en contenedores Docker, incluyendo:
+
+- **App**: Laravel + PHP-FPM + Node + Vite + Supervisor (incluye worker de colas)
+- **DB**: MySQL 8
+- **Nginx**: proxy HTTP expuesto en el puerto 8080
+
+Actualmente el servicio de IA está deshabilitado para acelerar el build y estabilizar el stack.
+
+### 1. Requisitos previos
+
+- Docker y Docker Compose instalados
+
+### 2. Levantar todos los servicios
+
+Desde la raíz del proyecto:
+
+```bash
+docker-compose up --build
+```
+
+Esto levantará:
+- `app` (PHP-FPM + Laravel + worker de colas bajo Supervisor)
+- `db` (MySQL, datos persistentes en volumen `db_data`)
+- `nginx` (servidor HTTP)
+
+Accede a la app en: [http://localhost:8080](http://localhost:8080)
+
+Si ya construiste antes y quieres forzar recreación completa del contenedor principal:
+
+```bash
+docker-compose up -d --build --force-recreate app nginx
+```
+
+
+### 3. Primer uso y migraciones
+
+Las migraciones y seeders se ejecutan automáticamente al iniciar el contenedor `app`.
+No necesitas correr comandos manuales: al hacer `docker-compose up --build` el sistema estará listo para usar.
+
+Para validar que los procesos internos quedaron arriba:
+
+```bash
+docker-compose exec app supervisorctl -c /etc/supervisor/conf.d/supervisord.conf status
+```
+
+Deberías ver `php-fpm` y `queue-worker` en estado `RUNNING`.
+
+### 4. Variables de entorno
+
+El archivo `.env` ya está preparado para funcionar en Docker. Si necesitas personalizar credenciales, revisa `docker-compose.yml` y `.env`.
+
+---
+
 ### 1. Dependencias PHP y Node
 
 ```powershell
@@ -137,6 +194,21 @@ php artisan migrate
 php artisan db:seed --class=RoleSeeder
 php artisan db:seed --class=DemoSeeder
 php artisan storage:link
+```
+
+Las cuentas demo quedan configurables desde variables de entorno:
+
+```powershell
+DEMO_ADMIN_EMAIL=admin@example.com
+DEMO_ADMIN_PASSWORD=admin12345
+DEMO_CLIENT_EMAIL=cliente@example.com
+DEMO_CLIENT_PASSWORD=cliente12345
+```
+
+Si necesitas regenerar solo las cuentas y datos demo después de cambiar esas variables, usa:
+
+```powershell
+php artisan db:seed --class=DemoSeeder
 ```
 
 > Nota: si ya habías corrido `php artisan migrate` antes de `php artisan queue:table`, vuelve a ejecutar `php artisan migrate` para aplicar la migración de la cola.

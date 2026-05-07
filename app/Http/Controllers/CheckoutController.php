@@ -2,13 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\{Invoice, InvoiceItem, Product, InvoiceContact, Customer, InvoiceStatus, Coupon};
-use App\Services\CurrencyService;
 use App\Mail\InvoiceCreated;
+use App\Models\{Coupon, CreditMovement, Customer, Invoice, InvoiceContact, InvoiceItem, InvoicePayment, InvoiceStatus, MovementType, PaymentGatewayTransaction, Product};
+use App\Services\{CurrencyService, InventoryService};
+use App\Services\PayPalService;
+use App\Services\StripeService;
+use App\Support\Settings;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 class CheckoutController extends Controller
@@ -16,6 +20,8 @@ class CheckoutController extends Controller
     public function index(CurrencyService $currency)
     {
         $rate = $currency->getPromedio('oficial') ?? (float) config('currency.bs_rate', 0);
+        $payments = $this->paymentSettings();
+        $payments = $this->publicPaymentConfiguration($payments);
 
         $customer = null;
         if (auth()->check()) {
@@ -24,6 +30,7 @@ class CheckoutController extends Controller
 
         return Inertia::render('Checkout/Index', [
             'rate' => $rate,
+            'payments' => $payments,
             'customer' => $customer ? [
                 'fullName' => $customer->name,
                 'identification_type_id' => $customer->identification_type_id,
@@ -37,7 +44,7 @@ class CheckoutController extends Controller
         ]);
     }
 
-    public function store(Request $request, CurrencyService $currency)
+    public function store(Request $request, CurrencyService $currency, InventoryService $inventory)
     {
         $payload = $request->validate([
             'fullName' => ['required','string','max:255'],
@@ -49,24 +56,110 @@ class CheckoutController extends Controller
             'city' => ['nullable','string','max:100'],
             'zipCode' => ['nullable','string','max:20'],
             'paymentMethod' => ['required','string','max:100'],
-            'bank' => ['required','string','max:100'],
-            'originBank' => ['required','string','max:100'],
-            'reference' => ['required','string','max:100'],
-            'date' => ['required','date'],
+            'bank' => ['nullable','string','max:100'],
+            'originBank' => ['nullable','string','max:100'],
+            'reference' => ['nullable','string','max:100'],
+            'date' => ['nullable','date'],
             'rateBs' => ['nullable','numeric'],
             'coupon_code' => ['nullable','string','max:50'],
+            'paypalOrderId' => ['nullable','string','max:255'],
+            'paypalCaptureId' => ['nullable','string','max:255'],
+            'stripePaymentIntentId' => ['nullable','string','max:255'],
             'items' => ['required','array','min:1'],
             'items.*.product_id' => ['required','exists:products,id'],
             'items.*.quantity' => ['required','integer','min:1'],
             'items.*.price_usd' => ['nullable','numeric'],
         ]);
 
+        $payments = $this->paymentSettings();
+        $methods = collect($payments['methods'] ?? []);
+        $selectedMethod = (string) ($payload['paymentMethod'] ?? '');
+        $methodConfig = $methods->get($selectedMethod);
+
+        if (!is_array($methodConfig) || empty($methodConfig['enabled'])) {
+            return back()->withErrors([
+                'paymentMethod' => 'El metodo de pago seleccionado no esta disponible actualmente.',
+            ])->withInput();
+        }
+
+        if ($selectedMethod === 'manual') {
+            foreach (['bank', 'originBank', 'reference', 'date'] as $field) {
+                if (empty($payload[$field])) {
+                    return back()->withErrors([
+                        $field => 'Este campo es obligatorio para pagos manuales.',
+                    ])->withInput();
+                }
+            }
+        }
+
+        if ($selectedMethod === 'paypal') {
+            foreach (['paypalOrderId', 'paypalCaptureId'] as $field) {
+                if (empty($payload[$field])) {
+                    return back()->withErrors([
+                        $field => 'Debes completar y capturar el pago con PayPal antes de confirmar.',
+                    ])->withInput();
+                }
+            }
+        }
+
+        if ($selectedMethod === 'stripe' && empty($payload['stripePaymentIntentId'])) {
+            return back()->withErrors([
+                'stripePaymentIntentId' => 'Debes completar y verificar el pago con Stripe antes de confirmar.',
+            ])->withInput();
+        }
+
         // Costos/Impuestos (deben coincidir con el frontend)
         $shippingUsd = 200.0;
         $taxRate = 0.15;
 
-        return DB::transaction(function () use ($payload, $currency, $shippingUsd, $taxRate) {
+        return DB::transaction(function () use ($payload, $currency, $inventory, $shippingUsd, $taxRate, $methodConfig, $selectedMethod) {
             $rate = isset($payload['rateBs']) ? (float) $payload['rateBs'] : null;
+            $verifiedGatewayTransaction = null;
+
+            if ($selectedMethod === 'paypal') {
+                $verifiedGatewayTransaction = PaymentGatewayTransaction::query()
+                    ->where('provider', 'paypal')
+                    ->where('payment_method', 'paypal')
+                    ->where('external_order_id', $payload['paypalOrderId'])
+                    ->where('external_capture_id', $payload['paypalCaptureId'])
+                    ->where('status', 'COMPLETED')
+                    ->first();
+
+                if (! $verifiedGatewayTransaction) {
+                    return back()->withErrors([
+                        'paymentMethod' => 'La captura de PayPal no pudo validarse en el servidor.',
+                    ])->withInput();
+                }
+
+                if ($verifiedGatewayTransaction->invoice_id) {
+                    return back()->withErrors([
+                        'paymentMethod' => 'Esa captura de PayPal ya fue asociada a otra factura.',
+                    ])->withInput();
+                }
+            }
+
+            if ($selectedMethod === 'stripe') {
+                $verifiedGatewayTransaction = PaymentGatewayTransaction::query()
+                    ->where('provider', 'stripe')
+                    ->where('payment_method', 'stripe')
+                    ->where('external_order_id', $payload['stripePaymentIntentId'])
+                    ->where('external_capture_id', $payload['stripePaymentIntentId'])
+                    ->where('status', 'succeeded')
+                    ->first();
+
+                if (! $verifiedGatewayTransaction) {
+                    return back()->withErrors([
+                        'paymentMethod' => 'El pago con Stripe no pudo validarse en el servidor.',
+                    ])->withInput();
+                }
+
+                if ($verifiedGatewayTransaction->invoice_id) {
+                    return back()->withErrors([
+                        'paymentMethod' => 'Ese pago de Stripe ya fue asociado a otra factura.',
+                    ])->withInput();
+                }
+            }
+
             // Cliente asociado (CRM)
             $customer = Customer::firstOrCreate(
                 ['email' => $payload['email']],
@@ -165,8 +258,7 @@ class CheckoutController extends Controller
 
             // Recargo/descuento por método de pago
             $paymentFeeRate = match ($payload['paymentMethod']) {
-                'pago-movil' => 0.02,
-                default => 0.0,
+                default => ((float) ($methodConfig['fee_percent'] ?? 0)) / 100,
             };
             $baseForFees = max(0, $itemsTotalUsd - $discountUsd);
             $paymentFeeUsd = round($baseForFees * $paymentFeeRate, 2);
@@ -177,6 +269,12 @@ class CheckoutController extends Controller
             $totalBs = $rate !== null
                 ? round($totalUsd * $rate, 2)
                 : $currency->usdToBs($totalUsd);
+
+            if ($verifiedGatewayTransaction && round((float) $verifiedGatewayTransaction->amount, 2) !== round($totalUsd, 2)) {
+                return back()->withErrors([
+                    'paymentMethod' => 'El monto validado por la pasarela no coincide con el total actual del pedido.',
+                ])->withInput();
+            }
 
             $invoice->update([
                 'total_usd' => $totalUsd,
@@ -193,11 +291,34 @@ class CheckoutController extends Controller
                 'city' => $payload['city'] ?? null,
                 'zip_code' => $payload['zipCode'] ?? null,
                 'payment_method' => $payload['paymentMethod'],
-                'bank' => $payload['bank'],
-                'origin_bank' => $payload['originBank'],
-                'reference' => $payload['reference'],
-                'payment_date' => $payload['date'],
+                'bank' => $payload['bank'] ?: ($methodConfig['label'] ?? strtoupper($payload['paymentMethod'])),
+                'origin_bank' => $payload['originBank'] ?: ($payload['paymentMethod'] === 'paypal' ? 'PayPal' : ($payload['bank'] ?: 'N/A')),
+                'reference' => $payload['reference'] ?: ($payload['paypalCaptureId'] ?? $payload['paypalOrderId'] ?? 'N/A'),
+                'payment_date' => $payload['date'] ?: now()->toDateString(),
             ]);
+
+            InvoicePayment::create([
+                'invoice_id' => $invoice->id,
+                'method' => $payload['paymentMethod'],
+                'amount_usd' => $totalUsd,
+                'amount_bs' => $totalBs,
+                'reference' => $payload['reference'] ?: ($payload['paypalCaptureId'] ?? $payload['paypalOrderId'] ?? null),
+                'bank' => $payload['bank'] ?: ($payload['paymentMethod'] === 'paypal' ? 'PayPal' : ($payload['paymentMethod'] === 'stripe' ? 'Stripe' : null)),
+                'notes' => $payload['paymentMethod'] === 'paypal'
+                    ? 'Orden PayPal: '.($payload['paypalOrderId'] ?? 'N/A')
+                    : ($payload['paymentMethod'] === 'stripe'
+                        ? 'Payment Intent Stripe: '.($payload['stripePaymentIntentId'] ?? 'N/A')
+                        : null),
+            ]);
+
+            if ($verifiedGatewayTransaction) {
+                $verifiedGatewayTransaction->forceFill([
+                    'invoice_id' => $invoice->id,
+                    'consumed_at' => now(),
+                ])->save();
+
+                $this->markInvoiceAsPaid($invoice, $inventory);
+            }
 
             // Notificación por correo (cliente + correo de la empresa si está configurado)
             try {
@@ -243,5 +364,375 @@ class CheckoutController extends Controller
             'qrUrl' => $invoiceId ? route('qr.invoice', ['invoice' => $invoiceId]) : null,
             'invoiceNumber' => $invoiceNumber,
         ]);
+    }
+
+    public function createPayPalOrder(Request $request, PayPalService $payPalService): JsonResponse
+    {
+        $payload = $request->validate([
+            'paymentMethod' => ['required', 'in:paypal'],
+            'coupon_code' => ['nullable', 'string', 'max:50'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.product_id' => ['required', 'exists:products,id'],
+            'items.*.quantity' => ['required', 'integer', 'min:1'],
+        ]);
+
+        if (! $payPalService->isEnabled()) {
+            return response()->json(['message' => 'PayPal no esta disponible actualmente.'], 422);
+        }
+
+        $payments = $this->paymentSettings();
+        $methodConfig = $payments['methods']['paypal'] ?? [];
+
+        if (empty($methodConfig['enabled'])) {
+            return response()->json(['message' => 'PayPal no esta habilitado en configuracion.'], 422);
+        }
+
+        try {
+            [$itemsTotalUsd, $discountUsd] = $this->resolveCartAmounts($payload);
+            $baseForFees = max(0, $itemsTotalUsd - $discountUsd);
+            $paymentFeeUsd = round($baseForFees * (((float) ($methodConfig['fee_percent'] ?? 0)) / 100), 2);
+            $taxUsd = round($baseForFees * 0.15, 2);
+            $totalUsd = $baseForFees + $taxUsd + 200.0 + $paymentFeeUsd;
+
+            $general = Settings::get('general', ['company_name' => config('app.name')]);
+            $order = $payPalService->createOrder($totalUsd, 'USD', [
+                'brand_name' => $general['company_name'] ?? config('app.name'),
+                'description' => 'Pedido en checkout',
+                'custom_id' => 'checkout-'.Str::lower(Str::random(10)),
+            ]);
+
+            return response()->json([
+                'orderID' => $order['id'] ?? null,
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'message' => $e->getCode() === 422 ? $e->getMessage() : 'No fue posible iniciar el pago con PayPal.',
+            ], 422);
+        }
+    }
+
+    public function capturePayPalOrder(Request $request, PayPalService $payPalService): JsonResponse
+    {
+        $payload = $request->validate([
+            'paymentMethod' => ['required', 'in:paypal'],
+            'orderID' => ['required', 'string', 'max:255'],
+        ]);
+
+        try {
+            $capture = $payPalService->captureOrder($payload['orderID']);
+            $captureId = $capture['purchase_units'][0]['payments']['captures'][0]['id'] ?? null;
+            $captureStatus = (string) ($capture['status'] ?? '');
+
+            if (! is_string($captureId) || $captureId === '') {
+                return response()->json(['message' => 'PayPal no devolvio una captura valida.'], 422);
+            }
+
+            if ($captureStatus !== 'COMPLETED') {
+                return response()->json(['message' => 'PayPal no confirmo la captura como completada.'], 422);
+            }
+
+            $captureAmount = (float) ($capture['purchase_units'][0]['payments']['captures'][0]['amount']['value'] ?? 0);
+            $captureCurrency = $capture['purchase_units'][0]['payments']['captures'][0]['amount']['currency_code'] ?? 'USD';
+
+            PaymentGatewayTransaction::updateOrCreate(
+                [
+                    'provider' => 'paypal',
+                    'external_capture_id' => $captureId,
+                ],
+                [
+                    'payment_method' => 'paypal',
+                    'event_type' => 'capture',
+                    'status' => $captureStatus,
+                    'external_order_id' => $payload['orderID'],
+                    'external_transaction_id' => $captureId,
+                    'currency' => $captureCurrency,
+                    'amount' => $captureAmount,
+                    'payload' => $capture,
+                    'verified_at' => now(),
+                ]
+            );
+
+            return response()->json([
+                'orderID' => $payload['orderID'],
+                'captureID' => $captureId,
+                'status' => $captureStatus,
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json(['message' => 'No fue posible confirmar el pago con PayPal.'], 422);
+        }
+    }
+
+    public function createStripePaymentIntent(Request $request, StripeService $stripeService): JsonResponse
+    {
+        $payload = $request->validate([
+            'paymentMethod' => ['required', 'in:stripe'],
+            'coupon_code' => ['nullable', 'string', 'max:50'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.product_id' => ['required', 'exists:products,id'],
+            'items.*.quantity' => ['required', 'integer', 'min:1'],
+        ]);
+
+        if (! $stripeService->isEnabled()) {
+            return response()->json(['message' => 'Stripe no esta disponible actualmente.'], 422);
+        }
+
+        $payments = $this->paymentSettings();
+        $methodConfig = $payments['methods']['stripe'] ?? [];
+
+        if (empty($methodConfig['enabled'])) {
+            return response()->json(['message' => 'Stripe no esta habilitado en configuracion.'], 422);
+        }
+
+        try {
+            [$itemsTotalUsd, $discountUsd] = $this->resolveCartAmounts($payload);
+            $baseForFees = max(0, $itemsTotalUsd - $discountUsd);
+            $paymentFeeUsd = round($baseForFees * (((float) ($methodConfig['fee_percent'] ?? 0)) / 100), 2);
+            $taxUsd = round($baseForFees * 0.15, 2);
+            $totalUsd = $baseForFees + $taxUsd + 200.0 + $paymentFeeUsd;
+
+            $intent = $stripeService->createPaymentIntent($totalUsd, 'usd', [
+                'description' => 'Pedido en checkout',
+                'checkout_ref' => 'checkout-'.Str::lower(Str::random(10)),
+            ]);
+
+            return response()->json([
+                'clientSecret' => $intent['client_secret'] ?? null,
+                'paymentIntentId' => $intent['id'] ?? null,
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'message' => 'No fue posible preparar el pago con Stripe.',
+            ], 422);
+        }
+    }
+
+    public function verifyStripePaymentIntent(Request $request, StripeService $stripeService): JsonResponse
+    {
+        $payload = $request->validate([
+            'paymentMethod' => ['required', 'in:stripe'],
+            'paymentIntentId' => ['required', 'string', 'max:255'],
+        ]);
+
+        try {
+            $intent = $stripeService->retrievePaymentIntent($payload['paymentIntentId']);
+            $status = (string) ($intent['status'] ?? '');
+
+            if ($status !== 'succeeded') {
+                return response()->json(['message' => 'Stripe no confirmo el pago como exitoso.'], 422);
+            }
+
+            $chargeId = $intent['latest_charge']['id'] ?? null;
+            $amount = ((float) ($intent['amount_received'] ?? $intent['amount'] ?? 0)) / 100;
+            $currency = strtoupper((string) ($intent['currency'] ?? 'USD'));
+
+            PaymentGatewayTransaction::updateOrCreate(
+                [
+                    'provider' => 'stripe',
+                    'external_capture_id' => $payload['paymentIntentId'],
+                ],
+                [
+                    'payment_method' => 'stripe',
+                    'event_type' => 'payment_intent',
+                    'status' => $status,
+                    'external_order_id' => $payload['paymentIntentId'],
+                    'external_transaction_id' => $chargeId,
+                    'currency' => $currency,
+                    'amount' => $amount,
+                    'payload' => $intent,
+                    'verified_at' => now(),
+                ]
+            );
+
+            return response()->json([
+                'paymentIntentId' => $payload['paymentIntentId'],
+                'status' => $status,
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json(['message' => 'No fue posible verificar el pago con Stripe.'], 422);
+        }
+    }
+
+    protected function publicPaymentConfiguration(array $payments): array
+    {
+        $methods = collect($payments['methods'] ?? [])->map(function (array $method, string $key) {
+            if ($key === 'paypal') {
+                unset($method['client_secret']);
+            }
+
+            if ($key === 'stripe') {
+                unset($method['secret_key']);
+            }
+
+            return $method;
+        })->all();
+
+        return [
+            'methods' => $methods,
+            'bank_accounts' => array_values(array_filter(
+                $payments['bank_accounts'] ?? [],
+                fn ($account) => ($account['enabled'] ?? true) === true
+            )),
+            'origin_banks' => array_values(array_filter(
+                $payments['origin_banks'] ?? [],
+                fn ($bank) => ($bank['enabled'] ?? true) === true
+            )),
+        ];
+    }
+
+    protected function paymentSettings(): array
+    {
+        $defaults = [
+            'methods' => [
+                'manual' => [
+                    'enabled' => true,
+                    'label' => 'Transferencia bancaria',
+                    'description' => 'Paga con transferencia o deposito y comparte tu referencia.',
+                    'instructions' => 'Selecciona una cuenta bancaria, realiza tu pago y registra los datos de la transferencia.',
+                    'fee_percent' => 0,
+                ],
+                'paypal' => [
+                    'enabled' => false,
+                    'label' => 'PayPal',
+                    'description' => 'Configura PayPal en administracion para habilitarlo en checkout.',
+                    'client_id' => null,
+                    'client_secret' => null,
+                    'environment' => 'sandbox',
+                    'instructions' => 'Cuando este activo, los clientes podran continuar con PayPal.',
+                    'fee_percent' => 0,
+                ],
+                'stripe' => [
+                    'enabled' => false,
+                    'label' => 'Stripe',
+                    'description' => 'Paga con tarjeta internacional desde un formulario seguro.',
+                    'publishable_key' => null,
+                    'secret_key' => null,
+                    'environment' => 'test',
+                    'instructions' => 'Cuando este activo, podras pagar con tarjeta sin salir del checkout.',
+                    'fee_percent' => 0,
+                ],
+            ],
+            'bank_accounts' => [],
+            'origin_banks' => [],
+        ];
+
+        return array_replace_recursive($defaults, Settings::get('payments', $defaults) ?? []);
+    }
+
+    protected function resolveCartAmounts(array $payload): array
+    {
+        $itemsTotalUsd = 0.0;
+
+        foreach ($payload['items'] as $item) {
+            $product = Product::findOrFail($item['product_id']);
+            $itemsTotalUsd += ((float) $product->price_usd) * ((int) $item['quantity']);
+        }
+
+        $discountUsd = 0.0;
+        if (! empty($payload['coupon_code'] ?? null)) {
+            $code = strtoupper(trim($payload['coupon_code']));
+            $coupon = Coupon::where('code', $code)->where('active', true)->first();
+
+            if (! $coupon) {
+                abort(422, 'El cupón ingresado no es válido.');
+            }
+
+            $now = now();
+            if (($coupon->valid_from && $now->lt($coupon->valid_from)) ||
+                ($coupon->valid_until && $now->gt($coupon->valid_until))) {
+                abort(422, 'El cupón no está vigente.');
+            }
+
+            if ($coupon->max_uses !== null && $coupon->uses >= $coupon->max_uses) {
+                abort(422, 'El cupón ha alcanzado el número máximo de usos.');
+            }
+
+            if ($coupon->min_amount_usd !== null && $itemsTotalUsd < $coupon->min_amount_usd) {
+                abort(422, 'El total de la compra no cumple el mínimo para usar este cupón.');
+            }
+
+            $discountUsd = $coupon->type === 'percent'
+                ? round($itemsTotalUsd * ($coupon->value / 100), 2)
+                : min($itemsTotalUsd, (float) $coupon->value);
+        }
+
+        return [$itemsTotalUsd, $discountUsd];
+    }
+
+    protected function markInvoiceAsPaid(Invoice $invoice, InventoryService $inventory): void
+    {
+        if ($invoice->status === 'paid') {
+            return;
+        }
+
+        $invoice->status = 'paid';
+
+        $paidStatus = InvoiceStatus::where('code', 'paid')->first();
+        if ($paidStatus) {
+            $invoice->invoice_status_id = $paidStatus->id;
+        }
+
+        $invoice->save();
+
+        $movementType = MovementType::where('code', 'sale')->first();
+
+        $invoice->loadMissing('items.product', 'customer', 'creditAccount');
+
+        foreach ($invoice->items as $item) {
+            if (! $item->product) {
+                continue;
+            }
+
+            $inventory->registerExit(
+                $item->product,
+                (int) $item->quantity,
+                (float) $item->price_usd,
+                $movementType?->id,
+                $invoice->number,
+                'Salida por pago confirmado en checkout',
+                $invoice->warehouse_id
+            );
+        }
+
+        if (! $invoice->customer_id) {
+            return;
+        }
+
+        $customer = $invoice->customer;
+        if ($customer) {
+            $pointsToAdd = (int) floor($invoice->total_usd ?? 0);
+            $customer->loyalty_points = (int) ($customer->loyalty_points ?? 0) + $pointsToAdd;
+            $customer->lifetime_spent_usd = (float) ($customer->lifetime_spent_usd ?? 0) + (float) ($invoice->total_usd ?? 0);
+            $customer->last_purchase_at = now();
+            $customer->save();
+        }
+
+        if (! $invoice->credit_account_id) {
+            return;
+        }
+
+        $account = $invoice->creditAccount;
+        if (! $account) {
+            return;
+        }
+
+        CreditMovement::create([
+            'credit_account_id' => $account->id,
+            'invoice_id' => $invoice->id,
+            'type' => 'payment',
+            'amount_usd' => $invoice->total_usd,
+            'description' => 'Abono automático por factura '.$invoice->number,
+            'paid_at' => now(),
+        ]);
+
+        $account->balance_usd = (float) $account->balance_usd - (float) $invoice->total_usd;
+        $account->save();
     }
 }

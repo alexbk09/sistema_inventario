@@ -9,6 +9,18 @@ import { useI18n } from '@/Hooks/useI18n'
 import { router } from '@inertiajs/react'
 import { useEffect } from 'react'
 
+const ensureArray = (value) => {
+  if (Array.isArray(value)) {
+    return value
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.values(value)
+  }
+
+  return []
+}
+
 export default function ShopIndex({ products = {}, categories = [], canLogin }) {
   const { t } = useI18n()
   const [filters, setFilters] = useState({
@@ -21,14 +33,15 @@ export default function ShopIndex({ products = {}, categories = [], canLogin }) 
   })
   const [isCartOpen, setIsCartOpen] = useState(false)
   const { itemCount } = useCart()
-  const [productList, setProductList] = useState(products.data || [])
+  const [productList, setProductList] = useState(() => ensureArray(products.data))
   const [page, setPage] = useState(products.current_page || 1)
   const [lastPage, setLastPage] = useState(products.last_page || 1)
   const [loadingMore, setLoadingMore] = useState(false)
+  const safeCategories = ensureArray(categories)
 
   // Cuando cambian los productos (por navegación o filtros), actualiza el listado
   useEffect(() => {
-    setProductList(products.data || [])
+    setProductList(ensureArray(products.data))
     setPage(products.current_page || 1)
     setLastPage(products.last_page || 1)
   }, [products])
@@ -114,7 +127,7 @@ export default function ShopIndex({ products = {}, categories = [], canLogin }) 
       preserveState: true,
       onSuccess: (pageData) => {
         // Concatenar productos
-        setProductList((prev) => [...prev, ...(pageData.props.products.data || [])])
+        setProductList((prev) => [...ensureArray(prev), ...ensureArray(pageData.props.products?.data)])
         setPage(pageData.props.products.current_page || page + 1)
         setLastPage(pageData.props.products.last_page || lastPage)
         setLoadingMore(false)
@@ -172,7 +185,7 @@ export default function ShopIndex({ products = {}, categories = [], canLogin }) 
       preserveScroll: true,
       preserveState: true,
       onSuccess: (pageData) => {
-        setProductList(pageData.props.products.data || [])
+        setProductList(ensureArray(pageData.props.products?.data))
         setPage(pageData.props.products.current_page || newPage)
         setLastPage(pageData.props.products.last_page || lastPage)
         setLoadingMore(false)
@@ -212,7 +225,7 @@ export default function ShopIndex({ products = {}, categories = [], canLogin }) 
                   tags: [],
                 })
               }
-              categories={categories}
+              categories={safeCategories}
             />
 
             {/* Productos */}

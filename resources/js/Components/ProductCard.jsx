@@ -27,11 +27,6 @@ export default function ProductCard({
 
     setIsAdding(true)
     try {
-      console.log('[v0] Agregando producto al carrito:', {
-        id: String(product.id),
-        name: product.name,
-        price: Number(product.price ?? product.price_usd ?? 0),
-      })
       addToCart({
         id: String(product.id),
         name: product.name,
@@ -55,7 +50,7 @@ export default function ProductCard({
       setIsAdding(false)
     }
   }
-  console.log('Renderizando ProductCard, rate:', pageRate ?? window?.BS_RATE)
+
   const isOutOfStock = product.stock <= 0
   const priceUsd = Number(product.price ?? product.price_usd ?? 0)
   const priceBs = Number(

@@ -1,10 +1,11 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.jsx';
 import AdminTable from '@/Components/admin/provider/AdminTableProviders.jsx';
 import AdminFilters from '@/Components/admin/provider/AdminTableFilterProviders.jsx';
 import SupplierModal from '@/Components/admin/provider/SuplimerModal.jsx';
 import ConfirmDialog from '@/Components/common/ConfirmDialog.jsx';
+import AdminIndexShell from '@/Components/admin/AdminIndexShell.jsx';
 import toast from 'react-hot-toast';
 
 export default function Index({ providers, filters }) {
@@ -170,21 +171,38 @@ export default function Index({ providers, filters }) {
   return (
     <AuthenticatedLayout>
       <Head title="Proveedores" />
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Proveedores</h1>
-          <p className="text-muted-foreground">Gestiona los proveedores de la tienda</p>
-        </div>
-        {/* <Link href={route('admin.providers.create')} className="px-3 py-2 bg-indigo-600 text-white rounded">Nuevo</Link> */}
-
-        <AdminFilters
-          searchPlaceholder="Buscar por empresa, encargado o email..."
-          searchValue={search}
-          onSearchChange={setSearch}
-          onAddNew={handleAddNew}
-          addButtonLabel="Nuevo Proveedor"
-        />
-
+      <AdminIndexShell
+        title="Ordena proveedores con mejor contexto operativo y menos fricción"
+        description="La vista reúne búsqueda, alta rápida, edición y limpieza del padrón de proveedores en un mismo flujo consistente con el resto del panel."
+        stats={[
+          { label: 'Proveedores visibles', value: data.length },
+          { label: 'Página', value: `${page}/${totalPages}` },
+          { label: 'Búsqueda', value: debounced ? 'Activa' : 'General' },
+        ]}
+        contextTitle="Proveedores"
+        contextDescription="Gestiona contactos comerciales, datos de empresa y mantenimiento del catálogo de abastecimiento desde una sola pantalla."
+        contextItems={[
+          { label: 'Resultados visibles', value: data.length },
+          { label: 'Filtro', value: debounced || 'Sin filtro' },
+          { label: 'Modal', value: isModalOpen ? 'Abierto' : 'Disponible' },
+        ]}
+        primaryAction={
+          <button
+            type="button"
+            onClick={handleAddNew}
+            className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+          >
+            Nuevo proveedor
+          </button>
+        }
+        filters={
+          <AdminFilters
+            searchPlaceholder="Buscar por empresa, encargado o email..."
+            searchValue={search}
+            onSearchChange={setSearch}
+          />
+        }
+      >
         <AdminTable
           columns={columns}
           data={data}
@@ -194,18 +212,7 @@ export default function Index({ providers, filters }) {
           onEdit={handleEdit}
           onDelete={handleDelete}
         />
-
-        {/*         {data.map((p) => (
-          <div key={p.id} className="border rounded p-3">
-            <div className="font-semibold">{p.name}</div>
-            <div className="text-sm text-gray-600">{p.email} · {p.phone}</div>
-            <div className="mt-2 flex gap-2">
-              <Link href={route('admin.providers.edit', p.id)} className="px-2 py-1 border rounded">Editar</Link>
-              <Link as="button" method="delete" href={route('admin.providers.destroy', p.id)} className="px-2 py-1 border rounded text-red-600">Eliminar</Link>
-            </div>
-          </div>
-        ))} */}
-      </div>
+      </AdminIndexShell>
       <SupplierModal
         isOpen={isModalOpen}
         onClose={() => {

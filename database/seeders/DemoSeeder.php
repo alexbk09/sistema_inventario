@@ -10,26 +10,54 @@ class DemoSeeder extends Seeder
 {
     public function run(): void
     {
+        $adminConfig = config('demo.users.admin');
+        $clientConfig = config('demo.users.client');
+
         // Usuario admin demo
         $admin = User::firstOrCreate(
-            ['email' => 'admin@example.com'],
-            ['name' => 'Administrador', 'password' => 'admin12345', 'type' => 'admin']
+            ['email' => $adminConfig['email']],
+            [
+                'name' => $adminConfig['name'],
+                'password' => $adminConfig['password'],
+                'type' => $adminConfig['type'],
+            ]
         );
-        // Asegura que la contraseña sea la correcta (evita doble hash)
-        $admin->forceFill(['password' => 'admin12345'])->save();
+        $admin->forceFill([
+            'name' => $adminConfig['name'],
+            'password' => $adminConfig['password'],
+            'type' => $adminConfig['type'],
+        ])->save();
         if (method_exists($admin, 'assignRole')) {
-            $admin->assignRole('admin');
+            $admin->syncRoles([$adminConfig['role']]);
         }
 
         // Usuario cliente demo
         $client = User::firstOrCreate(
-            ['email' => 'cliente@example.com'],
-            ['name' => 'Cliente Demo', 'password' => 'cliente12345', 'type' => 'client']
+            ['email' => $clientConfig['email']],
+            [
+                'name' => $clientConfig['name'],
+                'password' => $clientConfig['password'],
+                'type' => $clientConfig['type'],
+            ]
         );
-        $client->forceFill(['password' => 'cliente12345'])->save();
+        $client->forceFill([
+            'name' => $clientConfig['name'],
+            'password' => $clientConfig['password'],
+            'type' => $clientConfig['type'],
+        ])->save();
         if (method_exists($client, 'assignRole')) {
-            $client->assignRole('user');
+            $client->syncRoles([$clientConfig['role']]);
         }
+
+        Customer::updateOrCreate(
+            ['user_id' => $client->id],
+            [
+                'name' => $client->name,
+                'email' => $client->email,
+                'phone' => $clientConfig['phone'],
+                'address' => $clientConfig['address'],
+            ]
+        );
 
         // Categorías
         $cats = collect(['Electrónica', 'Hogar', 'Deportes', 'Moda'])->map(function ($n) {

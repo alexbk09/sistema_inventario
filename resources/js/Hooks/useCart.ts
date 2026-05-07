@@ -96,23 +96,19 @@ export function useCart() {
   // Agregar producto al carrito
   const addToCart = useCallback(
     (product: Omit<CartItem, 'quantity'>) => {
-      console.log('[v0] useCart - addToCart llamado con:', product)
       setCart((prevCart) => {
         const existingItem = prevCart.items.find((item) => item.id === product.id)
         let newItems: CartItem[]
 
         if (existingItem) {
-          console.log('[v0] Producto ya existe, incrementando cantidad')
           newItems = prevCart.items.map((item) =>
             item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
           )
         } else {
-          console.log('[v0] Nuevo producto, agregando al carrito')
           newItems = [...prevCart.items, { ...product, quantity: 1 }]
         }
 
         const newCart = { items: newItems, total: calculateTotal(newItems) }
-        console.log('[v0] Carrito actualizado:', newCart)
         saveCart(newCart)
         return newCart
       })

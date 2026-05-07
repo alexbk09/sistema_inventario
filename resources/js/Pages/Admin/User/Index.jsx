@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.jsx';
 import AdminTable from '@/Components/admin/provider/AdminTableProviders.jsx';
 import AdminFilters from '@/Components/common/AdminFilters.jsx';
+import AdminIndexShell from '@/Components/admin/AdminIndexShell.jsx';
 
 export default function Index({ users, filters }) {
   const { data } = users;
@@ -73,18 +74,29 @@ export default function Index({ users, filters }) {
   return (
     <AuthenticatedLayout>
       <Head title="Usuarios" />
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Usuarios</h1>
-          <p className="text-muted-foreground">Consulta la información básica de los usuarios del sistema.</p>
-        </div>
-
-        <AdminFilters
-          searchPlaceholder="Buscar por nombre o email..."
-          searchValue={search}
-          onSearchChange={setSearch}
-        />
-
+      <AdminIndexShell
+        title="Supervisa usuarios con un flujo más claro para consulta y control"
+        description="La pantalla concentra búsqueda, lectura rápida de roles y navegación hacia el detalle del usuario sin perder foco sobre el listado principal."
+        stats={[
+          { label: 'Usuarios visibles', value: data.length },
+          { label: 'Página', value: `${page}/${totalPages}` },
+          { label: 'Búsqueda', value: debounced ? 'Activa' : 'General' },
+        ]}
+        contextTitle="Usuarios"
+        contextDescription="Consulta usuarios del sistema, su correo principal y los roles asignados dentro del mismo patrón visual del backoffice."
+        contextItems={[
+          { label: 'Resultados visibles', value: data.length },
+          { label: 'Filtro', value: debounced || 'Sin filtro' },
+          { label: 'Acción', value: 'Detalle directo' },
+        ]}
+        filters={
+          <AdminFilters
+            searchPlaceholder="Buscar por nombre o email..."
+            searchValue={search}
+            onSearchChange={setSearch}
+          />
+        }
+      >
         <AdminTable
           columns={columns}
           data={data}
@@ -93,7 +105,7 @@ export default function Index({ users, filters }) {
           onPageChange={handlePageChange}
           onView={handleView}
         />
-      </div>
+      </AdminIndexShell>
     </AuthenticatedLayout>
   );
 }

@@ -263,6 +263,10 @@ Route::get('/product/{product}', function (\App\Models\Product $product) {
 Route::middleware('auth')->group(function () {
     Route::get('/checkout', [CheckoutController::class, 'index'])->name('checkout.index');
     Route::post('/checkout', [CheckoutController::class, 'store'])->name('checkout.store');
+    Route::post('/checkout/paypal/order', [CheckoutController::class, 'createPayPalOrder'])->name('checkout.paypal.order');
+    Route::post('/checkout/paypal/capture', [CheckoutController::class, 'capturePayPalOrder'])->name('checkout.paypal.capture');
+    Route::post('/checkout/stripe/intent', [CheckoutController::class, 'createStripePaymentIntent'])->name('checkout.stripe.intent');
+    Route::post('/checkout/stripe/verify', [CheckoutController::class, 'verifyStripePaymentIntent'])->name('checkout.stripe.verify');
 });
 Route::get('/confirmacion', [CheckoutController::class, 'confirmation'])->name('checkout.confirmation');
 

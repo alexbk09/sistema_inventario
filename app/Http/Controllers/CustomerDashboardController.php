@@ -13,7 +13,15 @@ class CustomerDashboardController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
-        $customer = Customer::where('user_id', $user->id)->first();
+        $customer = Customer::firstOrCreate(
+            ['user_id' => $user->id],
+            [
+                'name' => $user->name,
+                'email' => $user->email,
+                'phone' => '',
+                'address' => '',
+            ]
+        );
 
         // Resumen
         $totalSpent = (float) Invoice::where('customer_id', $customer->id)->sum('total_usd');

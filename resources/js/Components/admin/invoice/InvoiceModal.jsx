@@ -4,6 +4,25 @@ import { router } from '@inertiajs/react'
 import { Download, Printer, MessageCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 
+function formatGatewayDate(value) {
+  if (!value) return 'N/A'
+
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return 'N/A'
+
+  return parsed.toLocaleString('es-ES')
+}
+
+function prettyGatewayPayload(payload) {
+  if (!payload) return ''
+
+  try {
+    return JSON.stringify(payload, null, 2)
+  } catch {
+    return ''
+  }
+}
+
 const statusLabels = {
   pending: { label: 'Pendiente', color: 'bg-yellow-50 text-yellow-700' },
   paid: { label: 'Pagado', color: 'bg-green-50 text-green-700' },
@@ -89,6 +108,9 @@ export default function InvoiceModal({
 
   const contact = invoice.contact || {}
   const customer = invoice.customer || {}
+  const gatewayTransactions = Array.isArray(invoice.gateway_transactions)
+    ? invoice.gateway_transactions
+    : (Array.isArray(invoice.gatewayTransactions) ? invoice.gatewayTransactions : [])
 
   const [internalNotes, setInternalNotes] = useState(invoice.internal_notes || '')
   const [publicNotes, setPublicNotes] = useState(invoice.public_notes || '')
@@ -425,6 +447,64 @@ export default function InvoiceModal({
             <div className="flex justify-between text-xs text-orange-800 pt-1 border-t border-orange-200 mt-2">
               <span>Total pagos USD:</span>
               <span>{paymentsTotalUsd.toFixed(2)}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-lg space-y-3">
+          <div>
+            <p className="text-xs text-emerald-700 font-semibold mb-1">AUDITORIA DE PASARELA</p>
+            <p className="text-sm text-muted-foreground">Registro verificado de respuestas del gateway asociado a esta factura.</p>
+          </div>
+
+          {gatewayTransactions.length === 0 ? (
+            <p className="text-sm text-emerald-800">No hay transacciones de pasarela asociadas.</p>
+          ) : (
+            <div className="space-y-3 max-h-72 overflow-y-auto">
+              {gatewayTransactions.map((transaction, index) => {
+                const payload = prettyGatewayPayload(transaction.payload)
+
+                return (
+                  <div
+                    key={transaction.id ?? `${transaction.provider}-${transaction.external_capture_id ?? index}`}
+                    className="rounded-lg border border-emerald-100 bg-white/80 p-4 space-y-3"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">
+                          {(transaction.provider || 'gateway').toUpperCase()} / {transaction.event_type || 'evento'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Metodo: {transaction.payment_method || 'N/A'}
+                        </p>
+                      </div>
+                      <span className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
+                        {transaction.status || 'N/A'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-2 text-xs text-slate-700 md:grid-cols-2">
+                      <p><span className="font-semibold text-foreground">Order ID:</span> {transaction.external_order_id || 'N/A'}</p>
+                      <p><span className="font-semibold text-foreground">Capture ID:</span> {transaction.external_capture_id || 'N/A'}</p>
+                      <p><span className="font-semibold text-foreground">Transaction ID:</span> {transaction.external_transaction_id || 'N/A'}</p>
+                      <p><span className="font-semibold text-foreground">Monto:</span> {transaction.currency || 'USD'} {Number(transaction.amount || 0).toFixed(2)}</p>
+                      <p><span className="font-semibold text-foreground">Verificado:</span> {formatGatewayDate(transaction.verified_at)}</p>
+                      <p><span className="font-semibold text-foreground">Asociado a factura:</span> {formatGatewayDate(transaction.consumed_at)}</p>
+                    </div>
+
+                    {payload && (
+                      <details className="rounded-lg border border-emerald-100 bg-emerald-50/70">
+                        <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-emerald-800">
+                          Ver payload del gateway
+                        </summary>
+                        <pre className="max-h-64 overflow-auto border-t border-emerald-100 px-3 py-3 text-[11px] leading-5 text-slate-700 whitespace-pre-wrap break-words">
+                          {payload}
+                        </pre>
+                      </details>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>

@@ -6,6 +6,7 @@ import AdminFilters from '@/Components/common/AdminFilters.jsx';
 import ProductModal from '@/Components/admin/product/ProductModal.jsx';
 import BulkImportModal from '@/Components/admin/product/BulkImportModal.jsx';
 import ConfirmDialog from '@/Components/common/ConfirmDialog.jsx';
+import AdminIndexShell from '@/Components/admin/AdminIndexShell.jsx';
 import toast from 'react-hot-toast';
 
 export default function Index({ products, filters, summary, warehouses = [] }) {
@@ -153,42 +154,33 @@ export default function Index({ products, filters, summary, warehouses = [] }) {
   return (
     <AuthenticatedLayout>
       <Head title="Productos" />
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Productos</h1>
-          <p className="text-muted-foreground">Gestiona los productos</p>
-        </div>
-
-        {summary && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-card border border-border rounded-lg p-4">
-              <p className="text-sm text-muted-foreground mb-1">Total de productos</p>
-              <p className="text-2xl font-bold text-foreground">{Number(summary.total_products || 0)}</p>
-            </div>
-            <div className="bg-card border border-border rounded-lg p-4">
-              <p className="text-sm text-muted-foreground mb-1">Valor total inventario (USD)</p>
-              <p className="text-2xl font-bold text-foreground">${Number(summary.total_products_value_usd || 0).toFixed(2)}</p>
-            </div>
-            <div className="bg-card border border-border rounded-lg p-4">
-              <p className="text-sm text-muted-foreground mb-1">Salidas últimos 30 días</p>
-              <p className="text-2xl font-bold text-foreground">{Number(summary.last_30_days_exits || 0)}</p>
-            </div>
-            <div className="bg-card border border-border rounded-lg p-4">
-              <p className="text-sm text-muted-foreground mb-1">Entradas acumuladas</p>
-              <p className="text-2xl font-bold text-foreground">{Number(summary.total_entries || 0)}</p>
-            </div>
-          </div>
-        )}
-
-        <AdminFilters searchPlaceholder="Buscar por nombre, SKU o descripción" searchValue={search} onSearchChange={setSearch} onAddNew={handleAddNew} addButtonLabel="Nuevo Producto">
-          <div>
-            <button onClick={() => setIsBulkOpen(true)} className="ml-2 px-3 py-2 border rounded bg-muted hover:bg-muted/80">Importar Excel</button>
-          </div>
-        </AdminFilters>
-
+      <AdminIndexShell
+        title="Gestiona el catálogo con una vista más limpia y consistente"
+        description="La pantalla prioriza métricas, acciones y filtros sin romper el foco sobre la tabla principal ni sobre las tareas de inventario del día a día."
+        stats={[
+          { label: 'Productos', value: Number(summary?.total_products || data.length || 0) },
+          { label: 'Inventario USD', value: `$${Number(summary?.total_products_value_usd || 0).toFixed(2)}` },
+          { label: 'Salidas 30d', value: Number(summary?.last_30_days_exits || 0) },
+        ]}
+        contextTitle="Productos"
+        contextDescription="Combina consulta, alta rápida, importación y acceso a movimientos de inventario bajo el mismo sistema visual del backoffice."
+        contextItems={[
+          { label: 'Resultados visibles', value: data.length },
+          { label: 'Filtro', value: debounced || 'Sin filtro' },
+          { label: 'Entradas acumuladas', value: Number(summary?.total_entries || 0) },
+        ]}
+        primaryAction={
+          <button onClick={handleAddNew} className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800">Nuevo producto</button>
+        }
+        secondaryActions={
+          <button onClick={() => setIsBulkOpen(true)} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Importar Excel</button>
+        }
+        filters={
+          <AdminFilters searchPlaceholder="Buscar por nombre, SKU o descripción" searchValue={search} onSearchChange={setSearch} />
+        }
+      >
         <AdminTable columns={columns} data={data} page={page} totalPages={totalPages} onPageChange={handlePageChange} onEdit={handleEdit} onDelete={handleDelete} />
-
-      </div>
+      </AdminIndexShell>
 
       <ProductModal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); setEditingProduct(null); }} onSave={handleSave} editingProduct={editingProduct} />
       <BulkImportModal isOpen={isBulkOpen} onClose={() => setIsBulkOpen(false)} warehouses={warehouses ?? (window.page?.props?.warehouses ?? [])} />

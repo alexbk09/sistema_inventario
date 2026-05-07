@@ -86,6 +86,41 @@ class SettingsController extends Controller
             'invoice_button_text' => null,
         ]);
 
+        $paymentDefaults = [
+            'methods' => [
+                'manual' => [
+                    'enabled' => true,
+                    'label' => 'Transferencia bancaria',
+                    'description' => 'Paga con transferencia o deposito y carga tu referencia.',
+                    'instructions' => 'Transfiere a una de las cuentas disponibles y completa la referencia de pago.',
+                    'fee_percent' => 0,
+                ],
+                'paypal' => [
+                    'enabled' => false,
+                    'label' => 'PayPal',
+                    'description' => 'Habilita pagos con PayPal desde tu configuracion.',
+                    'client_id' => null,
+                    'client_secret' => null,
+                    'environment' => 'sandbox',
+                    'instructions' => 'Configura tu Client ID y Secret para habilitar PayPal.',
+                    'fee_percent' => 0,
+                ],
+                'stripe' => [
+                    'enabled' => false,
+                    'label' => 'Stripe',
+                    'description' => 'Acepta tarjetas internacionales con Stripe.',
+                    'publishable_key' => null,
+                    'secret_key' => null,
+                    'environment' => 'test',
+                    'instructions' => 'Configura tus llaves de Stripe para habilitar el cobro con tarjeta.',
+                    'fee_percent' => 0,
+                ],
+            ],
+            'bank_accounts' => [],
+            'origin_banks' => [],
+        ];
+        $payments = array_replace_recursive($paymentDefaults, Settings::get('payments', $paymentDefaults) ?? []);
+
         $warehouseOptions = Warehouse::orderBy('name')->get(['id','name','code']);
 
         return Inertia::render('Admin/Settings/Index', [
@@ -100,6 +135,7 @@ class SettingsController extends Controller
             'security' => $security,
             'qr' => $qr,
             'mail' => $mail,
+            'payments' => $payments,
             'warehouseOptions' => $warehouseOptions,
         ]);
     }
@@ -157,6 +193,45 @@ class SettingsController extends Controller
             'mail.footer_text' => ['nullable', 'string', 'max:500'],
             'mail.invoice_intro' => ['nullable', 'string', 'max:500'],
             'mail.invoice_button_text' => ['nullable', 'string', 'max:100'],
+
+            'payments.methods.manual.enabled' => ['required', 'boolean'],
+            'payments.methods.manual.label' => ['required', 'string', 'max:100'],
+            'payments.methods.manual.description' => ['nullable', 'string', 'max:255'],
+            'payments.methods.manual.instructions' => ['nullable', 'string', 'max:1000'],
+            'payments.methods.manual.fee_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+
+            'payments.methods.paypal.enabled' => ['required', 'boolean'],
+            'payments.methods.paypal.label' => ['required', 'string', 'max:100'],
+            'payments.methods.paypal.description' => ['nullable', 'string', 'max:255'],
+            'payments.methods.paypal.client_id' => ['nullable', 'string', 'max:255'],
+            'payments.methods.paypal.client_secret' => ['nullable', 'string', 'max:255'],
+            'payments.methods.paypal.environment' => ['nullable', 'in:sandbox,live'],
+            'payments.methods.paypal.instructions' => ['nullable', 'string', 'max:1000'],
+            'payments.methods.paypal.fee_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+
+            'payments.methods.stripe.enabled' => ['required', 'boolean'],
+            'payments.methods.stripe.label' => ['required', 'string', 'max:100'],
+            'payments.methods.stripe.description' => ['nullable', 'string', 'max:255'],
+            'payments.methods.stripe.publishable_key' => ['nullable', 'string', 'max:255'],
+            'payments.methods.stripe.secret_key' => ['nullable', 'string', 'max:255'],
+            'payments.methods.stripe.environment' => ['nullable', 'in:test,live'],
+            'payments.methods.stripe.instructions' => ['nullable', 'string', 'max:1000'],
+            'payments.methods.stripe.fee_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+
+            'payments.bank_accounts' => ['nullable', 'array'],
+            'payments.bank_accounts.*.bank_name' => ['required', 'string', 'max:120'],
+            'payments.bank_accounts.*.account_name' => ['required', 'string', 'max:120'],
+            'payments.bank_accounts.*.account_number' => ['required', 'string', 'max:80'],
+            'payments.bank_accounts.*.account_type' => ['nullable', 'string', 'max:50'],
+            'payments.bank_accounts.*.identification' => ['nullable', 'string', 'max:80'],
+            'payments.bank_accounts.*.email' => ['nullable', 'email', 'max:255'],
+            'payments.bank_accounts.*.phone' => ['nullable', 'string', 'max:50'],
+            'payments.bank_accounts.*.notes' => ['nullable', 'string', 'max:500'],
+            'payments.bank_accounts.*.enabled' => ['required', 'boolean'],
+
+            'payments.origin_banks' => ['nullable', 'array'],
+            'payments.origin_banks.*.name' => ['required', 'string', 'max:120'],
+            'payments.origin_banks.*.enabled' => ['required', 'boolean'],
         ]);
 
         \App\Support\Settings::set('general', $validated['general']);
@@ -170,6 +245,7 @@ class SettingsController extends Controller
         \App\Support\Settings::set('security', $validated['security']);
         \App\Support\Settings::set('qr', $validated['qr']);
         \App\Support\Settings::set('mail', $validated['mail']);
+        \App\Support\Settings::set('payments', $validated['payments']);
 
         return back()->with('success', 'Configuración actualizada correctamente.');
     }

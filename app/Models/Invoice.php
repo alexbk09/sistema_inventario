@@ -53,6 +53,11 @@ class Invoice extends Model
         return $this->hasMany(InvoicePayment::class);
     }
 
+    public function gatewayTransactions(): HasMany
+    {
+        return $this->hasMany(PaymentGatewayTransaction::class);
+    }
+
     public function adjustments(): HasMany
     {
         return $this->hasMany(InvoiceAdjustment::class);

@@ -1,9 +1,11 @@
+<?php
+    
     /**
      * Devuelve la URL absoluta de la imagen principal del producto.
      * Si hay imágenes asociadas, retorna la primera; si no, usa image_url como fallback.
      * Siempre usa asset() para asegurar compatibilidad con cambios de storage o servidor.
      */
-    public function getMainImageUrl(): string
+    /*public function getMainImageUrl(): string
     {
         $img = $this->images()->orderBy('sort_order')->first();
         if ($img && $img->path) {
@@ -17,8 +19,8 @@
         }
         // Fallback global (puedes cambiarlo por un placeholder genérico)
         return asset('images/placeholder.svg');
-    }
-<?php
+    }*/
+
 
 namespace App\Models;
 

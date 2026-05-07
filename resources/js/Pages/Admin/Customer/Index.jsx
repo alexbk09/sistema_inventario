@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.jsx';
 import AdminTable from '@/Components/admin/provider/AdminTableProviders.jsx';
 import AdminFilters from '@/Components/common/AdminFilters.jsx';
+import AdminIndexShell from '@/Components/admin/AdminIndexShell.jsx';
 
 export default function Index({ customers, filters, identificationTypes = [] }) {
   const { data } = customers;
@@ -105,27 +106,38 @@ export default function Index({ customers, filters, identificationTypes = [] }) 
   return (
     <AuthenticatedLayout>
       <Head title="Clientes" />
-      <div className="space-y-6">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground mb-2">Clientes</h1>
-            <p className="text-muted-foreground">Gestiona y consulta la información de tus clientes y su actividad de compras.</p>
-          </div>
+      <AdminIndexShell
+        title="Gestiona clientes con una vista más clara y operativa"
+        description="La pantalla agrupa búsqueda, captura rápida y consulta en un solo flujo visual, reduciendo el salto entre acciones y listado."
+        stats={[
+          { label: 'Registros', value: data.length },
+          { label: 'Página', value: `${page}/${totalPages}` },
+          { label: 'Búsqueda', value: debounced ? 'Activa' : 'General' },
+        ]}
+        contextTitle="Clientes"
+        contextDescription="Consulta actividad comercial y registra nuevos clientes sin perder el foco de la tabla principal."
+        contextItems={[
+          { label: 'Resultados visibles', value: data.length },
+          { label: 'Filtro', value: debounced || 'Sin filtro' },
+          { label: 'Modal', value: showModal ? 'Abierto' : 'Disponible' },
+        ]}
+        primaryAction={
           <button
             type="button"
             onClick={() => setShowModal(true)}
-            className="px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition"
+            className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
           >
             Nuevo cliente
           </button>
-        </div>
-
-        <AdminFilters
-          searchPlaceholder="Buscar por nombre, email, teléfono o dirección..."
-          searchValue={search}
-          onSearchChange={setSearch}
-        />
-
+        }
+        filters={
+          <AdminFilters
+            searchPlaceholder="Buscar por nombre, email, teléfono o dirección..."
+            searchValue={search}
+            onSearchChange={setSearch}
+          />
+        }
+      >
         <AdminTable
           columns={columns}
           data={data}
@@ -134,21 +146,22 @@ export default function Index({ customers, filters, identificationTypes = [] }) 
           onPageChange={handlePageChange}
           onView={handleView}
         />
+      </AdminIndexShell>
 
-        {showModal && (
-          <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
-            <div className="bg-card border border-border rounded-xl shadow-lg w-full max-w-lg mx-4">
-              <div className="flex items-center justify-between px-5 py-3 border-b border-border">
-                <h2 className="text-lg font-bold text-foreground">Nuevo cliente</h2>
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="text-sm text-muted-foreground hover:text-foreground"
-                >
-                  Cerrar
-                </button>
-              </div>
-              <form onSubmit={handleCreate} className="px-5 py-4 space-y-4">
+      {showModal && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
+          <div className="bg-card border border-border rounded-xl shadow-lg w-full max-w-lg mx-4">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-border">
+              <h2 className="text-lg font-bold text-foreground">Nuevo cliente</h2>
+              <button
+                type="button"
+                onClick={() => setShowModal(false)}
+                className="text-sm text-muted-foreground hover:text-foreground"
+              >
+                Cerrar
+              </button>
+            </div>
+            <form onSubmit={handleCreate} className="px-5 py-4 space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-muted-foreground mb-1">Tipo ID</label>
@@ -236,11 +249,10 @@ export default function Index({ customers, filters, identificationTypes = [] }) 
                     {processing ? 'Guardando...' : 'Guardar cliente'}
                   </button>
                 </div>
-              </form>
-            </div>
+            </form>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </AuthenticatedLayout>
   );
 }

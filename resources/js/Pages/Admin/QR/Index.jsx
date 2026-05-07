@@ -1,19 +1,55 @@
-import { Head } from '@inertiajs/react'
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.jsx'
+import { Head, Link } from '@inertiajs/react';
+import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.jsx';
+import AdminIndexShell from '@/Components/admin/AdminIndexShell.jsx';
 
 export default function Index({ invoices = [], products = [], qr = {} }) {
+  const hasWhatsAppUrl = Boolean(qr.whatsapp_contact_url);
+
   return (
     <AuthenticatedLayout>
       <Head title="QRs" />
-      <div className="space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Códigos QR</h1>
-          <p className="text-muted-foreground">
-            Vista rápida para generar y descargar códigos QR de facturas, productos y contacto.
-          </p>
-        </div>
-
-        <section className="bg-card border border-border rounded-lg p-4 space-y-4">
+      <AdminIndexShell
+        title="Centraliza códigos QR con una vista más útil para operación diaria"
+        description="La pantalla reúne accesos rápidos a facturas, productos y contacto para descargar o validar códigos sin navegar entre módulos dispersos."
+        stats={[
+          { label: 'Facturas recientes', value: invoices.length },
+          { label: 'Productos recientes', value: products.length },
+          { label: 'WhatsApp', value: hasWhatsAppUrl ? 'Configurado' : 'Pendiente' },
+        ]}
+        contextTitle="QR y enlaces rápidos"
+        contextDescription="Usa este módulo para abrir, descargar y verificar los códigos más consultados desde ventas, catálogo y contacto."
+        contextItems={[
+          { label: 'QR facturas', value: invoices.length },
+          { label: 'QR productos', value: products.length },
+          { label: 'URL contacto', value: hasWhatsAppUrl ? 'Lista' : 'Sin configurar' },
+        ]}
+        primaryAction={
+          <Link
+            href={route('admin.settings.index')}
+            className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+          >
+            Ajustar QR
+          </Link>
+        }
+        filters={
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Facturas</p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">Consulta los últimos comprobantes con acceso inmediato a su PNG.</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Productos</p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">Valida códigos del catálogo reciente y descarga sus QR sin salir del módulo.</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Contacto</p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">Comprueba la URL pública de WhatsApp configurada para atención o ventas.</p>
+            </div>
+          </div>
+        }
+      >
+        <div className="space-y-6 p-6">
+        <section className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm space-y-4">
           <h2 className="text-xl font-semibold text-foreground">Facturas recientes</h2>
           {invoices.length === 0 ? (
             <p className="text-sm text-muted-foreground">No hay facturas recientes.</p>
@@ -57,7 +93,7 @@ export default function Index({ invoices = [], products = [], qr = {} }) {
           )}
         </section>
 
-        <section className="bg-card border border-border rounded-lg p-4 space-y-4">
+        <section className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm space-y-4">
           <h2 className="text-xl font-semibold text-foreground">Productos recientes</h2>
           {products.length === 0 ? (
             <p className="text-sm text-muted-foreground">No hay productos recientes.</p>
@@ -103,7 +139,7 @@ export default function Index({ invoices = [], products = [], qr = {} }) {
           )}
         </section>
 
-        <section className="bg-card border border-border rounded-lg p-4 space-y-4">
+        <section className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm space-y-4">
           <h2 className="text-xl font-semibold text-foreground">Contacto / WhatsApp</h2>
           <p className="text-sm text-muted-foreground">
             Este QR apunta a la URL configurada en 
@@ -131,7 +167,8 @@ export default function Index({ invoices = [], products = [], qr = {} }) {
             </div>
           </div>
         </section>
-      </div>
+        </div>
+      </AdminIndexShell>
     </AuthenticatedLayout>
-  )
+  );
 }

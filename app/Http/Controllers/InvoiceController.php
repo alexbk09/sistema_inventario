@@ -36,6 +36,7 @@ class InvoiceController extends Controller
                 'items.product',
                 'contact',
                 'payments',
+                'gatewayTransactions',
                 'adjustments',
                 'invoiceStatus',
             ])

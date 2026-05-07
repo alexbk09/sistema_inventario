@@ -29,7 +29,7 @@ class ProcessProductImage implements ShouldQueue
         $fullPath = storage_path('app/public/' . $image->path);
         if (!file_exists($fullPath)) return;
 
-        $service = env('IMAGE_AI_URL', 'http://127.0.0.1:8001/process');
+        // $service = env('IMAGE_AI_URL', 'http://127.0.0.1:8001/process');
         try {
             $response = Http::attach('file', file_get_contents($fullPath), basename($fullPath))
                 ->timeout(120)

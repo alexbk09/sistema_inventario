@@ -198,14 +198,13 @@ class ProductController extends Controller
                     'sort_order' => $index,
                 ]);
 
-                // Process image locally with free open-source model (Python script)
-                        // Dispatch processing to queue (non-blocking)
-                        try {
-                            ProcessProductImage::dispatch($image->id);
-                            Log::info('ProductController: dispatched ProcessProductImage', ['image_id'=>$image->id]);
-                        } catch (\Throwable $e) {
-                            Log::error('ProductController: failed to dispatch ProcessProductImage', ['error'=>$e->getMessage()]);
-                        }
+                // IA deshabilitada temporalmente
+                // try {
+                //     ProcessProductImage::dispatch($image->id);
+                //     Log::info('ProductController: dispatched ProcessProductImage', ['image_id'=>$image->id]);
+                // } catch (\Throwable $e) {
+                //     Log::error('ProductController: failed to dispatch ProcessProductImage', ['error'=>$e->getMessage()]);
+                // }
 
                 if ($index === 0) {
                     $product->image_url = $path;

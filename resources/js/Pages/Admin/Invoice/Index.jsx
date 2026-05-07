@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.jsx';
 import AdminTable from '@/Components/admin/provider/AdminTableProviders.jsx';
 import AdminFilters from '@/Components/common/AdminFilters.jsx';
-import InvoiceModal from '@/Components/Admin/invoice/InvoiceModal';
+import InvoiceModal from '@/Components/admin/invoice/InvoiceModal.jsx';
+import AdminIndexShell from '@/Components/admin/AdminIndexShell.jsx';
 
 export default function Index({ invoices, filters }) {
   const { data } = invoices;
@@ -78,17 +79,28 @@ export default function Index({ invoices, filters }) {
   return (
     <AuthenticatedLayout>
       <Head title="Facturas" />
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground mb-2">Facturas</h1>
-            <p className="text-muted-foreground">Listado de facturas</p>
-          </div>
-          <Link href={route('admin.invoices.create')} className="px-3 py-2 bg-primary text-primary-foreground rounded">Nueva</Link>
-        </div>
-
-        <AdminFilters searchPlaceholder="Buscar por número, cliente o estado" searchValue={search} onSearchChange={setSearch} />
-
+      <AdminIndexShell
+        title="Consulta facturas con un panel más claro para ventas y seguimiento"
+        description="La vista prioriza búsqueda, acceso rápido a nuevas facturas y revisión del historial sin obligar al usuario a recorrer una página lineal y plana."
+        stats={[
+          { label: 'Facturas visibles', value: data.length },
+          { label: 'Página', value: `${page}/${totalPages}` },
+          { label: 'Filtro', value: debounced ? 'Activo' : 'General' },
+        ]}
+        contextTitle="Facturas"
+        contextDescription="Revisa estados, totales y detalle comercial desde una tabla central con acceso inmediato al modal de consulta."
+        contextItems={[
+          { label: 'Búsqueda', value: debounced || 'Sin filtro' },
+          { label: 'Modal', value: isModalOpen ? 'Abierto' : 'Disponible' },
+          { label: 'Nueva factura', value: 'Acceso directo' },
+        ]}
+        primaryAction={
+          <Link href={route('admin.invoices.create')} className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800">Nueva factura</Link>
+        }
+        filters={
+          <AdminFilters searchPlaceholder="Buscar por número, cliente o estado" searchValue={search} onSearchChange={setSearch} />
+        }
+      >
         <AdminTable
           columns={columns}
           data={data}
@@ -97,13 +109,13 @@ export default function Index({ invoices, filters }) {
           onPageChange={handlePageChange}
           onView={handleViewInvoice}
         />
+      </AdminIndexShell>
 
-        <InvoiceModal
-          isOpen={isModalOpen}
-          onClose={handleCloseModal}
-          invoice={selectedInvoice}
-        />
-      </div>
+      <InvoiceModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        invoice={selectedInvoice}
+      />
     </AuthenticatedLayout>
   );
 }
