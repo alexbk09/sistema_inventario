@@ -1,8 +1,13 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.jsx';
 import AdminTable from '@/Components/admin/provider/AdminTableProviders.jsx';
+import { useI18n } from '@/Hooks/useI18n';
+import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates';
 
 export default function Index({ accounts, customers = [] }) {
+  const { t } = useI18n();
+  const { displayCurrency, formatPriceFromUsd } = useConfiguredCurrencyRates();
+  const formatActiveAmount = (value) => formatPriceFromUsd(Number(value || 0), displayCurrency);
   const { data } = accounts;
   const page = accounts.current_page ?? accounts?.meta?.current_page ?? 1;
   const totalPages = accounts.last_page ?? accounts?.meta?.last_page ?? 1;
@@ -17,10 +22,10 @@ export default function Index({ accounts, customers = [] }) {
   };
 
   const columns = [
-    { key: 'customer', label: 'Cliente', width: '30%', render: (_v, row) => row.customer?.name ?? 'N/A' },
-    { key: 'status', label: 'Estado', width: '15%' },
-    { key: 'credit_limit_usd', label: 'Límite USD', width: '20%', render: (v) => `$${Number(v ?? 0).toFixed(2)}` },
-    { key: 'balance_usd', label: 'Saldo USD', width: '20%', render: (v) => `$${Number(v ?? 0).toFixed(2)}` },
+    { key: 'customer', label: t('admin.credits.index.table.customer', 'Cliente'), width: '30%', render: (_v, row) => row.customer?.name ?? t('admin.credits.values.not_available', 'N/A') },
+    { key: 'status', label: t('admin.credits.index.table.status', 'Estado'), width: '15%' },
+    { key: 'credit_limit_usd', label: `${t('admin.credits.index.table.credit_limit_usd', 'Límite')} ${displayCurrency}`, width: '20%', render: (v) => formatActiveAmount(v) },
+    { key: 'balance_usd', label: `${t('admin.credits.index.table.balance_usd', 'Saldo')} ${displayCurrency}`, width: '20%', render: (v) => formatActiveAmount(v) },
   ];
 
   const { data: form, setData, post, processing, reset } = useForm({
@@ -39,12 +44,12 @@ export default function Index({ accounts, customers = [] }) {
 
   return (
     <AuthenticatedLayout>
-      <Head title="Cuentas de crédito" />
+      <Head title={t('admin.credits.index.page_title', 'Cuentas de crédito')} />
       <div className="space-y-6">
         <div className="flex flex-col lg:flex-row lg:items-start gap-6">
           <div className="flex-1">
-            <h1 className="text-3xl font-bold text-foreground mb-1">Cuentas de Crédito</h1>
-            <p className="text-muted-foreground text-sm">Controla el saldo y límite de crédito de tus clientes.</p>
+            <h1 className="text-3xl font-bold text-foreground mb-1">{t('admin.credits.index.title', 'Cuentas de crédito')}</h1>
+            <p className="text-muted-foreground text-sm">{t('admin.credits.index.description', 'Controla el saldo y límite de crédito de tus clientes.')}</p>
 
             <div className="mt-4">
               <AdminTable
@@ -59,11 +64,11 @@ export default function Index({ accounts, customers = [] }) {
           </div>
 
           <div className="w-full lg:w-80 bg-card border border-border rounded-lg p-4 space-y-3">
-            <h2 className="text-lg font-bold text-foreground mb-1">Nueva cuenta</h2>
-            <p className="text-xs text-muted-foreground mb-2">Selecciona un cliente y define el límite de crédito.</p>
+            <h2 className="text-lg font-bold text-foreground mb-1">{t('admin.credits.index.form.title', 'Nueva cuenta')}</h2>
+            <p className="text-xs text-muted-foreground mb-2">{t('admin.credits.index.form.description', 'Selecciona un cliente y define el límite de crédito.')}</p>
             <form onSubmit={handleCreate} className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-muted-foreground mb-1">Cliente</label>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1">{t('admin.credits.index.form.customer', 'Cliente')}</label>
                 <select
                   value={form.customer_id}
                   onChange={(e) => setData('customer_id', e.target.value)}
@@ -78,7 +83,7 @@ export default function Index({ accounts, customers = [] }) {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-muted-foreground mb-1">Límite de crédito (USD)</label>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1">{`${t('admin.credits.index.form.credit_limit_usd', 'Límite de crédito')} (${displayCurrency})`}</label>
                 <input
                   type="number"
                   min="0"
@@ -86,19 +91,19 @@ export default function Index({ accounts, customers = [] }) {
                   value={form.credit_limit_usd}
                   onChange={(e) => setData('credit_limit_usd', e.target.value)}
                   className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground"
-                  placeholder="Opcional"
+                  placeholder={t('admin.credits.index.form.optional', 'Opcional')}
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-muted-foreground mb-1">Estado</label>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1">{t('admin.credits.index.form.status', 'Estado')}</label>
                 <select
                   value={form.status}
                   onChange={(e) => setData('status', e.target.value)}
                   className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground"
                 >
-                  <option value="active">Activa</option>
-                  <option value="suspended">Suspendida</option>
-                  <option value="closed">Cerrada</option>
+                  <option value="active">{t('admin.credits.statuses.active', 'Activa')}</option>
+                  <option value="suspended">{t('admin.credits.statuses.suspended', 'Suspendida')}</option>
+                  <option value="closed">{t('admin.credits.statuses.closed', 'Cerrada')}</option>
                 </select>
               </div>
               <button
@@ -106,7 +111,7 @@ export default function Index({ accounts, customers = [] }) {
                 disabled={processing || customers.length === 0}
                 className="w-full py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-semibold hover:bg-primary/90 transition disabled:opacity-50"
               >
-                {processing ? 'Guardando...' : 'Crear cuenta'}
+                {processing ? t('admin.credits.values.saving', 'Guardando...') : t('admin.credits.index.form.create', 'Crear cuenta')}
               </button>
             </form>
           </div>

@@ -56,7 +56,7 @@ class CustomerDashboardController extends Controller
             'summary' => [
                 'totalSpent' => $totalSpent,
                 'totalPurchases' => $totalPurchases,
-                'lastPurchase' => $lastPurchase ? $lastPurchase->created_at->format('d/m/Y') : null,
+                'lastPurchase' => $lastPurchase?->created_at?->toIso8601String(),
             ],
             'invoices' => $invoices,
             'topProducts' => $topProducts,

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\{Layaway, LayawayItem, Customer, Product};
+use App\Services\AdminNotificationService;
 use App\Services\CurrencyService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -14,7 +15,7 @@ class LayawayController extends Controller
     public function index(Request $request)
     {
         if (!$request->user() || !$request->user()->can('view credits')) {
-            return redirect()->route('dashboard')->with('error', 'No tienes permiso para ver apartados.');
+            return redirect()->route('dashboard')->with('error', __('app.admin.layaways.permissions.view_denied'));
         }
 
         $status = (string) $request->input('status', '');
@@ -38,7 +39,7 @@ class LayawayController extends Controller
     public function create(Request $request)
     {
         if (!$request->user() || !$request->user()->can('manage credits')) {
-            return redirect()->route('dashboard')->with('error', 'No tienes permiso para crear apartados.');
+            return redirect()->route('dashboard')->with('error', __('app.admin.layaways.permissions.create_denied'));
         }
 
         $customers = Customer::orderBy('name')->get(['id','name']);
@@ -50,10 +51,10 @@ class LayawayController extends Controller
         ]);
     }
 
-    public function store(Request $request, CurrencyService $currency)
+    public function store(Request $request, CurrencyService $currency, AdminNotificationService $notificationService)
     {
         if (!$request->user() || !$request->user()->can('manage credits')) {
-            return redirect()->route('dashboard')->with('error', 'No tienes permiso para crear apartados.');
+            return redirect()->route('dashboard')->with('error', __('app.admin.layaways.permissions.create_denied'));
         }
 
         $data = $request->validate([
@@ -65,7 +66,7 @@ class LayawayController extends Controller
             'items.*.quantity' => ['required','integer','min:1'],
         ]);
 
-        return DB::transaction(function () use ($data, $currency) {
+        return DB::transaction(function () use ($data, $currency, $notificationService) {
             $layaway = new Layaway();
             $layaway->number = 'LAY-'.Str::upper(Str::random(8));
             $layaway->customer_id = $data['customer_id'] ?? null;
@@ -103,14 +104,35 @@ class LayawayController extends Controller
                 'total_bs' => $currency->usdToBs($totalUsd),
             ]);
 
-            return redirect()->route('admin.layaways.index')->with('success', 'Apartado creado correctamente.');
+            $notificationMessage = 'Total: $'.number_format((float) $layaway->total_usd, 2);
+            if ($layaway->expires_at) {
+                $notificationMessage .= ' / Vence: '.$layaway->expires_at->format('d/m/Y H:i');
+            }
+
+            $notificationService->notifyStaff(
+                'layaway_created',
+                'Nuevo apartado '.$layaway->number,
+                $notificationMessage,
+                [
+                    'severity' => 'info',
+                    'action_url' => route('admin.layaways.show', $layaway->id),
+                    'action_label' => 'Ver apartado',
+                    'dedupe_key' => 'layaway_created:'.$layaway->id,
+                    'data' => [
+                        'layaway_id' => $layaway->id,
+                        'status' => $layaway->status,
+                    ],
+                ]
+            );
+
+            return redirect()->route('admin.layaways.index')->with('success', __('app.admin.layaways.notifications.created'));
         });
     }
 
     public function show(Request $request, Layaway $layaway)
     {
         if (!$request->user() || !$request->user()->can('view credits')) {
-            return redirect()->route('dashboard')->with('error', 'No tienes permiso para ver apartados.');
+            return redirect()->route('dashboard')->with('error', __('app.admin.layaways.permissions.view_denied'));
         }
 
         $layaway->load(['customer','items.product']);
@@ -120,19 +142,39 @@ class LayawayController extends Controller
         ]);
     }
 
-    public function update(Request $request, Layaway $layaway)
+    public function update(Request $request, Layaway $layaway, AdminNotificationService $notificationService)
     {
         if (!$request->user() || !$request->user()->can('manage credits')) {
-            return redirect()->route('dashboard')->with('error', 'No tienes permiso para actualizar apartados.');
+            return redirect()->route('dashboard')->with('error', __('app.admin.layaways.permissions.update_denied'));
         }
 
         $data = $request->validate([
             'status' => ['required','in:active,completed,cancelled,expired'],
         ]);
 
+        $oldStatus = $layaway->status;
         $layaway->status = $data['status'];
         $layaway->save();
 
-        return redirect()->route('admin.layaways.show', $layaway->id)->with('success', 'Apartado actualizado.');
+        if ($oldStatus !== $layaway->status) {
+            $notificationService->notifyStaff(
+                'layaway_status_changed',
+                'Apartado '.$layaway->number.' actualizado',
+                'Estado: '.$oldStatus.' -> '.$layaway->status,
+                [
+                    'severity' => $layaway->status === 'completed' ? 'success' : 'warning',
+                    'action_url' => route('admin.layaways.show', $layaway->id),
+                    'action_label' => 'Ver apartado',
+                    'dedupe_key' => 'layaway_status_changed:'.$layaway->id.':'.$layaway->status,
+                    'data' => [
+                        'layaway_id' => $layaway->id,
+                        'old_status' => $oldStatus,
+                        'new_status' => $layaway->status,
+                    ],
+                ]
+            );
+        }
+
+        return redirect()->route('admin.layaways.show', $layaway->id)->with('success', __('app.admin.layaways.notifications.updated'));
     }
 }

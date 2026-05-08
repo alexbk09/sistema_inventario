@@ -4,8 +4,10 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.jsx';
 import AdminTable from '@/Components/admin/provider/AdminTableProviders.jsx';
 import AdminFilters from '@/Components/common/AdminFilters.jsx';
 import AdminIndexShell from '@/Components/admin/AdminIndexShell.jsx';
+import { useI18n } from '@/Hooks/useI18n';
 
 export default function Index({ customers, filters, identificationTypes = [] }) {
+  const { t } = useI18n();
   const { data } = customers;
   const page = customers.current_page ?? customers?.meta?.current_page ?? 1;
   const totalPages = customers.last_page ?? customers?.meta?.last_page ?? 1;
@@ -63,12 +65,12 @@ export default function Index({ customers, filters, identificationTypes = [] }) 
   const columns = [
     {
       key: 'name',
-      label: 'Nombre',
+      label: t('admin.customers.index.table.name', 'Nombre'),
       width: '20%',
     },
     {
       key: 'email',
-      label: 'Email',
+      label: t('admin.customers.index.table.email', 'Email'),
       width: '20%',
       render: (value) => (
         <a href={`mailto:${value}`} className="text-accent hover:underline">
@@ -78,48 +80,48 @@ export default function Index({ customers, filters, identificationTypes = [] }) 
     },
     {
       key: 'phone',
-      label: 'Teléfono',
+      label: t('admin.customers.index.table.phone', 'Teléfono'),
       width: '15%',
     },
     {
       key: 'address',
-      label: 'Dirección',
+      label: t('admin.customers.index.table.address', 'Dirección'),
       width: '25%',
       render: (value) => (
         <p className="truncate" title={value}>
-          {value || '-'}
+          {value || t('admin.customers.values.empty', '-')}
         </p>
       ),
     },
     {
       key: 'loyalty_points',
-      label: 'Puntos',
+      label: t('admin.customers.index.table.points', 'Puntos'),
       width: '10%',
     },
     {
       key: 'invoices_count',
-      label: 'Compras',
+      label: t('admin.customers.index.table.purchases', 'Compras'),
       width: '10%',
     },
   ];
 
   return (
     <AuthenticatedLayout>
-      <Head title="Clientes" />
+      <Head title={t('admin.customers.index.page_title', 'Clientes')} />
       <AdminIndexShell
-        title="Gestiona clientes con una vista más clara y operativa"
-        description="La pantalla agrupa búsqueda, captura rápida y consulta en un solo flujo visual, reduciendo el salto entre acciones y listado."
+        title={t('admin.customers.index.hero_title', 'Gestiona clientes con una vista más clara y operativa')}
+        description={t('admin.customers.index.hero_description', 'La pantalla agrupa búsqueda, captura rápida y consulta en un solo flujo visual, reduciendo el salto entre acciones y listado.')}
         stats={[
-          { label: 'Registros', value: data.length },
-          { label: 'Página', value: `${page}/${totalPages}` },
-          { label: 'Búsqueda', value: debounced ? 'Activa' : 'General' },
+          { label: t('admin.customers.index.stats.records', 'Registros'), value: data.length },
+          { label: t('admin.customers.index.stats.page', 'Página'), value: `${page}/${totalPages}` },
+          { label: t('admin.customers.index.stats.search', 'Búsqueda'), value: debounced ? t('admin.customers.values.active_female', 'Activa') : t('admin.customers.values.general', 'General') },
         ]}
-        contextTitle="Clientes"
-        contextDescription="Consulta actividad comercial y registra nuevos clientes sin perder el foco de la tabla principal."
+        contextTitle={t('admin.customers.index.context_title', 'Clientes')}
+        contextDescription={t('admin.customers.index.context_description', 'Consulta actividad comercial y registra nuevos clientes sin perder el foco de la tabla principal.')}
         contextItems={[
-          { label: 'Resultados visibles', value: data.length },
-          { label: 'Filtro', value: debounced || 'Sin filtro' },
-          { label: 'Modal', value: showModal ? 'Abierto' : 'Disponible' },
+          { label: t('admin.customers.index.context_items.visible_results', 'Resultados visibles'), value: data.length },
+          { label: t('admin.customers.index.context_items.filter', 'Filtro'), value: debounced || t('admin.customers.values.no_filter', 'Sin filtro') },
+          { label: t('admin.customers.index.context_items.modal', 'Modal'), value: showModal ? t('admin.customers.values.open', 'Abierto') : t('admin.customers.values.available', 'Disponible') },
         ]}
         primaryAction={
           <button
@@ -127,12 +129,12 @@ export default function Index({ customers, filters, identificationTypes = [] }) 
             onClick={() => setShowModal(true)}
             className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
           >
-            Nuevo cliente
+            {t('admin.customers.index.actions.new', 'Nuevo cliente')}
           </button>
         }
         filters={
           <AdminFilters
-            searchPlaceholder="Buscar por nombre, email, teléfono o dirección..."
+            searchPlaceholder={t('admin.customers.index.filters.search_placeholder', 'Buscar por nombre, email, teléfono o dirección...')}
             searchValue={search}
             onSearchChange={setSearch}
           />
@@ -152,19 +154,19 @@ export default function Index({ customers, filters, identificationTypes = [] }) 
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
           <div className="bg-card border border-border rounded-xl shadow-lg w-full max-w-lg mx-4">
             <div className="flex items-center justify-between px-5 py-3 border-b border-border">
-              <h2 className="text-lg font-bold text-foreground">Nuevo cliente</h2>
+              <h2 className="text-lg font-bold text-foreground">{t('admin.customers.modal.create_title', 'Nuevo cliente')}</h2>
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
                 className="text-sm text-muted-foreground hover:text-foreground"
               >
-                Cerrar
+                {t('admin.customers.modal.actions.close', 'Cerrar')}
               </button>
             </div>
             <form onSubmit={handleCreate} className="px-5 py-4 space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-muted-foreground mb-1">Tipo ID</label>
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">{t('admin.customers.modal.form.id_type', 'Tipo ID')}</label>
                     <select
                       value={form.identification_type_id}
                       onChange={(e) => setData('identification_type_id', e.target.value)}
@@ -179,7 +181,7 @@ export default function Index({ customers, filters, identificationTypes = [] }) 
                     </select>
                   </div>
                   <div className="md:col-span-2">
-                    <label className="block text-xs font-semibold text-muted-foreground mb-1">Identificación</label>
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">{t('admin.customers.modal.form.identification', 'Identificación')}</label>
                     <input
                       type="text"
                       value={form.identification}
@@ -191,7 +193,7 @@ export default function Index({ customers, filters, identificationTypes = [] }) 
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-1">
                   <div>
-                    <label className="block text-xs font-semibold text-muted-foreground mb-1">Nombre</label>
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">{t('admin.customers.modal.form.name', 'Nombre')}</label>
                     <input
                       type="text"
                       value={form.name}
@@ -201,35 +203,35 @@ export default function Index({ customers, filters, identificationTypes = [] }) 
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-muted-foreground mb-1">Email</label>
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">{t('admin.customers.modal.form.email', 'Email')}</label>
                     <input
                       type="email"
                       value={form.email}
                       onChange={(e) => setData('email', e.target.value)}
                       className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground"
-                      placeholder="Opcional"
+                      placeholder={t('admin.customers.values.optional', 'Opcional')}
                     />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-muted-foreground mb-1">Teléfono</label>
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">{t('admin.customers.modal.form.phone', 'Teléfono')}</label>
                     <input
                       type="text"
                       value={form.phone}
                       onChange={(e) => setData('phone', e.target.value)}
                       className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground"
-                      placeholder="Opcional"
+                      placeholder={t('admin.customers.values.optional', 'Opcional')}
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-muted-foreground mb-1">Dirección</label>
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">{t('admin.customers.modal.form.address', 'Dirección')}</label>
                     <input
                       type="text"
                       value={form.address}
                       onChange={(e) => setData('address', e.target.value)}
                       className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground"
-                      placeholder="Opcional"
+                      placeholder={t('admin.customers.values.optional', 'Opcional')}
                     />
                   </div>
                 </div>
@@ -239,14 +241,14 @@ export default function Index({ customers, filters, identificationTypes = [] }) 
                     onClick={() => setShowModal(false)}
                     className="px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground"
                   >
-                    Cancelar
+                    {t('admin.customers.modal.actions.cancel', 'Cancelar')}
                   </button>
                   <button
                     type="submit"
                     disabled={processing}
                     className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition disabled:opacity-50"
                   >
-                    {processing ? 'Guardando...' : 'Guardar cliente'}
+                    {processing ? t('admin.customers.modal.actions.saving', 'Guardando...') : t('admin.customers.modal.actions.submit', 'Guardar cliente')}
                   </button>
                 </div>
             </form>

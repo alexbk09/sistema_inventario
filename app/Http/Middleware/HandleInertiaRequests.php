@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\AdminNotificationService;
+use App\Support\CurrencySettings;
 use App\Support\Settings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Lang;
@@ -21,6 +23,10 @@ class HandleInertiaRequests extends Middleware
      */
     public function version(Request $request): ?string
     {
+        if (app()->environment(['local', 'testing'])) {
+            return null;
+        }
+
         return parent::version($request);
     }
 
@@ -32,56 +38,34 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         $user = $request->user();
+        $locale = app()->getLocale();
+        $supportedLocales = config('locales.supported', []);
+        $currentLocaleConfig = $supportedLocales[$locale] ?? $supportedLocales[config('app.fallback_locale')] ?? null;
 
-        // Notificaciones internas básicas para usuarios autenticados (stock bajo, apartados vencidos)
         $notifications = [
-            'low_stock' => [
-                'count' => 0,
-                'items' => [],
-            ],
-            'expired_layaways' => [
-                'count' => 0,
-                'items' => [],
-            ],
+            'unread_count' => 0,
+            'items' => [],
         ];
 
-        if ($user) {
-            $inventorySettings = Settings::get('inventory', [
-                'default_min_stock' => 0,
-            ]);
-            $defaultMinStock = (int) ($inventorySettings['default_min_stock'] ?? 0);
+        if ($user && $this->isBackofficeUser($user)) {
+            $notificationService = app(AdminNotificationService::class);
+            $notificationService->syncSystemNotifications();
 
-            // Productos con stock bajo
-            $lowStockQuery = \App\Models\Product::query()
-                ->where(function ($q) {
-                    $q->whereNotNull('min_stock')
-                      ->whereColumn('stock', '<=', 'min_stock');
-                })
-                ->orWhere(function ($q) use ($defaultMinStock) {
-                    if ($defaultMinStock > 0) {
-                        $q->whereNull('min_stock')
-                          ->where('stock', '<=', $defaultMinStock);
-                    }
-                })
-                ->orWhere('stock', '<=', 0);
-
-            $notifications['low_stock']['count'] = (int) (clone $lowStockQuery)->count();
-            $notifications['low_stock']['items'] = (clone $lowStockQuery)
-                ->orderBy('stock')
-                ->take(5)
-                ->get(['id','name','sku','stock','min_stock']);
-
-            // Apartados vencidos
-            $expiredLayawaysQuery = \App\Models\Layaway::whereIn('status', ['active','pending'])
-                ->whereNotNull('expires_at')
-                ->where('expires_at', '<', now())
-                ->with('customer:id,name');
-
-            $notifications['expired_layaways']['count'] = (int) (clone $expiredLayawaysQuery)->count();
-            $notifications['expired_layaways']['items'] = (clone $expiredLayawaysQuery)
-                ->orderBy('expires_at')
-                ->take(5)
-                ->get(['id','number','customer_id','expires_at','status']);
+            $notifications['unread_count'] = $notificationService->getUnreadCountForUser($user);
+            $notifications['items'] = $notificationService
+                ->getUnreadForUser($user, 12)
+                ->map(fn ($notification) => [
+                    'id' => $notification->id,
+                    'type' => $notification->type,
+                    'severity' => $notification->severity,
+                    'title' => $notification->title,
+                    'message' => $notification->message,
+                    'action_url' => $notification->action_url,
+                    'action_label' => $notification->action_label,
+                    'data' => $notification->data,
+                    'created_at' => $notification->created_at?->toIso8601String(),
+                ])
+                ->values();
         }
 
         return [
@@ -91,7 +75,9 @@ class HandleInertiaRequests extends Middleware
                 'error' => $request->session()->get('error'),
             ],
             'notifications' => $notifications,
-            'locale' => app()->getLocale(),
+            'locale' => $locale,
+            'localeConfig' => $currentLocaleConfig,
+            'supportedLocales' => array_values($supportedLocales),
             'translations' => [
                 'app' => Lang::get('app'),
             ],
@@ -112,7 +98,7 @@ class HandleInertiaRequests extends Middleware
                 'location' => Settings::get('location', null),
                 'branding' => Settings::get('branding', null),
                 'billing' => Settings::get('billing', null),
-                'currency' => Settings::get('currency', null),
+                'currency' => CurrencySettings::normalize(Settings::get('currency', CurrencySettings::defaults())),
                 'store' => Settings::get('store', null),
                 'inventory' => Settings::get('inventory', null),
                 'warehouses' => Settings::get('warehouses', null),
@@ -120,5 +106,16 @@ class HandleInertiaRequests extends Middleware
                 'qr' => Settings::get('qr', null),
             ],
         ];
+    }
+
+    private function isBackofficeUser($user): bool
+    {
+        $roles = collect($user->roles ?? [])
+            ->map(fn ($role) => is_string($role) ? $role : ($role->name ?? null))
+            ->filter()
+            ->values();
+
+        return in_array($user->type, ['admin', 'supervisor', 'cashier', 'warehouse'], true)
+            || $roles->intersect(['admin', 'supervisor', 'cashier', 'warehouse'])->isNotEmpty();
     }
 }

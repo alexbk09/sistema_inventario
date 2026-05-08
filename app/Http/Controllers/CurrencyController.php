@@ -15,7 +15,7 @@ class CurrencyController extends Controller
         if ($valor === null) {
             return response()->json([
                 'ok' => false,
-                'message' => 'No se pudo obtener el promedio',
+                'message' => __('app.currency.average_unavailable'),
                 'fuente' => $fuente,
             ], 502)
             ->header('Cache-Control', 'no-store, no-cache, must-revalidate')
@@ -33,7 +33,19 @@ class CurrencyController extends Controller
     public function promedios(Request $request, CurrencyService $service)
     {
         $apiUrl = $request->query('api');
-        $data = $service->getPromedios($apiUrl);
+        $legacy = $request->boolean('legacy', false);
+
+        if ($legacy) {
+            $data = $service->getPromedios($apiUrl);
+            return response()->json([
+                'ok' => true,
+                'data' => $data,
+            ])
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate')
+            ->header('Pragma', 'no-cache');
+        }
+
+        $data = $service->getConfiguredExchangeRates();
         return response()->json([
             'ok' => true,
             'data' => $data,

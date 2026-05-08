@@ -65,7 +65,7 @@ class ProductController extends Controller
             $sheet = $reader->getActiveSheet();
             $rows = $sheet->toArray();
         } catch (\Throwable $e) {
-            return redirect()->back()->with('error', 'No se pudo leer el archivo. Instala PhpSpreadsheet (phpoffice/phpspreadsheet).');
+            return redirect()->back()->with('error', __('app.admin.products.bulk_import.notifications.reader_unavailable'));
         }
 
         // Expect header in first row: name,sku,price_usd,stock,description,category_names,image_url
@@ -125,14 +125,14 @@ class ProductController extends Controller
 
                 // If warehouse provided, register entry movement for the stock
                 if (!empty($data['warehouse_id']) && $stock > 0) {
-                    $inventory->registerEntry($product, $stock, $price, null, 'Importación masiva', null, $data['warehouse_id']);
+                    $inventory->registerEntry($product, $stock, $price, null, __('app.admin.products.bulk_import.reference'), null, $data['warehouse_id']);
                 }
 
                 $created++;
             }
         });
 
-        return redirect()->route('admin.products.index')->with('success', "Productos importados: {$created}");
+        return redirect()->route('admin.products.index')->with('success', __('app.admin.products.bulk_import.notifications.imported', ['count' => $created]));
     }
 
     public function create()

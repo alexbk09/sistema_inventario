@@ -4,8 +4,10 @@ import GuestLayout from '@/Layouts/GuestLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react'
+import { useI18n } from '@/Hooks/useI18n'
 
 export default function Login({ status, canResetPassword }) {
+    const { t } = useI18n();
     const { data, setData, post, processing, errors, reset } = useForm({
         email: '',
         password: '',
@@ -23,12 +25,12 @@ export default function Login({ status, canResetPassword }) {
             onError: (errors) => {
                 // Si hay errores de validación
                 const firstKey = Object.keys(errors || {})[0];
-                const msg = errors?.[firstKey] || 'Error al iniciar sesión. Revisa los campos.';
+                const msg = errors?.[firstKey] || t('auth.login.notifications.error', 'Error al iniciar sesión. Revisa los campos.');
                 setErrorMessage(msg);
                 toast.error(msg);
             },
             onSuccess: () => {
-                toast.success('¡Bienvenido! Inicio de sesión exitoso.');
+                toast.success(t('auth.login.notifications.success', 'Bienvenido. Inicio de sesión exitoso.'));
             },
             onFinish: () => reset('password'),
         });
@@ -36,6 +38,7 @@ export default function Login({ status, canResetPassword }) {
 
     return (
         <GuestLayout>
+            <Head title={t('auth.login.page_title', 'Iniciar sesión')} />
             {status && (
                 <div className="mb-4 text-sm font-medium text-green-600">
                     {status}
@@ -55,8 +58,8 @@ export default function Login({ status, canResetPassword }) {
                         <div className="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-2xl mb-4">
                             <span className="text-3xl">⚡</span>
                         </div>
-                        <h1 className="text-3xl font-bold text-foreground mb-2">Inventario</h1>
-                        <p className="text-muted-foreground">Inicia sesión en tu cuenta</p>
+                        <h1 className="text-3xl font-bold text-foreground mb-2">{t('auth.brand', 'Inventario')}</h1>
+                        <p className="text-muted-foreground">{t('auth.login.subtitle', 'Inicia sesión en tu cuenta')}</p>
                         </div>
 
                         <div className="bg-card border border-border rounded-lg p-8 shadow-md">
@@ -64,7 +67,7 @@ export default function Login({ status, canResetPassword }) {
                                             {/* Email */}
                                             <div>
                                                 <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
-                                                    Email
+                                                    {t('auth.login.fields.email', 'Email')}
                                                 </label>
                                                 <div className="relative">
                                                     <Mail className="absolute left-3 top-3 w-5 h-5 text-muted-foreground" />
@@ -73,7 +76,7 @@ export default function Login({ status, canResetPassword }) {
                                                         type="email"
                                                         value={data.email}
                                                         onChange={(e) => setData('email', e.target.value)}
-                                                        placeholder="tu@email.com"
+                                                        placeholder={t('auth.login.fields.email_placeholder', 'tu@email.com')}
                                                         required
                                                         className="w-full pl-10 pr-4 py-2 border border-border rounded-lg bg-card text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition"
                                                     />
@@ -84,7 +87,7 @@ export default function Login({ status, canResetPassword }) {
                                             {/* Contraseña */}
                                             <div>
                                                 <label htmlFor="password" className="block text-sm font-medium text-foreground mb-2">
-                                                    Contraseña
+                                                    {t('auth.login.fields.password', 'Contraseña')}
                                                 </label>
                                                 <div className="relative">
                                                     <Lock className="absolute left-3 top-3 w-5 h-5 text-muted-foreground" />
@@ -93,7 +96,7 @@ export default function Login({ status, canResetPassword }) {
                                                         type={showPassword ? 'text' : 'password'}
                                                         value={data.password}
                                                         onChange={(e) => setData('password', e.target.value)}
-                                                        placeholder="••••••••"
+                                                        placeholder={t('auth.login.fields.password_placeholder', '••••••••')}
                                                         required
                                                         className="w-full pl-10 pr-10 py-2 border border-border rounded-lg bg-card text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition"
                                                     />
@@ -121,11 +124,11 @@ export default function Login({ status, canResetPassword }) {
                                                         checked={data.remember}
                                                         onChange={(e) => setData('remember', e.target.checked)}
                                                     />
-                                                    <span className="text-sm text-foreground">Recuérdame</span>
+                                                    <span className="text-sm text-foreground">{t('auth.login.fields.remember', 'Recuérdame')}</span>
                                                 </label>
                                                 {canResetPassword && (
                                                     <Link href={route('password.request')} className="text-sm text-primary hover:text-primary/80 transition">
-                                                        ¿Olvidaste tu contraseña?
+                                                        {t('auth.login.forgot_password', '¿Olvidaste tu contraseña?')}
                                                     </Link>
                                                 )}
                                             </div>
@@ -136,14 +139,14 @@ export default function Login({ status, canResetPassword }) {
                                                 disabled={processing}
                                                 className="w-full bg-primary text-primary-foreground py-2 rounded-lg hover:bg-primary/90 transition disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                                             >
-                                                {processing ? 'Iniciando sesión...' : 'Iniciar sesión'}
+                                                {processing ? t('auth.login.actions.processing', 'Iniciando sesión...') : t('auth.login.actions.submit', 'Iniciar sesión')}
                                             </button>
 
                                             {/* Registro */}
                                             <div className="text-center text-sm text-muted-foreground">
-                                                ¿No tienes cuenta?{' '}
+                                                {t('auth.login.register_prompt', '¿No tienes cuenta?')}{' '}
                                                 <Link href={route('register')} className="text-primary hover:text-primary/80 transition font-medium">
-                                                    Regístrate aquí
+                                                    {t('auth.login.register_link', 'Regístrate aquí')}
                                                 </Link>
                                             </div>
                                         </form>

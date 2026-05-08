@@ -4,6 +4,13 @@ import { usePage } from '@inertiajs/react'
 interface CurrencySettings {
   base_currency?: string
   secondary_currency?: string | null
+  default_display_currency?: string
+  available_currencies?: string[]
+  supported_currencies?: Array<{
+    code?: string
+    enabled?: boolean
+    visible_in_store?: boolean
+  }>
 }
 
 export function useDisplayCurrency() {
@@ -11,21 +18,42 @@ export function useDisplayCurrency() {
   const settingsCurrency: CurrencySettings = page.props?.settings?.currency ?? {}
   const base = settingsCurrency.base_currency || 'USD'
   const secondary = settingsCurrency.secondary_currency || null
+  const derivedAvailable = Array.isArray(settingsCurrency.supported_currencies)
+    ? settingsCurrency.supported_currencies
+        .filter((currency) => currency?.enabled && currency?.visible_in_store !== false && typeof currency?.code === 'string')
+        .map((currency) => String(currency.code))
+    : []
+  const available = derivedAvailable.length > 0
+    ? derivedAvailable
+    : [base, secondary, ...(Array.isArray(settingsCurrency.available_currencies) ? settingsCurrency.available_currencies : [])].filter(Boolean) as string[]
+  const uniqueAvailable = [...new Set(available)]
+  const normalizedSecondary = secondary && uniqueAvailable.includes(secondary)
+    ? secondary
+    : null
+  const defaultDisplay = uniqueAvailable.includes(settingsCurrency.default_display_currency || '')
+    ? String(settingsCurrency.default_display_currency)
+    : base
 
   const getInitial = (): string => {
-    if (typeof window === 'undefined') return base
+    if (typeof window === 'undefined') return defaultDisplay
     try {
       const saved = window.localStorage.getItem('displayCurrency')
-      if (saved && (saved === base || saved === secondary)) {
+      if (saved && uniqueAvailable.includes(saved)) {
         return saved
       }
     } catch {
       // ignore
     }
-    return base
+    return defaultDisplay
   }
 
   const [displayCurrency, setDisplayCurrencyState] = useState<string>(getInitial)
+
+  useEffect(() => {
+    if (!uniqueAvailable.includes(displayCurrency)) {
+      setDisplayCurrencyState(defaultDisplay)
+    }
+  }, [defaultDisplay, displayCurrency, uniqueAvailable])
 
   // Sincronizar con localStorage y emitir evento global
   useEffect(() => {
@@ -59,8 +87,7 @@ export function useDisplayCurrency() {
   }, [])
 
   const setDisplayCurrency = (value: string) => {
-    const allowed = [base, secondary].filter(Boolean) as string[]
-    if (!allowed.includes(value)) return
+    if (!uniqueAvailable.includes(value)) return
     setDisplayCurrencyState(value)
   }
 
@@ -68,6 +95,7 @@ export function useDisplayCurrency() {
     displayCurrency,
     setDisplayCurrency,
     baseCurrency: base,
-    secondaryCurrency: secondary,
+    secondaryCurrency: normalizedSecondary,
+    availableCurrencies: uniqueAvailable,
   }
 }

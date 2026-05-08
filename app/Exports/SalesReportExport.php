@@ -47,35 +47,36 @@ class SalesReportExport implements FromQuery, WithHeadings, WithMapping
     public function headings(): array
     {
         return [
-            'Fecha',
-            'Número',
-            'Tipo',
-            'Cliente',
-            'Sucursal/Bodega',
-            'Estado',
-            'Total USD',
-            'Total BS',
+            __('app.report_exports.sales.columns.date'),
+            __('app.report_exports.sales.columns.number'),
+            __('app.report_exports.sales.columns.type'),
+            __('app.report_exports.sales.columns.customer'),
+            __('app.report_exports.sales.columns.branch_warehouse'),
+            __('app.report_exports.sales.columns.status'),
+            __('app.report_exports.sales.columns.total_usd'),
+            __('app.report_exports.sales.columns.total_bs'),
         ];
     }
 
     public function map($invoice): array
     {
+        $locale = app()->getLocale();
         $typeLabels = [
-            'invoice' => 'Factura',
-            'delivery_note' => 'Nota de entrega',
-            'proforma' => 'Proforma',
+            'invoice' => __('app.report_exports.sales.document_types.invoice'),
+            'delivery_note' => __('app.report_exports.sales.document_types.delivery_note'),
+            'proforma' => __('app.report_exports.sales.document_types.proforma'),
         ];
 
         $statusLabels = [
-            'pending' => 'Pendiente',
-            'paid' => 'Pagado',
-            'shipped' => 'Enviado',
-            'delivered' => 'Entregado',
-            'cancelled' => 'Cancelado',
+            'pending' => __('app.report_exports.sales.statuses.pending'),
+            'paid' => __('app.report_exports.sales.statuses.paid'),
+            'shipped' => __('app.report_exports.sales.statuses.shipped'),
+            'delivered' => __('app.report_exports.sales.statuses.delivered'),
+            'cancelled' => __('app.report_exports.sales.statuses.cancelled'),
         ];
 
         return [
-            optional($invoice->created_at)->format('Y-m-d H:i:s'),
+            $invoice->created_at?->copy()->locale($locale)->isoFormat('L LT'),
             $invoice->number,
             $typeLabels[$invoice->document_type] ?? $invoice->document_type,
             optional($invoice->customer)->name,

@@ -43,6 +43,8 @@ export function useI18n() {
   const page = usePage<any>()
   const locale: string = page.props?.locale ?? 'es'
   const translations = (page.props?.translations?.app ?? {}) as Record<string, any>
+  const supportedLocales = (page.props?.supportedLocales ?? []) as Array<Record<string, string>>
+  const localeConfig = (page.props?.localeConfig ?? null) as Record<string, string> | null
 
   const t = (key: string, fallback?: string, replacements?: Record<string, unknown>): string => {
     const raw = get(translations, key, fallback)
@@ -50,5 +52,5 @@ export function useI18n() {
     return interpolate(withPlural, replacements)
   }
 
-  return { t, locale }
+  return { t, locale, localeConfig, supportedLocales }
 }

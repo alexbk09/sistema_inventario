@@ -1,40 +1,49 @@
-import React, { useState } from 'react';
-import { Head, useForm } from '@inertiajs/react';
+import React, { useEffect, useState } from 'react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.jsx';
+import { useI18n } from '@/Hooks/useI18n';
+import { toast } from 'react-hot-toast';
 
-const defaultPayments = {
+const buildDefaultPayments = (t) => ({
     methods: {
         manual: {
             enabled: true,
-            label: 'Transferencia bancaria',
-            description: 'Pago por transferencia o deposito con referencia manual.',
-            instructions: 'Realiza tu transferencia y comparte los datos del pago durante el checkout.',
+            label: t('admin.settings.commerce.tabs.manual.label', 'Transferencia bancaria'),
+            description: t('admin.settings.commerce.manual.defaults.description', 'Pago por transferencia o deposito con referencia manual.'),
+            instructions: t('admin.settings.commerce.manual.defaults.instructions', 'Realiza tu transferencia y comparte los datos del pago durante el checkout.'),
             fee_percent: 0,
         },
         paypal: {
             enabled: false,
-            label: 'PayPal',
-            description: 'Habilita PayPal cuando tengas tus credenciales listas.',
+            label: t('admin.settings.commerce.tabs.paypal.title', 'PayPal'),
+            description: t('admin.settings.commerce.paypal.defaults.description', 'Habilita PayPal cuando tengas tus credenciales listas.'),
             client_id: '',
             client_secret: '',
             environment: 'sandbox',
-            instructions: 'Configura Client ID y Secret para activarlo.',
+            instructions: t('admin.settings.commerce.paypal.defaults.instructions', 'Configura Client ID y Secret para activarlo.'),
             fee_percent: 0,
         },
         stripe: {
             enabled: false,
-            label: 'Stripe',
-            description: 'Acepta pagos con tarjeta mediante Stripe.',
+            label: t('admin.settings.commerce.tabs.stripe.title', 'Stripe'),
+            description: t('admin.settings.commerce.stripe.defaults.description', 'Acepta pagos con tarjeta mediante Stripe.'),
             publishable_key: '',
             secret_key: '',
             environment: 'test',
-            instructions: 'Configura Publishable Key y Secret Key para activar el cobro con tarjeta.',
+            instructions: t('admin.settings.commerce.stripe.defaults.instructions', 'Configura Publishable Key y Secret Key para activar el cobro con tarjeta.'),
             fee_percent: 0,
         },
     },
     bank_accounts: [],
     origin_banks: [],
-};
+});
+
+const currencyProviderOptions = [
+    { value: 'dolarapi', label: 'DolarApi' },
+    { value: 'frankfurter', label: 'Frankfurter' },
+    { value: 'exchangeratehost', label: 'ExchangeRate.host' },
+    { value: 'manual', label: 'Manual' },
+];
 
 function SettingsSection({ eyebrow, title, description, children, contentClassName = 'p-6' }) {
     return (
@@ -54,6 +63,10 @@ function SettingsSection({ eyebrow, title, description, children, contentClassNa
 }
 
 export default function SettingsIndex({ general, location, branding, billing, currency, store, inventory, warehouses, security, qr, mail, payments, warehouseOptions = [] }) {
+    const { t } = useI18n();
+    const page = usePage();
+    const flash = page.props?.flash ?? {};
+    const defaultPayments = buildDefaultPayments(t);
     const { data, setData, put, processing, errors } = useForm({
         general: general ?? {},
         location: location ?? {},
@@ -78,6 +91,19 @@ export default function SettingsIndex({ general, location, branding, billing, cu
     });
     const [paymentTab, setPaymentTab] = useState('manual');
     const [activeSettingsGroup, setActiveSettingsGroup] = useState('identity');
+    const [syncingCurrencyRates, setSyncingCurrencyRates] = useState(false);
+    const supportedCurrencies = Array.isArray(data.currency?.supported_currencies) ? data.currency.supported_currencies : [];
+    const enabledCurrencies = supportedCurrencies.filter((item) => item?.enabled);
+
+    useEffect(() => {
+        if (flash.success) {
+            toast.success(flash.success);
+        }
+
+        if (flash.error) {
+            toast.error(flash.error);
+        }
+    }, [flash.error, flash.success]);
 
     const handleChange = (section, field) => (e) => {
         const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
@@ -90,6 +116,42 @@ export default function SettingsIndex({ general, location, branding, billing, cu
     const submit = (e) => {
         e.preventDefault();
         put(route('admin.settings.update'));
+    };
+
+    const syncCurrencyRates = () => {
+        setSyncingCurrencyRates(true);
+        router.post(route('admin.settings.currency.sync'), {}, {
+            preserveScroll: true,
+            onFinish: () => setSyncingCurrencyRates(false),
+        });
+    };
+
+    const updateSupportedCurrency = (index, field, value) => {
+        const nextCurrencies = [...supportedCurrencies];
+        const current = nextCurrencies[index] ?? {};
+        const nextValue = field === 'code' || field === 'rate_provider' || field === 'rate_mode'
+            ? String(value || '').toUpperCase().replace('EXCHANGERATEHOST', 'exchangeratehost').replace('DOLARAPI', 'dolarapi').replace('FRANKFURTER', 'frankfurter').replace('MANUAL', 'manual')
+            : value;
+
+        nextCurrencies[index] = {
+            ...current,
+            [field]: nextValue,
+        };
+
+        if (field === 'enabled' && !value && data.currency.default_display_currency === current.code) {
+            const fallbackCurrency = nextCurrencies.find((item) => item?.enabled && item?.code !== current.code)?.code || data.currency.base_currency || 'USD';
+            setData('currency', {
+                ...data.currency,
+                default_display_currency: fallbackCurrency,
+                supported_currencies: nextCurrencies,
+            });
+            return;
+        }
+
+        setData('currency', {
+            ...data.currency,
+            supported_currencies: nextCurrencies,
+        });
     };
 
     const updatePaymentMethod = (methodKey, field, value) => {
@@ -191,33 +253,33 @@ export default function SettingsIndex({ general, location, branding, billing, cu
     const paymentTabs = [
         {
             key: 'manual',
-            title: 'Manual',
-            eyebrow: 'Transferencias',
-            description: manualMethod.description || 'Cuentas bancarias y referencias manuales.',
+            title: t('admin.settings.commerce.tabs.manual.title', 'Manual'),
+            eyebrow: t('admin.settings.commerce.tabs.manual.eyebrow', 'Transferencias'),
+            description: manualMethod.description || t('admin.settings.commerce.tabs.manual.description', 'Cuentas bancarias y referencias manuales.'),
             enabled: !!manualMethod.enabled,
-            readiness: `${visibleBankAccounts} cuentas activas`,
+            readiness: t('admin.settings.commerce.tabs.manual.readiness', '{count} cuentas activas', { count: visibleBankAccounts }),
             accent: 'from-emerald-500/20 via-emerald-500/10 to-white',
             ring: 'border-emerald-200',
             badge: 'text-emerald-700 bg-emerald-100',
         },
         {
             key: 'paypal',
-            title: 'PayPal',
-            eyebrow: 'Wallet',
-            description: paypalMethod.description || 'Cobros con PayPal para checkout.',
+            title: t('admin.settings.commerce.tabs.paypal.title', 'PayPal'),
+            eyebrow: t('admin.settings.commerce.tabs.paypal.eyebrow', 'Wallet'),
+            description: paypalMethod.description || t('admin.settings.commerce.tabs.paypal.description', 'Cobros con PayPal para checkout.'),
             enabled: !!paypalMethod.enabled,
-            readiness: paypalMethod.client_id ? 'Credenciales listas' : 'Faltan credenciales',
+            readiness: paypalMethod.client_id ? t('admin.settings.commerce.tabs.paypal.ready', 'Credenciales listas') : t('admin.settings.commerce.tabs.paypal.pending', 'Faltan credenciales'),
             accent: 'from-sky-500/20 via-sky-500/10 to-white',
             ring: 'border-sky-200',
             badge: paypalMethod.client_id ? 'text-sky-700 bg-sky-100' : 'text-amber-700 bg-amber-100',
         },
         {
             key: 'stripe',
-            title: 'Stripe',
-            eyebrow: 'Tarjetas',
-            description: stripeMethod.description || 'Cobros con tarjeta y formulario seguro.',
+            title: t('admin.settings.commerce.tabs.stripe.title', 'Stripe'),
+            eyebrow: t('admin.settings.commerce.tabs.stripe.eyebrow', 'Tarjetas'),
+            description: stripeMethod.description || t('admin.settings.commerce.tabs.stripe.description', 'Cobros con tarjeta y formulario seguro.'),
             enabled: !!stripeMethod.enabled,
-            readiness: stripeMethod.publishable_key ? 'Llaves listas' : 'Faltan llaves',
+            readiness: stripeMethod.publishable_key ? t('admin.settings.commerce.tabs.stripe.ready', 'Llaves listas') : t('admin.settings.commerce.tabs.stripe.pending', 'Faltan llaves'),
             accent: 'from-fuchsia-500/20 via-fuchsia-500/10 to-white',
             ring: 'border-fuchsia-200',
             badge: stripeMethod.publishable_key ? 'text-fuchsia-700 bg-fuchsia-100' : 'text-amber-700 bg-amber-100',
@@ -227,64 +289,64 @@ export default function SettingsIndex({ general, location, branding, billing, cu
     const settingsGroups = [
         {
             key: 'identity',
-            eyebrow: 'Base',
-            title: 'Identidad',
-            description: 'Empresa, ubicacion y branding.',
-            sections: '3 secciones',
+            eyebrow: t('admin.settings.groups.identity.eyebrow', 'Base'),
+            title: t('admin.settings.groups.identity.title', 'Identidad'),
+            description: t('admin.settings.groups.identity.description', 'Empresa, ubicacion y branding.'),
+            sections: t('admin.settings.groups.identity.sections', '3 secciones'),
         },
         {
             key: 'operations',
-            eyebrow: 'Core',
-            title: 'Operacion',
-            description: 'Inventario, sucursales, facturacion y moneda.',
-            sections: '4 secciones',
+            eyebrow: t('admin.settings.groups.operations.eyebrow', 'Core'),
+            title: t('admin.settings.groups.operations.title', 'Operacion'),
+            description: t('admin.settings.groups.operations.description', 'Inventario, sucursales, facturacion y moneda.'),
+            sections: t('admin.settings.groups.operations.sections', '4 secciones'),
         },
         {
             key: 'commerce',
-            eyebrow: 'Venta',
-            title: 'Comercio',
-            description: 'Pagos, checkout y textos de tienda.',
-            sections: '2 secciones',
+            eyebrow: t('admin.settings.groups.commerce.eyebrow', 'Venta'),
+            title: t('admin.settings.groups.commerce.title', 'Comercio'),
+            description: t('admin.settings.groups.commerce.description', 'Pagos, checkout y textos de tienda.'),
+            sections: t('admin.settings.groups.commerce.sections', '2 secciones'),
         },
         {
             key: 'communication',
-            eyebrow: 'Canales',
-            title: 'Comunicacion',
-            description: 'Seguridad, QR y correo transaccional.',
-            sections: '3 secciones',
+            eyebrow: t('admin.settings.groups.communication.eyebrow', 'Canales'),
+            title: t('admin.settings.groups.communication.title', 'Comunicacion'),
+            description: t('admin.settings.groups.communication.description', 'Seguridad, QR y correo transaccional.'),
+            sections: t('admin.settings.groups.communication.sections', '3 secciones'),
         },
     ];
     const activeSettingsMeta = settingsGroups.find((group) => group.key === activeSettingsGroup) ?? settingsGroups[0];
 
     return (
         <AuthenticatedLayout>
-            <Head title="Configuración" />
+            <Head title={t('admin.settings.shell.page_title', 'Configuración')} />
 
             <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
                 <form onSubmit={submit} className="space-y-8">
                     <section className="overflow-hidden rounded-[36px] border border-slate-200 bg-[linear-gradient(135deg,_#f8fafc,_#e0f2fe_52%,_#fff7ed)] shadow-sm">
                         <div className="grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_320px] lg:px-8">
                             <div>
-                                <p className="text-xs font-semibold uppercase tracking-[0.26em] text-sky-700">Configuracion</p>
+                                <p className="text-xs font-semibold uppercase tracking-[0.26em] text-sky-700">{t('admin.settings.shell.eyebrow', 'Configuracion')}</p>
                                 <h1 className="mt-3 max-w-3xl text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-                                    Ordena toda la administracion en bloques claros y faciles de operar.
+                                    {t('admin.settings.shell.title', 'Ordena toda la administracion en bloques claros y faciles de operar.')}
                                 </h1>
                                 <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
-                                    Esta vista ahora se divide por grupos funcionales para que el usuario no tenga que recorrer un formulario interminable. Edita solo el area que necesitas y mantén contexto con un resumen permanente.
+                                    {t('admin.settings.shell.description', 'Esta vista ahora se divide por grupos funcionales para que el usuario no tenga que recorrer un formulario interminable. Edita solo el area que necesitas y mantén contexto con un resumen permanente.')}
                                 </p>
                             </div>
 
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-1">
                                 <div className="rounded-[24px] border border-white/60 bg-white/70 px-4 py-4 backdrop-blur">
-                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Grupos</p>
+                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t('admin.settings.shell.stats.groups', 'Grupos')}</p>
                                     <p className="mt-2 text-3xl font-semibold text-slate-900">{settingsGroups.length}</p>
                                 </div>
                                 <div className="rounded-[24px] border border-white/60 bg-white/70 px-4 py-4 backdrop-blur">
-                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Metodos activos</p>
+                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t('admin.settings.shell.stats.active_methods', 'Metodos activos')}</p>
                                     <p className="mt-2 text-3xl font-semibold text-slate-900">{activeMethods}</p>
                                 </div>
                                 <div className="rounded-[24px] border border-white/60 bg-white/70 px-4 py-4 backdrop-blur">
-                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Seccion actual</p>
+                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t('admin.settings.shell.stats.current_section', 'Seccion actual')}</p>
                                     <p className="mt-2 text-lg font-semibold text-slate-900">{activeSettingsMeta.title}</p>
                                 </div>
                             </div>
@@ -294,7 +356,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                     <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
                         <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
                             <div className="rounded-[28px] border border-slate-200 bg-white p-3 shadow-sm">
-                                <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Navegacion</p>
+                                <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">{t('admin.settings.shell.navigation', 'Navegacion')}</p>
                                 <div className="space-y-3">
                                     {settingsGroups.map((group) => {
                                         const isActive = activeSettingsGroup === group.key;
@@ -323,20 +385,20 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                             </div>
 
                             <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-                                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Contexto</p>
+                                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">{t('admin.settings.shell.context', 'Contexto')}</p>
                                 <h2 className="mt-2 text-xl font-semibold text-slate-900">{activeSettingsMeta.title}</h2>
                                 <p className="mt-2 text-sm leading-6 text-slate-600">{activeSettingsMeta.description}</p>
                                 <div className="mt-5 space-y-3 text-sm text-slate-600">
                                     <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
-                                        <span>Secciones</span>
+                                        <span>{t('admin.settings.shell.context_items.sections', 'Secciones')}</span>
                                         <strong className="text-slate-900">{activeSettingsMeta.sections}</strong>
                                     </div>
                                     <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
-                                        <span>Cuentas visibles</span>
+                                        <span>{t('admin.settings.shell.context_items.visible_accounts', 'Cuentas visibles')}</span>
                                         <strong className="text-slate-900">{visibleBankAccounts}</strong>
                                     </div>
                                     <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
-                                        <span>Bancos origen</span>
+                                        <span>{t('admin.settings.shell.context_items.origin_banks', 'Bancos origen')}</span>
                                         <strong className="text-slate-900">{visibleOriginBanks}</strong>
                                     </div>
                                 </div>
@@ -347,13 +409,13 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                             {activeSettingsGroup === 'identity' && (
                                 <>
                                     <SettingsSection
-                                        eyebrow="Empresa"
-                                        title="Datos de empresa"
-                                        description="Define la identidad principal del negocio y los datos que se reutilizan en panel, documentos y contacto."
+                                        eyebrow={t('admin.settings.identity.company.eyebrow', 'Empresa')}
+                                        title={t('admin.settings.identity.company.title', 'Datos de empresa')}
+                                        description={t('admin.settings.identity.company.description', 'Define la identidad principal del negocio y los datos que se reutilizan en panel, documentos y contacto.')}
                                     >
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-slate-700">Nombre de la empresa *</label>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.company_name', 'Nombre de la empresa')} *</label>
                                 <input
                                     type="text"
                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -365,7 +427,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                 )}
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-700">Nombre comercial</label>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.trade_name', 'Nombre comercial')}</label>
                                 <input
                                     type="text"
                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -374,7 +436,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-700">RIF / NIT</label>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.tax_id', 'RIF / NIT')}</label>
                                 <input
                                     type="text"
                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -383,7 +445,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-700">Email</label>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.email', 'Email')}</label>
                                 <input
                                     type="email"
                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -392,7 +454,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-700">Teléfono</label>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.phone', 'Teléfono')}</label>
                                 <input
                                     type="text"
                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -401,7 +463,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-700">WhatsApp</label>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.whatsapp', 'WhatsApp')}</label>
                                 <input
                                     type="text"
                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -413,13 +475,13 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                     </SettingsSection>
 
                                     <SettingsSection
-                                        eyebrow="Ubicacion"
-                                        title="Ubicacion"
-                                        description="Organiza la informacion geografica del negocio y los enlaces de referencia para contacto y mapa."
+                                        eyebrow={t('admin.settings.identity.location.eyebrow', 'Ubicacion')}
+                                        title={t('admin.settings.identity.location.title', 'Ubicacion')}
+                                        description={t('admin.settings.identity.location.description', 'Organiza la informacion geografica del negocio y los enlaces de referencia para contacto y mapa.')}
                                     >
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-slate-700">Dirección</label>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.location.fields.address', 'Dirección')}</label>
                                 <textarea
                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
                                     rows={2}
@@ -428,7 +490,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-700">Ciudad</label>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.location.fields.city', 'Ciudad')}</label>
                                 <input
                                     type="text"
                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -437,7 +499,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-700">Estado / Región</label>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.location.fields.state', 'Estado / Región')}</label>
                                 <input
                                     type="text"
                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -446,7 +508,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-700">País</label>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.location.fields.country', 'País')}</label>
                                 <input
                                     type="text"
                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -455,7 +517,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-700">URL de Google Maps</label>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.location.fields.google_maps_url', 'URL de Google Maps')}</label>
                                 <input
                                     type="url"
                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -467,13 +529,13 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                     </SettingsSection>
 
                                     <SettingsSection
-                                        eyebrow="Visual"
-                                        title="Branding"
-                                        description="Concentra logos, favicon y colores clave para mantener una identidad consistente en toda la experiencia."
+                                        eyebrow={t('admin.settings.identity.branding.eyebrow', 'Visual')}
+                                        title={t('admin.settings.identity.branding.title', 'Branding')}
+                                        description={t('admin.settings.identity.branding.description', 'Concentra logos, favicon y colores clave para mantener una identidad consistente en toda la experiencia.')}
                                     >
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-slate-700">Logo (URL)</label>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.branding.fields.logo_url', 'Logo (URL)')}</label>
                                 <input
                                     type="text"
                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -482,7 +544,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-700">Logo oscuro (URL)</label>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.branding.fields.logo_dark_url', 'Logo oscuro (URL)')}</label>
                                 <input
                                     type="text"
                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -491,7 +553,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-700">Favicon (URL)</label>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.branding.fields.favicon_url', 'Favicon (URL)')}</label>
                                 <input
                                     type="text"
                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -501,7 +563,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                             </div>
                             <div className="flex gap-4 items-end">
                                 <div className="flex-1">
-                                    <label className="block text-sm font-medium text-slate-700">Color primario</label>
+                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.branding.fields.primary_color', 'Color primario')}</label>
                                     <input
                                         type="text"
                                         className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -510,7 +572,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                     />
                                 </div>
                                 <div className="flex-1">
-                                    <label className="block text-sm font-medium text-slate-700">Color secundario</label>
+                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.branding.fields.secondary_color', 'Color secundario')}</label>
                                     <input
                                         type="text"
                                         className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -527,9 +589,9 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                             {activeSettingsGroup === 'operations' && (
                                 <>
                                     <SettingsSection
-                                        eyebrow="Inventario"
-                                        title="Inventario"
-                                        description="Configura reglas base de stock para evitar ajustes repetitivos y mantener el comportamiento esperado del sistema."
+                                        eyebrow={t('admin.settings.operations.inventory.eyebrow', 'Inventario')}
+                                        title={t('admin.settings.operations.inventory.title', 'Inventario')}
+                                        description={t('admin.settings.operations.inventory.description', 'Configura reglas base de stock para evitar ajustes repetitivos y mantener el comportamiento esperado del sistema.')}
                                     >
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="flex items-center gap-2 mt-2">
@@ -541,11 +603,11 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                     onChange={handleChange('inventory', 'allow_negative_stock')}
                                 />
                                 <label htmlFor="allow_negative_stock" className="text-sm text-slate-700">
-                                    Permitir stock negativo
+                                    {t('admin.settings.operations.inventory.fields.allow_negative_stock', 'Permitir stock negativo')}
                                 </label>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-700">Stock mínimo por defecto</label>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.operations.inventory.fields.default_min_stock', 'Stock mínimo por defecto')}</label>
                                 <input
                                     type="number"
                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -560,9 +622,9 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                     </SettingsSection>
 
                                     <SettingsSection
-                                        eyebrow="Sucursal"
-                                        title="Multi-bodega y ventas"
-                                        description="Define como se comportan las facturas respecto a la seleccion de bodegas y la operacion diaria de ventas."
+                                        eyebrow={t('admin.settings.operations.warehouses.eyebrow', 'Sucursal')}
+                                        title={t('admin.settings.operations.warehouses.title', 'Multi-bodega y ventas')}
+                                        description={t('admin.settings.operations.warehouses.description', 'Define como se comportan las facturas respecto a la seleccion de bodegas y la operacion diaria de ventas.')}
                                     >
                         <div className="space-y-4">
                             <div className="flex items-center gap-2 mt-2">
@@ -574,17 +636,17 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                     onChange={handleChange('warehouses', 'require_warehouse_on_invoice')}
                                 />
                                 <label htmlFor="require_warehouse_on_invoice" className="text-sm text-slate-700">
-                                    Requerir seleccionar bodega/sucursal en las facturas
+                                    {t('admin.settings.operations.warehouses.fields.require_warehouse_on_invoice', 'Requerir seleccionar bodega/sucursal en las facturas')}
                                 </label>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-700">Bodega por defecto para ventas</label>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.operations.warehouses.fields.default_warehouse_id', 'Bodega por defecto para ventas')}</label>
                                 <select
                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
                                     value={data.warehouses.default_warehouse_id ?? ''}
                                     onChange={handleChange('warehouses', 'default_warehouse_id')}
                                 >
-                                    <option value="">Sin bodega por defecto</option>
+                                    <option value="">{t('admin.settings.operations.warehouses.fields.default_warehouse_empty', 'Sin bodega por defecto')}</option>
                                     {(warehouseOptions || []).map((w) => (
                                         <option key={w.id} value={w.id}>
                                             {w.name} ({w.code})
@@ -599,13 +661,13 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                     </SettingsSection>
 
                                     <SettingsSection
-                                        eyebrow="Documentos"
-                                        title="Facturacion"
-                                        description="Agrupa numeracion, impuestos y reglas contables generales para las facturas emitidas."
+                                        eyebrow={t('admin.settings.operations.billing.eyebrow', 'Documentos')}
+                                        title={t('admin.settings.operations.billing.title', 'Facturacion')}
+                                        description={t('admin.settings.operations.billing.description', 'Agrupa numeracion, impuestos y reglas contables generales para las facturas emitidas.')}
                                     >
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-slate-700">Prefijo de factura</label>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.operations.billing.fields.invoice_prefix', 'Prefijo de factura')}</label>
                                 <input
                                     type="text"
                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -614,7 +676,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-700">Longitud del número</label>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.operations.billing.fields.invoice_length', 'Longitud del número')}</label>
                                 <input
                                     type="number"
                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -623,7 +685,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-700">Impuesto por defecto (%)</label>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.operations.billing.fields.default_tax_percent', 'Impuesto por defecto (%)')}</label>
                                 <input
                                     type="number"
                                     step="0.01"
@@ -640,43 +702,221 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                     checked={!!data.billing.enable_igtf}
                                     onChange={handleChange('billing', 'enable_igtf')}
                                 />
-                                <label htmlFor="enable_igtf" className="text-sm text-slate-700">Habilitar IGTF</label>
+                                <label htmlFor="enable_igtf" className="text-sm text-slate-700">{t('admin.settings.operations.billing.fields.enable_igtf', 'Habilitar IGTF')}</label>
                             </div>
                         </div>
                                     </SettingsSection>
 
                                     <SettingsSection
-                                        eyebrow="Moneda"
-                                        title="Moneda"
-                                        description="Centraliza la configuracion monetaria usada en toda la aplicacion y su fuente de tasa."
+                                        eyebrow={t('admin.settings.operations.currency.eyebrow', 'Moneda')}
+                                        title={t('admin.settings.operations.currency.title', 'Moneda')}
+                                        description={t('admin.settings.operations.currency.description', 'Centraliza la configuracion monetaria usada en toda la aplicacion y su fuente de tasa.')}
                                     >
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700">Moneda base</label>
-                                <input
-                                    type="text"
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    value={data.currency.base_currency || ''}
-                                    onChange={handleChange('currency', 'base_currency')}
-                                />
+                        <div className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.operations.currency.fields.base_currency', 'Moneda base')}</label>
+                                    <input
+                                        type="text"
+                                        className="mt-1 block w-full rounded-md border-slate-300 bg-slate-50 shadow-sm text-sm"
+                                        value={data.currency.base_currency || 'USD'}
+                                        readOnly
+                                    />
+                                    <p className="mt-1 text-xs text-slate-500">{t('admin.settings.operations.currency.helpers.base_currency_fixed', 'USD permanece como moneda canónica interna del sistema.')}</p>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.operations.currency.fields.default_display_currency', 'Moneda por defecto')}</label>
+                                    <select
+                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                        value={data.currency.default_display_currency || data.currency.base_currency || 'USD'}
+                                        onChange={handleChange('currency', 'default_display_currency')}
+                                    >
+                                        {enabledCurrencies.map((item) => (
+                                            <option key={item.code} value={item.code}>{item.code}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.operations.currency.fields.rate_provider', 'Proveedor principal')}</label>
+                                    <select
+                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                        value={data.currency.rate_provider || data.currency.rate_source || 'dolarapi'}
+                                        onChange={(e) => setData('currency', {
+                                            ...data.currency,
+                                            rate_provider: e.target.value,
+                                            rate_source: e.target.value,
+                                        })}
+                                    >
+                                        {currencyProviderOptions.map((provider) => (
+                                            <option key={provider.value} value={provider.value}>{provider.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.operations.currency.fields.auto_refresh_interval_minutes', 'Actualización automática (min)')}</label>
+                                    <input
+                                        type="number"
+                                        min={5}
+                                        max={1440}
+                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                        value={data.currency.auto_refresh_interval_minutes ?? 60}
+                                        onChange={handleChange('currency', 'auto_refresh_interval_minutes')}
+                                    />
+                                </div>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700">Segunda moneda</label>
-                                <input
-                                    type="text"
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    value={data.currency.secondary_currency || ''}
-                                    onChange={handleChange('currency', 'secondary_currency')}
-                                />
+
+                            <div className="flex flex-col gap-3 rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-4 md:flex-row md:items-center md:justify-between">
+                                <div>
+                                    <p className="text-sm font-semibold text-slate-900">{t('admin.settings.operations.currency.actions.sync_title', 'Sincronización de tasas')}</p>
+                                    <p className="mt-1 text-xs text-slate-500">{t('admin.settings.operations.currency.actions.sync_description', 'Actualiza las tasas automáticas guardadas y conserva la última tasa válida para cada moneda activa.')}</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={syncCurrencyRates}
+                                    disabled={syncingCurrencyRates}
+                                    className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    {syncingCurrencyRates
+                                        ? t('admin.settings.operations.currency.actions.syncing', 'Sincronizando...')
+                                        : t('admin.settings.operations.currency.actions.sync_now', 'Actualizar ahora')}
+                                </button>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700">Fuente de tasa</label>
+
+                            <div className="flex items-center gap-2">
                                 <input
-                                    type="text"
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    value={data.currency.rate_source || ''}
-                                    onChange={handleChange('currency', 'rate_source')}
+                                    id="currency-auto-refresh"
+                                    type="checkbox"
+                                    className="rounded border-slate-300 text-sky-600 shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                    checked={!!data.currency.auto_refresh_enabled}
+                                    onChange={handleChange('currency', 'auto_refresh_enabled')}
                                 />
+                                <label htmlFor="currency-auto-refresh" className="text-sm text-slate-700">
+                                    {t('admin.settings.operations.currency.fields.auto_refresh_enabled', 'Actualizar tasas automáticamente')}
+                                </label>
+                            </div>
+
+                            <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+                                <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+                                    <div>
+                                        <h3 className="text-sm font-semibold text-slate-900">{t('admin.settings.operations.currency.fields.supported_currencies', 'Monedas disponibles')}</h3>
+                                        <p className="text-xs text-slate-500">{t('admin.settings.operations.currency.helpers.enabled_currencies_count', 'Activa las monedas que el usuario podrá ver sin tener que programar.')}</p>
+                                    </div>
+                                    <span className="inline-flex w-fit rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600">
+                                        {enabledCurrencies.length} activas
+                                    </span>
+                                </div>
+
+                                <div className="mt-4 grid grid-cols-1 xl:grid-cols-2 gap-4">
+                                    {supportedCurrencies.map((item, index) => (
+                                        <div key={item.code || index} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div>
+                                                    <p className="text-sm font-semibold text-slate-900">{item.code}</p>
+                                                    <p className="text-xs text-slate-500">{item.name}</p>
+                                                </div>
+                                                <label className="inline-flex items-center gap-2 text-xs text-slate-600">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="rounded border-slate-300 text-sky-600 shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                                        checked={!!item.enabled}
+                                                        disabled={item.code === 'USD'}
+                                                        onChange={(e) => updateSupportedCurrency(index, 'enabled', e.target.checked)}
+                                                    />
+                                                    {t('admin.settings.operations.currency.fields.enabled', 'Activa')}
+                                                </label>
+                                            </div>
+
+                                            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-xs font-medium text-slate-600">{t('admin.settings.operations.currency.fields.symbol', 'Símbolo')}</label>
+                                                    <input
+                                                        type="text"
+                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                        value={item.symbol || ''}
+                                                        onChange={(e) => updateSupportedCurrency(index, 'symbol', e.target.value)}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium text-slate-600">{t('admin.settings.operations.currency.fields.rate_mode', 'Modo de tasa')}</label>
+                                                    <select
+                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                        value={item.rate_mode || 'auto'}
+                                                        onChange={(e) => updateSupportedCurrency(index, 'rate_mode', e.target.value.toLowerCase())}
+                                                    >
+                                                        <option value="auto">{t('admin.settings.operations.currency.modes.auto', 'Automática')}</option>
+                                                        <option value="manual">{t('admin.settings.operations.currency.modes.manual', 'Manual')}</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium text-slate-600">{t('admin.settings.operations.currency.fields.rate_provider', 'Proveedor')}</label>
+                                                    <select
+                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                        value={item.rate_provider || data.currency.rate_provider || 'dolarapi'}
+                                                        onChange={(e) => updateSupportedCurrency(index, 'rate_provider', e.target.value.toLowerCase())}
+                                                    >
+                                                        {currencyProviderOptions.map((provider) => (
+                                                            <option key={provider.value} value={provider.value}>{provider.label}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium text-slate-600">{t('admin.settings.operations.currency.fields.manual_rate', 'Tasa manual')}</label>
+                                                    <input
+                                                        type="number"
+                                                        step="0.0001"
+                                                        min="0"
+                                                        disabled={(item.rate_mode || 'auto') !== 'manual'}
+                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm disabled:bg-slate-100"
+                                                        value={item.manual_rate ?? ''}
+                                                        onChange={(e) => updateSupportedCurrency(index, 'manual_rate', e.target.value)}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium text-slate-600">{t('admin.settings.operations.currency.fields.markup_percent', 'Margen adicional (%)')}</label>
+                                                    <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        min="0"
+                                                        max="100"
+                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                        value={item.markup_percent ?? 0}
+                                                        onChange={(e) => updateSupportedCurrency(index, 'markup_percent', e.target.value)}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-slate-600">
+                                                <label className="inline-flex items-center gap-2">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="rounded border-slate-300 text-sky-600 shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                                        checked={!!item.visible_in_store}
+                                                        onChange={(e) => updateSupportedCurrency(index, 'visible_in_store', e.target.checked)}
+                                                    />
+                                                    {t('admin.settings.operations.currency.fields.visible_in_store', 'Visible en tienda')}
+                                                </label>
+                                                <label className="inline-flex items-center gap-2">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="rounded border-slate-300 text-sky-600 shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                                        checked={!!item.visible_in_admin}
+                                                        onChange={(e) => updateSupportedCurrency(index, 'visible_in_admin', e.target.checked)}
+                                                    />
+                                                    {t('admin.settings.operations.currency.fields.visible_in_admin', 'Visible en admin')}
+                                                </label>
+                                                <label className="inline-flex items-center gap-2">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="rounded border-slate-300 text-sky-600 shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                                        checked={!!item.allow_checkout}
+                                                        onChange={(e) => updateSupportedCurrency(index, 'allow_checkout', e.target.checked)}
+                                                    />
+                                                    {t('admin.settings.operations.currency.fields.allow_checkout', 'Disponible en checkout')}
+                                                </label>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         </div>
                                     </SettingsSection>
@@ -686,13 +926,13 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                             {activeSettingsGroup === 'communication' && (
                                 <>
                                     <SettingsSection
-                                        eyebrow="Seguridad"
-                                        title="Seguridad"
-                                        description="Ajusta la dureza de acceso y prepara el sistema para futuros mecanismos de autenticacion reforzada."
+                                        eyebrow={t('admin.settings.communication.security.eyebrow', 'Seguridad')}
+                                        title={t('admin.settings.communication.security.title', 'Seguridad')}
+                                        description={t('admin.settings.communication.security.description', 'Ajusta la dureza de acceso y prepara el sistema para futuros mecanismos de autenticacion reforzada.')}
                                     >
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-slate-700">Longitud mínima de contraseña</label>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.communication.security.fields.min_password_length', 'Longitud mínima de contraseña')}</label>
                                 <input
                                     type="number"
                                     min={6}
@@ -706,7 +946,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                 )}
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-700">Intentos fallidos antes de bloqueo</label>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.communication.security.fields.max_failed_logins', 'Intentos fallidos antes de bloqueo')}</label>
                                 <input
                                     type="number"
                                     min={1}
@@ -728,55 +968,55 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                     onChange={handleChange('security', 'enable_two_factor')}
                                 />
                                 <label htmlFor="enable_two_factor" className="text-sm text-slate-700">
-                                    Habilitar 2FA (para futuros inicios de sesión)
+                                    {t('admin.settings.communication.security.fields.enable_two_factor', 'Habilitar 2FA (para futuros inicios de sesión)')}
                                 </label>
                             </div>
                         </div>
                                     </SettingsSection>
 
                                     <SettingsSection
-                                        eyebrow="Automatizacion"
-                                        title="QR y enlaces rapidos"
-                                        description="Concentra las bases de URL para documentos, productos y contacto, evitando configuraciones dispersas."
+                                        eyebrow={t('admin.settings.communication.qr.eyebrow', 'Automatizacion')}
+                                        title={t('admin.settings.communication.qr.title', 'QR y enlaces rapidos')}
+                                        description={t('admin.settings.communication.qr.description', 'Concentra las bases de URL para documentos, productos y contacto, evitando configuraciones dispersas.')}
                                     >
                         <p className="text-sm text-slate-600">
-                            Estas URLs se usarán como base para generar códigos QR de facturas, productos y contacto.
+                            {t('admin.settings.communication.qr.helper', 'Estas URLs se usarán como base para generar códigos QR de facturas, productos y contacto.')}
                         </p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-slate-700">URL base para facturas</label>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.communication.qr.fields.invoice_base_url', 'URL base para facturas')}</label>
                                 <input
                                     type="url"
                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
                                     value={data.qr.invoice_base_url || ''}
                                     onChange={handleChange('qr', 'invoice_base_url')}
-                                    placeholder="https://midominio.com/facturas/{numero}"
+                                    placeholder={t('admin.settings.communication.qr.placeholders.invoice_base_url', 'https://midominio.com/facturas/{numero}')}
                                 />
                                 {errors['qr.invoice_base_url'] && (
                                     <p className="mt-1 text-xs text-red-600">{errors['qr.invoice_base_url']}</p>
                                 )}
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-700">URL base para productos</label>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.communication.qr.fields.product_base_url', 'URL base para productos')}</label>
                                 <input
                                     type="url"
                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
                                     value={data.qr.product_base_url || ''}
                                     onChange={handleChange('qr', 'product_base_url')}
-                                    placeholder="https://midominio.com/productos/{sku}"
+                                    placeholder={t('admin.settings.communication.qr.placeholders.product_base_url', 'https://midominio.com/productos/{sku}')}
                                 />
                                 {errors['qr.product_base_url'] && (
                                     <p className="mt-1 text-xs text-red-600">{errors['qr.product_base_url']}</p>
                                 )}
                             </div>
                             <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-slate-700">URL de contacto por WhatsApp</label>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.communication.qr.fields.whatsapp_contact_url', 'URL de contacto por WhatsApp')}</label>
                                 <input
                                     type="url"
                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
                                     value={data.qr.whatsapp_contact_url || ''}
                                     onChange={handleChange('qr', 'whatsapp_contact_url')}
-                                    placeholder="https://wa.me/58XXXXXXXXXX?text=Hola%20tengo%20una%20consulta"
+                                    placeholder={t('admin.settings.communication.qr.placeholders.whatsapp_contact_url', 'https://wa.me/58XXXXXXXXXX?text=Hola%20tengo%20una%20consulta')}
                                 />
                                 {errors['qr.whatsapp_contact_url'] && (
                                     <p className="mt-1 text-xs text-red-600">{errors['qr.whatsapp_contact_url']}</p>
@@ -786,61 +1026,61 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                     </SettingsSection>
 
                                     <SettingsSection
-                                        eyebrow="Mensajeria"
-                                        title="Correo electronico"
-                                        description="Edita los textos base del correo transaccional sin salir de un panel dedicado a la comunicacion."
+                                        eyebrow={t('admin.settings.communication.mail.eyebrow', 'Mensajeria')}
+                                        title={t('admin.settings.communication.mail.title', 'Correo electronico')}
+                                        description={t('admin.settings.communication.mail.description', 'Edita los textos base del correo transaccional sin salir de un panel dedicado a la comunicacion.')}
                                     >
                         <p className="text-sm text-slate-600">
-                            Ajusta algunos textos base que se usarán en las plantillas de correo (por ejemplo, facturas).
+                            {t('admin.settings.communication.mail.helper', 'Ajusta algunos textos base que se usarán en las plantillas de correo (por ejemplo, facturas).')}
                         </p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-slate-700">Prefijo de asunto para facturas</label>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.communication.mail.fields.invoice_subject_prefix', 'Prefijo de asunto para facturas')}</label>
                                 <input
                                     type="text"
                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
                                     value={data.mail.invoice_subject_prefix || ''}
                                     onChange={handleChange('mail', 'invoice_subject_prefix')}
-                                    placeholder="Ej: Factura, Comprobante, Pedido"
+                                    placeholder={t('admin.settings.communication.mail.placeholders.invoice_subject_prefix', 'Ej: Factura, Comprobante, Pedido')}
                                 />
                                 {errors['mail.invoice_subject_prefix'] && (
                                     <p className="mt-1 text-xs text-red-600">{errors['mail.invoice_subject_prefix']}</p>
                                 )}
                             </div>
                             <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-slate-700">Texto introductorio del correo de factura</label>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.communication.mail.fields.invoice_intro', 'Texto introductorio del correo de factura')}</label>
                                 <textarea
                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
                                     rows={2}
                                     value={data.mail.invoice_intro || ''}
                                     onChange={handleChange('mail', 'invoice_intro')}
-                                    placeholder="Ej: Gracias por tu compra. A continuación puedes revisar el detalle y estado de tu pedido."
+                                    placeholder={t('admin.settings.communication.mail.placeholders.invoice_intro', 'Ej: Gracias por tu compra. A continuación puedes revisar el detalle y estado de tu pedido.')}
                                 />
                                 {errors['mail.invoice_intro'] && (
                                     <p className="mt-1 text-xs text-red-600">{errors['mail.invoice_intro']}</p>
                                 )}
                             </div>
                             <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-slate-700">Texto de pie de correo</label>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.communication.mail.fields.footer_text', 'Texto de pie de correo')}</label>
                                 <textarea
                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
                                     rows={2}
                                     value={data.mail.footer_text || ''}
                                     onChange={handleChange('mail', 'footer_text')}
-                                    placeholder="Ej: Gracias por confiar en nosotros. Este mensaje fue generado automáticamente."
+                                    placeholder={t('admin.settings.communication.mail.placeholders.footer_text', 'Ej: Gracias por confiar en nosotros. Este mensaje fue generado automáticamente.')}
                                 />
                                 {errors['mail.footer_text'] && (
                                     <p className="mt-1 text-xs text-red-600">{errors['mail.footer_text']}</p>
                                 )}
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-700">Texto del botón en el correo de factura</label>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.communication.mail.fields.invoice_button_text', 'Texto del botón en el correo de factura')}</label>
                                 <input
                                     type="text"
                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
                                     value={data.mail.invoice_button_text || ''}
                                     onChange={handleChange('mail', 'invoice_button_text')}
-                                    placeholder="Ej: Ver mi pedido, Ver detalle de la compra"
+                                    placeholder={t('admin.settings.communication.mail.placeholders.invoice_button_text', 'Ej: Ver mi pedido, Ver detalle de la compra')}
                                 />
                                 {errors['mail.invoice_button_text'] && (
                                     <p className="mt-1 text-xs text-red-600">{errors['mail.invoice_button_text']}</p>
@@ -857,23 +1097,23 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                         <div className="border-b border-slate-200 bg-[linear-gradient(135deg,_#0f172a,_#1e293b)] px-6 py-6 text-white">
                             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                                 <div>
-                                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-200">Pagos</p>
-                                    <h2 className="mt-2 text-2xl font-semibold">Metodos, pasarelas y cuentas bancarias</h2>
+                                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-200">{t('admin.settings.commerce.header.eyebrow', 'Pagos')}</p>
+                                    <h2 className="mt-2 text-2xl font-semibold">{t('admin.settings.commerce.header.title', 'Metodos, pasarelas y cuentas bancarias')}</h2>
                                     <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
-                                        Activa lo que quieras mostrar en checkout. Las pasarelas se habilitan aqui y las cuentas bancarias manuales quedan disponibles para transferencias.
+                                        {t('admin.settings.commerce.header.description', 'Activa lo que quieras mostrar en checkout. Las pasarelas se habilitan aqui y las cuentas bancarias manuales quedan disponibles para transferencias.')}
                                     </p>
                                 </div>
                                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                                     <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-slate-100">
-                                        <p className="text-xs uppercase tracking-[0.2em] text-slate-300">Metodos activos</p>
+                                        <p className="text-xs uppercase tracking-[0.2em] text-slate-300">{t('admin.settings.commerce.header.stats.active_methods', 'Metodos activos')}</p>
                                         <p className="mt-1 text-2xl font-semibold text-white">{activeMethods}</p>
                                     </div>
                                     <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-slate-100">
-                                        <p className="text-xs uppercase tracking-[0.2em] text-slate-300">Cuentas visibles</p>
+                                        <p className="text-xs uppercase tracking-[0.2em] text-slate-300">{t('admin.settings.commerce.header.stats.visible_accounts', 'Cuentas visibles')}</p>
                                         <p className="mt-1 text-2xl font-semibold text-white">{visibleBankAccounts}</p>
                                     </div>
                                     <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-slate-100">
-                                        <p className="text-xs uppercase tracking-[0.2em] text-slate-300">Bancos origen</p>
+                                        <p className="text-xs uppercase tracking-[0.2em] text-slate-300">{t('admin.settings.commerce.header.stats.origin_banks', 'Bancos origen')}</p>
                                         <p className="mt-1 text-2xl font-semibold text-white">{visibleOriginBanks}</p>
                                     </div>
                                 </div>
@@ -883,7 +1123,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                         <div className="grid gap-6 p-6 xl:grid-cols-[280px_minmax(0,1fr)]">
                             <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
                                 <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-3">
-                                    <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Canales</p>
+                                    <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">{t('admin.settings.commerce.sidebar.channels', 'Canales')}</p>
                                     <div className="space-y-3">
                                         {paymentTabs.map((tab) => {
                                             const isActive = paymentTab === tab.key;
@@ -901,7 +1141,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                                             <h3 className="mt-2 text-base font-semibold text-slate-900">{tab.title}</h3>
                                                         </div>
                                                         <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${tab.enabled ? 'bg-slate-900 text-white' : 'bg-slate-200 text-slate-600'}`}>
-                                                            {tab.enabled ? 'Activo' : 'Pausado'}
+                                                            {tab.enabled ? t('admin.settings.commerce.values.active', 'Activo') : t('admin.settings.commerce.values.paused', 'Pausado')}
                                                         </span>
                                                     </div>
                                                     <p className="mt-3 text-sm leading-6 text-slate-600">{tab.description}</p>
@@ -910,7 +1150,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                                             {tab.readiness}
                                                         </span>
                                                         <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                                                            {isActive ? 'Editando' : 'Abrir'}
+                                                            {isActive ? t('admin.settings.commerce.values.editing', 'Editando') : t('admin.settings.commerce.values.open', 'Abrir')}
                                                         </span>
                                                     </div>
                                                 </button>
@@ -920,18 +1160,18 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                 </div>
 
                                 <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-                                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Resumen</p>
+                                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">{t('admin.settings.commerce.sidebar.summary', 'Resumen')}</p>
                                     <h3 className="mt-2 text-lg font-semibold text-slate-900">{activePaymentTab.title}</h3>
                                     <p className="mt-2 text-sm leading-6 text-slate-600">{activePaymentTab.description}</p>
                                     <div className="mt-5 space-y-3 text-sm text-slate-600">
                                         <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
-                                            <span>Estado</span>
+                                            <span>{t('admin.settings.commerce.sidebar.status', 'Estado')}</span>
                                             <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${activePaymentTab.enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
-                                                {activePaymentTab.enabled ? 'Visible en checkout' : 'Oculto en checkout'}
+                                                {activePaymentTab.enabled ? t('admin.settings.commerce.values.visible_checkout', 'Visible en checkout') : t('admin.settings.commerce.values.hidden_checkout', 'Oculto en checkout')}
                                             </span>
                                         </div>
                                         <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
-                                            <span>Preparación</span>
+                                            <span>{t('admin.settings.commerce.sidebar.readiness', 'Preparación')}</span>
                                             <span className="text-right text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{activePaymentTab.readiness}</span>
                                         </div>
                                     </div>
@@ -942,15 +1182,15 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                 <div className={`rounded-[24px] border bg-gradient-to-br p-5 ${activePaymentTab.ring} ${activePaymentTab.accent}`}>
                                     <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                                         <div>
-                                            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Workspace</p>
-                                            <h3 className="mt-2 text-2xl font-semibold text-slate-900">Configura {activePaymentTab.title} sin ruido visual</h3>
+                                            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">{t('admin.settings.commerce.workspace.eyebrow', 'Workspace')}</p>
+                                            <h3 className="mt-2 text-2xl font-semibold text-slate-900">{t('admin.settings.commerce.workspace.title_prefix', 'Configura')} {activePaymentTab.title} {t('admin.settings.commerce.workspace.title_suffix', 'sin ruido visual')}</h3>
                                             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                                                Ajusta disponibilidad, mensaje visible en checkout y requisitos operativos en un solo panel. El contenido secundario queda resumido en la barra lateral.
+                                                {t('admin.settings.commerce.workspace.description', 'Ajusta disponibilidad, mensaje visible en checkout y requisitos operativos en un solo panel. El contenido secundario queda resumido en la barra lateral.')}
                                             </p>
                                         </div>
                                         <div className="flex flex-wrap gap-2">
-                                            <span className="rounded-full bg-white/80 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">Checkout guiado</span>
-                                            <span className="rounded-full bg-white/80 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">Edición centralizada</span>
+                                            <span className="rounded-full bg-white/80 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">{t('admin.settings.commerce.workspace.chips.guided_checkout', 'Checkout guiado')}</span>
+                                            <span className="rounded-full bg-white/80 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">{t('admin.settings.commerce.workspace.chips.centralized_editing', 'Edición centralizada')}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -973,7 +1213,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                                     </label>
                                                 </div>
                                                 <div>
-                                                    <label className="block text-sm font-medium text-slate-700">Nombre visible</label>
+                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.common.visible_name', 'Nombre visible')}</label>
                                                     <input
                                                         type="text"
                                                         className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -982,7 +1222,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="block text-sm font-medium text-slate-700">Recargo (%)</label>
+                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.common.fee_percent', 'Recargo (%)')}</label>
                                                     <input
                                                         type="number"
                                                         step="0.01"
@@ -994,7 +1234,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                                     />
                                                 </div>
                                                 <div className="md:col-span-2">
-                                                    <label className="block text-sm font-medium text-slate-700">Descripcion</label>
+                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.common.description', 'Descripcion')}</label>
                                                     <input
                                                         type="text"
                                                         className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -1003,7 +1243,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                                     />
                                                 </div>
                                                 <div className="md:col-span-2">
-                                                    <label className="block text-sm font-medium text-slate-700">Instrucciones al cliente</label>
+                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.common.customer_instructions', 'Instrucciones al cliente')}</label>
                                                     <textarea
                                                         rows={3}
                                                         className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -1015,18 +1255,18 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                             </div>
 
                                             <div className="rounded-[24px] border border-emerald-200 bg-emerald-50 p-5">
-                                                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Experiencia</p>
-                                                <h3 className="mt-2 text-lg font-semibold text-emerald-950">Transferencias claras para el cliente</h3>
+                                                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">{t('admin.settings.commerce.manual.experience.eyebrow', 'Experiencia')}</p>
+                                                <h3 className="mt-2 text-lg font-semibold text-emerald-950">{t('admin.settings.commerce.manual.experience.title', 'Transferencias claras para el cliente')}</h3>
                                                 <p className="mt-2 text-sm leading-6 text-emerald-900/80">
-                                                    El checkout mostrara tarjetas con las cuentas disponibles, datos del titular y un formulario corto para referencia, banco de origen y fecha.
+                                                    {t('admin.settings.commerce.manual.experience.description', 'El checkout mostrara tarjetas con las cuentas disponibles, datos del titular y un formulario corto para referencia, banco de origen y fecha.')}
                                                 </p>
                                                 <div className="mt-4 space-y-2 text-sm text-emerald-900/80">
                                                     <div className="flex items-center justify-between rounded-2xl bg-white/60 px-4 py-3">
-                                                        <span>Cuentas publicadas</span>
+                                                        <span>{t('admin.settings.commerce.manual.experience.published_accounts', 'Cuentas publicadas')}</span>
                                                         <strong>{visibleBankAccounts}</strong>
                                                     </div>
                                                     <div className="flex items-center justify-between rounded-2xl bg-white/60 px-4 py-3">
-                                                        <span>Bancos origen visibles</span>
+                                                        <span>{t('admin.settings.commerce.manual.experience.visible_origin_banks', 'Bancos origen visibles')}</span>
                                                         <strong>{visibleOriginBanks}</strong>
                                                     </div>
                                                 </div>
@@ -1036,38 +1276,38 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                         <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
                                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                             <div>
-                                                <h3 className="text-lg font-semibold text-slate-900">Cuentas bancarias disponibles</h3>
-                                                <p className="text-sm text-slate-600">Estas son las cuentas que el cliente vera al pagar por transferencia.</p>
+                                                <h3 className="text-lg font-semibold text-slate-900">{t('admin.settings.commerce.manual.accounts.title', 'Cuentas bancarias disponibles')}</h3>
+                                                <p className="text-sm text-slate-600">{t('admin.settings.commerce.manual.accounts.description', 'Estas son las cuentas que el cliente vera al pagar por transferencia.')}</p>
                                             </div>
                                             <button
                                                 type="button"
                                                 onClick={addBankAccount}
                                                 className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
                                             >
-                                                Agregar cuenta bancaria
+                                                {t('admin.settings.commerce.manual.accounts.add', 'Agregar cuenta bancaria')}
                                             </button>
                                         </div>
 
                                         <div className="mt-5 space-y-4">
                                             {bankAccounts.length === 0 ? (
                                                 <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
-                                                    No hay cuentas cargadas todavia.
+                                                    {t('admin.settings.commerce.manual.accounts.empty', 'No hay cuentas cargadas todavia.')}
                                                 </div>
                                             ) : bankAccounts.map((account, index) => (
                                                 <details key={`bank-account-${index}`} className="group overflow-hidden rounded-[24px] border border-slate-200 bg-slate-50 open:bg-white">
                                                     <summary className="flex cursor-pointer list-none flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
                                                         <div>
                                                             <div className="flex items-center gap-2">
-                                                                <h4 className="text-base font-semibold text-slate-900">{account?.bank_name || `Cuenta ${index + 1}`}</h4>
+                                                                <h4 className="text-base font-semibold text-slate-900">{account?.bank_name || `${t('admin.settings.commerce.manual.accounts.account_fallback', 'Cuenta')} ${index + 1}`}</h4>
                                                                 <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${account?.enabled !== false ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
-                                                                    {account?.enabled !== false ? 'Visible' : 'Oculta'}
+                                                                    {account?.enabled !== false ? t('admin.settings.commerce.values.visible', 'Visible') : t('admin.settings.commerce.values.hidden_female', 'Oculta')}
                                                                 </span>
                                                             </div>
                                                             <p className="mt-1 text-sm text-slate-600">
-                                                                {(account?.account_name || 'Sin titular')} · {(account?.account_number || 'Sin número')}
+                                                                {(account?.account_name || t('admin.settings.commerce.manual.accounts.no_holder', 'Sin titular'))} · {(account?.account_number || t('admin.settings.commerce.manual.accounts.no_number', 'Sin número'))}
                                                             </p>
                                                         </div>
-                                                        <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 transition group-open:rotate-180">Abrir</span>
+                                                        <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 transition group-open:rotate-180">{t('admin.settings.commerce.values.open', 'Abrir')}</span>
                                                     </summary>
 
                                                     <div className="border-t border-slate-200 px-4 py-4">
@@ -1081,7 +1321,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                                                     onChange={(e) => updateBankAccount(index, 'enabled', e.target.checked)}
                                                                 />
                                                                 <label htmlFor={`bank_account_enabled_${index}`} className="text-sm font-medium text-slate-700">
-                                                                    Mostrar esta cuenta en checkout
+                                                                    {t('admin.settings.commerce.manual.accounts.show_in_checkout', 'Mostrar esta cuenta en checkout')}
                                                                 </label>
                                                             </div>
                                                             <button
@@ -1089,13 +1329,13 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                                                 onClick={() => removeBankAccount(index)}
                                                                 className="text-sm font-semibold text-rose-600 transition hover:text-rose-700"
                                                             >
-                                                                Eliminar cuenta
+                                                                {t('admin.settings.commerce.manual.accounts.delete', 'Eliminar cuenta')}
                                                             </button>
                                                         </div>
 
                                                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                                                         <div>
-                                                            <label className="block text-sm font-medium text-slate-700">Banco</label>
+                                                            <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.manual.accounts.fields.bank_name', 'Banco')}</label>
                                                             <input
                                                                 type="text"
                                                                 className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -1105,7 +1345,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                                             {errors[`payments.bank_accounts.${index}.bank_name`] && <p className="mt-1 text-xs text-red-600">{errors[`payments.bank_accounts.${index}.bank_name`]}</p>}
                                                         </div>
                                                         <div>
-                                                            <label className="block text-sm font-medium text-slate-700">Titular</label>
+                                                            <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.manual.accounts.fields.account_name', 'Titular')}</label>
                                                             <input
                                                                 type="text"
                                                                 className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -1114,7 +1354,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                                             />
                                                         </div>
                                                         <div>
-                                                            <label className="block text-sm font-medium text-slate-700">Numero de cuenta</label>
+                                                            <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.manual.accounts.fields.account_number', 'Numero de cuenta')}</label>
                                                             <input
                                                                 type="text"
                                                                 className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -1123,7 +1363,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                                             />
                                                         </div>
                                                         <div>
-                                                            <label className="block text-sm font-medium text-slate-700">Tipo de cuenta</label>
+                                                            <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.manual.accounts.fields.account_type', 'Tipo de cuenta')}</label>
                                                             <input
                                                                 type="text"
                                                                 className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -1132,7 +1372,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                                             />
                                                         </div>
                                                         <div>
-                                                            <label className="block text-sm font-medium text-slate-700">RIF / Cedula</label>
+                                                            <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.manual.accounts.fields.identification', 'RIF / Cedula')}</label>
                                                             <input
                                                                 type="text"
                                                                 className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -1141,7 +1381,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                                             />
                                                         </div>
                                                         <div>
-                                                            <label className="block text-sm font-medium text-slate-700">Telefono</label>
+                                                            <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.manual.accounts.fields.phone', 'Telefono')}</label>
                                                             <input
                                                                 type="text"
                                                                 className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -1150,7 +1390,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                                             />
                                                         </div>
                                                         <div className="md:col-span-2 xl:col-span-1">
-                                                            <label className="block text-sm font-medium text-slate-700">Email</label>
+                                                            <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.manual.accounts.fields.email', 'Email')}</label>
                                                             <input
                                                                 type="email"
                                                                 className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -1159,7 +1399,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                                             />
                                                         </div>
                                                         <div className="md:col-span-2 xl:col-span-2">
-                                                            <label className="block text-sm font-medium text-slate-700">Nota visible</label>
+                                                            <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.manual.accounts.fields.notes', 'Nota visible')}</label>
                                                             <input
                                                                 type="text"
                                                                 className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -1177,22 +1417,22 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                         <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
                                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                             <div>
-                                                <h3 className="text-lg font-semibold text-slate-900">Bancos de origen para el formulario</h3>
-                                                <p className="text-sm text-slate-600">El cliente podra elegir desde que banco hizo su transferencia.</p>
+                                                <h3 className="text-lg font-semibold text-slate-900">{t('admin.settings.commerce.manual.origin_banks.title', 'Bancos de origen para el formulario')}</h3>
+                                                <p className="text-sm text-slate-600">{t('admin.settings.commerce.manual.origin_banks.description', 'El cliente podra elegir desde que banco hizo su transferencia.')}</p>
                                             </div>
                                             <button
                                                 type="button"
                                                 onClick={addOriginBank}
                                                 className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
                                             >
-                                                Agregar banco origen
+                                                {t('admin.settings.commerce.manual.origin_banks.add', 'Agregar banco origen')}
                                             </button>
                                         </div>
 
                                         <div className="mt-5 space-y-3">
                                             {originBanks.length === 0 ? (
                                                 <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
-                                                    No hay bancos de origen cargados todavia.
+                                                    {t('admin.settings.commerce.manual.origin_banks.empty', 'No hay bancos de origen cargados todavia.')}
                                                 </div>
                                             ) : originBanks.map((bank, index) => (
                                                 <div key={`origin-bank-${index}`} className="flex flex-col gap-3 rounded-[20px] border border-slate-200 bg-slate-50 p-4 md:flex-row md:items-center">
@@ -1205,11 +1445,11 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                                             onChange={(e) => updateOriginBank(index, 'enabled', e.target.checked)}
                                                         />
                                                         <label htmlFor={`origin_bank_enabled_${index}`} className="text-sm font-medium text-slate-700">
-                                                            Visible
+                                                            {t('admin.settings.commerce.values.visible', 'Visible')}
                                                         </label>
                                                     </div>
                                                     <div className="flex-1">
-                                                        <label className="block text-sm font-medium text-slate-700">Nombre del banco</label>
+                                                        <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.manual.origin_banks.fields.name', 'Nombre del banco')}</label>
                                                         <input
                                                             type="text"
                                                             className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -1223,7 +1463,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                                         onClick={() => removeOriginBank(index)}
                                                         className="text-sm font-semibold text-rose-600 transition hover:text-rose-700"
                                                     >
-                                                        Eliminar
+                                                        {t('admin.settings.commerce.values.delete', 'Eliminar')}
                                                     </button>
                                                 </div>
                                             ))}
@@ -1243,11 +1483,11 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                                     onChange={(e) => updatePaymentMethod('paypal', 'enabled', e.target.checked)}
                                                 />
                                                 <label htmlFor="payments_paypal_enabled" className="text-sm font-medium text-slate-700">
-                                                    Habilitar PayPal en checkout
+                                                    {t('admin.settings.commerce.paypal.enable', 'Habilitar PayPal en checkout')}
                                                 </label>
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-slate-700">Nombre visible</label>
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.common.visible_name', 'Nombre visible')}</label>
                                                 <input
                                                     type="text"
                                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -1256,18 +1496,18 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-slate-700">Entorno</label>
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.paypal.environment', 'Entorno')}</label>
                                                 <select
                                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
                                                     value={paypalMethod.environment || 'sandbox'}
                                                     onChange={(e) => updatePaymentMethod('paypal', 'environment', e.target.value)}
                                                 >
-                                                    <option value="sandbox">Sandbox</option>
-                                                    <option value="live">Live</option>
+                                                    <option value="sandbox">{t('admin.settings.commerce.paypal.options.sandbox', 'Sandbox')}</option>
+                                                    <option value="live">{t('admin.settings.commerce.paypal.options.live', 'Live')}</option>
                                                 </select>
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-slate-700">Client ID</label>
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.paypal.client_id', 'Client ID')}</label>
                                                 <input
                                                     type="text"
                                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -1276,7 +1516,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-slate-700">Client Secret</label>
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.paypal.client_secret', 'Client Secret')}</label>
                                                 <input
                                                     type="password"
                                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -1285,7 +1525,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-slate-700">Recargo (%)</label>
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.common.fee_percent', 'Recargo (%)')}</label>
                                                 <input
                                                     type="number"
                                                     step="0.01"
@@ -1297,7 +1537,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                                 />
                                             </div>
                                             <div className="md:col-span-2">
-                                                <label className="block text-sm font-medium text-slate-700">Descripcion</label>
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.common.description', 'Descripcion')}</label>
                                                 <input
                                                     type="text"
                                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -1306,7 +1546,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                                 />
                                             </div>
                                             <div className="md:col-span-2">
-                                                <label className="block text-sm font-medium text-slate-700">Instrucciones al cliente</label>
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.common.customer_instructions', 'Instrucciones al cliente')}</label>
                                                 <textarea
                                                     rows={3}
                                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -1318,19 +1558,19 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                         </div>
 
                                         <div className="rounded-[24px] border border-sky-200 bg-sky-50 p-5">
-                                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">Pasarela</p>
-                                            <h3 className="mt-2 text-lg font-semibold text-sky-950">Activacion controlada desde configuracion</h3>
+                                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">{t('admin.settings.commerce.paypal.card.eyebrow', 'Pasarela')}</p>
+                                            <h3 className="mt-2 text-lg font-semibold text-sky-950">{t('admin.settings.commerce.paypal.card.title', 'Activacion controlada desde configuracion')}</h3>
                                             <p className="mt-2 text-sm leading-6 text-sky-900/80">
-                                                Cuando esta opcion esta activa, checkout mostrara PayPal como un metodo seleccionable. Las credenciales quedan centralizadas aqui para el equipo administrativo.
+                                                {t('admin.settings.commerce.paypal.card.description', 'Cuando esta opcion esta activa, checkout mostrara PayPal como un metodo seleccionable. Las credenciales quedan centralizadas aqui para el equipo administrativo.')}
                                             </p>
                                             <div className="mt-4 space-y-2 text-sm text-sky-900/80">
                                                 <div className="flex items-center justify-between rounded-2xl bg-white/70 px-4 py-3">
-                                                    <span>Client ID</span>
-                                                    <strong>{paypalMethod.client_id ? 'Configurado' : 'Pendiente'}</strong>
+                                                    <span>{t('admin.settings.commerce.paypal.client_id', 'Client ID')}</span>
+                                                    <strong>{paypalMethod.client_id ? t('admin.settings.commerce.values.configured', 'Configurado') : t('admin.settings.commerce.values.pending', 'Pendiente')}</strong>
                                                 </div>
                                                 <div className="flex items-center justify-between rounded-2xl bg-white/70 px-4 py-3">
-                                                    <span>Client Secret</span>
-                                                    <strong>{paypalMethod.client_secret ? 'Configurado' : 'Pendiente'}</strong>
+                                                    <span>{t('admin.settings.commerce.paypal.client_secret', 'Client Secret')}</span>
+                                                    <strong>{paypalMethod.client_secret ? t('admin.settings.commerce.values.configured', 'Configurado') : t('admin.settings.commerce.values.pending', 'Pendiente')}</strong>
                                                 </div>
                                             </div>
                                         </div>
@@ -1348,11 +1588,11 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                                     onChange={(e) => updatePaymentMethod('stripe', 'enabled', e.target.checked)}
                                                 />
                                                 <label htmlFor="payments_stripe_enabled" className="text-sm font-medium text-slate-700">
-                                                    Habilitar Stripe en checkout
+                                                    {t('admin.settings.commerce.stripe.enable', 'Habilitar Stripe en checkout')}
                                                 </label>
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-slate-700">Nombre visible</label>
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.common.visible_name', 'Nombre visible')}</label>
                                                 <input
                                                     type="text"
                                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -1361,18 +1601,18 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-slate-700">Entorno</label>
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.stripe.environment', 'Entorno')}</label>
                                                 <select
                                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
                                                     value={stripeMethod.environment || 'test'}
                                                     onChange={(e) => updatePaymentMethod('stripe', 'environment', e.target.value)}
                                                 >
-                                                    <option value="test">Test</option>
-                                                    <option value="live">Live</option>
+                                                    <option value="test">{t('admin.settings.commerce.stripe.options.test', 'Test')}</option>
+                                                    <option value="live">{t('admin.settings.commerce.stripe.options.live', 'Live')}</option>
                                                 </select>
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-slate-700">Publishable Key</label>
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.stripe.publishable_key', 'Publishable Key')}</label>
                                                 <input
                                                     type="text"
                                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -1381,7 +1621,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-slate-700">Secret Key</label>
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.stripe.secret_key', 'Secret Key')}</label>
                                                 <input
                                                     type="password"
                                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -1390,7 +1630,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-slate-700">Recargo (%)</label>
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.common.fee_percent', 'Recargo (%)')}</label>
                                                 <input
                                                     type="number"
                                                     step="0.01"
@@ -1402,7 +1642,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                                 />
                                             </div>
                                             <div className="md:col-span-2">
-                                                <label className="block text-sm font-medium text-slate-700">Descripcion</label>
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.common.description', 'Descripcion')}</label>
                                                 <input
                                                     type="text"
                                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -1411,7 +1651,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                                 />
                                             </div>
                                             <div className="md:col-span-2">
-                                                <label className="block text-sm font-medium text-slate-700">Instrucciones al cliente</label>
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.common.customer_instructions', 'Instrucciones al cliente')}</label>
                                                 <textarea
                                                     rows={3}
                                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -1423,19 +1663,19 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                         </div>
 
                                         <div className="rounded-[24px] border border-fuchsia-200 bg-fuchsia-50 p-5">
-                                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-fuchsia-700">Tarjetas</p>
-                                            <h3 className="mt-2 text-lg font-semibold text-fuchsia-950">Formulario integrado en el checkout</h3>
+                                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-fuchsia-700">{t('admin.settings.commerce.stripe.card.eyebrow', 'Tarjetas')}</p>
+                                            <h3 className="mt-2 text-lg font-semibold text-fuchsia-950">{t('admin.settings.commerce.stripe.card.title', 'Formulario integrado en el checkout')}</h3>
                                             <p className="mt-2 text-sm leading-6 text-fuchsia-900/80">
-                                                Cuando esté activo, el checkout mostrara un formulario seguro de tarjeta solo si el cliente elige Stripe como metodo de pago.
+                                                {t('admin.settings.commerce.stripe.card.description', 'Cuando esté activo, el checkout mostrara un formulario seguro de tarjeta solo si el cliente elige Stripe como metodo de pago.')}
                                             </p>
                                             <div className="mt-4 space-y-2 text-sm text-fuchsia-900/80">
                                                 <div className="flex items-center justify-between rounded-2xl bg-white/70 px-4 py-3">
-                                                    <span>Publishable Key</span>
-                                                    <strong>{stripeMethod.publishable_key ? 'Configurada' : 'Pendiente'}</strong>
+                                                    <span>{t('admin.settings.commerce.stripe.publishable_key', 'Publishable Key')}</span>
+                                                    <strong>{stripeMethod.publishable_key ? t('admin.settings.commerce.values.configured_female', 'Configurada') : t('admin.settings.commerce.values.pending', 'Pendiente')}</strong>
                                                 </div>
                                                 <div className="flex items-center justify-between rounded-2xl bg-white/70 px-4 py-3">
-                                                    <span>Secret Key</span>
-                                                    <strong>{stripeMethod.secret_key ? 'Configurada' : 'Pendiente'}</strong>
+                                                    <span>{t('admin.settings.commerce.stripe.secret_key', 'Secret Key')}</span>
+                                                    <strong>{stripeMethod.secret_key ? t('admin.settings.commerce.values.configured_female', 'Configurada') : t('admin.settings.commerce.values.pending', 'Pendiente')}</strong>
                                                 </div>
                                             </div>
                                         </div>
@@ -1446,13 +1686,13 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                     </section>
 
                                     <SettingsSection
-                                        eyebrow="Escaparate"
-                                        title="Tienda publica"
-                                        description="Mantiene reunidos los textos principales de la experiencia publica para que el equipo los pueda actualizar sin friccion."
+                                        eyebrow={t('admin.settings.commerce.store.eyebrow', 'Escaparate')}
+                                        title={t('admin.settings.commerce.store.title', 'Tienda publica')}
+                                        description={t('admin.settings.commerce.store.description', 'Mantiene reunidos los textos principales de la experiencia publica para que el equipo los pueda actualizar sin friccion.')}
                                     >
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-slate-700">Título de inicio</label>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.home_title', 'Título de inicio')}</label>
                                 <input
                                     type="text"
                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -1461,7 +1701,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-700">Subtítulo</label>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.home_subtitle', 'Subtítulo')}</label>
                                 <input
                                     type="text"
                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -1470,7 +1710,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                 />
                             </div>
                             <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-slate-700">Texto de contacto</label>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.contact_text', 'Texto de contacto')}</label>
                                 <textarea
                                     className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
                                     rows={2}
@@ -1488,9 +1728,9 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                     <div className="sticky bottom-4 z-10">
                         <div className="flex flex-col gap-4 rounded-[28px] border border-slate-200 bg-white/95 px-5 py-4 shadow-lg shadow-slate-200/60 backdrop-blur sm:flex-row sm:items-center sm:justify-between">
                             <div>
-                                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Guardado</p>
+                                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">{t('admin.settings.footer.eyebrow', 'Guardado')}</p>
                                 <p className="mt-1 text-sm text-slate-600">
-                                    Estás editando <span className="font-semibold text-slate-900">{activeSettingsMeta.title}</span>. Guarda cuando termines este bloque.
+                                    {t('admin.settings.footer.message_prefix', 'Estás editando')} <span className="font-semibold text-slate-900">{activeSettingsMeta.title}</span>. {t('admin.settings.footer.message_suffix', 'Guarda cuando termines este bloque.')}
                                 </p>
                             </div>
                             <button
@@ -1498,7 +1738,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                 disabled={processing}
                                 className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 disabled:opacity-50"
                             >
-                                {processing ? 'Guardando...' : 'Guardar cambios'}
+                                {processing ? t('admin.settings.footer.saving', 'Guardando...') : t('admin.settings.footer.save', 'Guardar cambios')}
                             </button>
                         </div>
                     </div>

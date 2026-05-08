@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\{Invoice, InvoiceItem, Product, Customer, MovementType, InvoiceStatus, Warehouse, InvoiceAdjustment, CreditAccount, CreditMovement, Layaway};
-use App\Services\{CurrencyService, InventoryService};
+use App\Services\{AdminNotificationService, CurrencyService, InventoryService};
 use App\Support\{Settings, Audit};
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -59,7 +59,7 @@ class InvoiceController extends Controller
         ]);
     }
 
-    public function store(Request $request, CurrencyService $currency)
+    public function store(Request $request, CurrencyService $currency, AdminNotificationService $notificationService)
     {
         $data = $request->validate([
             'customer_id' => ['nullable','exists:customers,id'],
@@ -248,10 +248,31 @@ class InvoiceController extends Controller
             'customer_id' => $invoice->customer_id,
         ]);
 
+        $notificationMessage = 'Monto: $'.number_format((float) $invoice->total_usd, 2);
+        if ($invoice->customer_id && $invoice->customer) {
+            $notificationMessage .= ' / Cliente: '.$invoice->customer->name;
+        }
+
+        $notificationService->notifyStaff(
+            'invoice_created',
+            'Nueva factura '.$invoice->number,
+            $notificationMessage,
+            [
+                'severity' => 'info',
+                'action_url' => route('admin.invoices.index'),
+                'action_label' => 'Ver facturas',
+                'dedupe_key' => 'invoice_created:'.$invoice->id,
+                'data' => [
+                    'invoice_id' => $invoice->id,
+                    'status' => $invoice->status,
+                ],
+            ]
+        );
+
         return redirect()->route('admin.invoices.index');
     }
 
-    public function update(Request $request, Invoice $invoice, CurrencyService $currency, InventoryService $inventory)
+    public function update(Request $request, Invoice $invoice, CurrencyService $currency, InventoryService $inventory, AdminNotificationService $notificationService)
     {
         if ($invoice->status !== 'pending') {
             abort(403, 'Solo se pueden editar facturas en estado pendiente.');
@@ -413,6 +434,25 @@ class InvoiceController extends Controller
             'old_status' => $oldStatus,
             'new_status' => $invoice->status,
         ]);
+
+        if ($oldStatus !== $invoice->status) {
+            $notificationService->notifyStaff(
+                'invoice_status_changed',
+                'Factura '.$invoice->number.' actualizada',
+                'Estado: '.$oldStatus.' -> '.$invoice->status,
+                [
+                    'severity' => $invoice->status === 'cancelled' ? 'warning' : 'success',
+                    'action_url' => route('admin.invoices.index'),
+                    'action_label' => 'Ver facturas',
+                    'dedupe_key' => 'invoice_status_changed:'.$invoice->id.':'.$invoice->status,
+                    'data' => [
+                        'invoice_id' => $invoice->id,
+                        'old_status' => $oldStatus,
+                        'new_status' => $invoice->status,
+                    ],
+                ]
+            );
+        }
 
         return redirect()->route('admin.invoices.index');
     }

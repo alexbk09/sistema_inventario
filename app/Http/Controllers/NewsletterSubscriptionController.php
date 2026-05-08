@@ -17,7 +17,7 @@ class NewsletterSubscriptionController extends Controller
 
         if (empty($validated['email']) && empty($validated['whatsapp'])) {
             return back()->withErrors([
-                'newsletter' => 'Debes indicar al menos un email o número de WhatsApp.',
+                'newsletter' => __('app.home.newsletter_validation_contact'),
             ])->withInput();
         }
 

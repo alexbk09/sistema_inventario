@@ -27,7 +27,7 @@ class CustomerProfileController extends Controller
 
         $customer->update($validated);
 
-        return back()->with('success', 'Perfil actualizado correctamente.');
+        return back()->with('success', __('app.profile.customer.notifications.updated'));
     }
 
     public function identificationTypes()

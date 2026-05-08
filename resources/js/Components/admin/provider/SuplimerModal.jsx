@@ -1,6 +1,7 @@
 import React from "react"
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
+import { useI18n } from '@/Hooks/useI18n';
 
 export default function SupplierModal({
   isOpen,
@@ -8,6 +9,7 @@ export default function SupplierModal({
   onSave,
   editingSupplier,
 }) {
+  const { t } = useI18n();
   const [formData, setFormData] = useState({
     name: '',
     contact_name: '',
@@ -47,7 +49,7 @@ export default function SupplierModal({
   const handleSubmit = (e) => {
     e.preventDefault()
     if (!formData.name.trim()) {
-      toast.error('Por favor completa el nombre de la empresa', { position: 'top-center' })
+      toast.error(t('admin.providers.modal.validation.company_required', 'Por favor completa el nombre de la empresa'), { position: 'top-center' })
       return
     }
     onSave({
@@ -62,13 +64,13 @@ export default function SupplierModal({
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative w-full max-w-lg mx-4 bg-card border border-border rounded-xl shadow-lg">
         <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-foreground">{editingSupplier ? 'Editar Proveedor' : 'Nuevo Proveedor'}</h2>
+          <h2 className="text-lg font-semibold text-foreground">{editingSupplier ? t('admin.providers.modal.edit_title', 'Editar proveedor') : t('admin.providers.modal.create_title', 'Nuevo proveedor')}</h2>
           <button onClick={onClose} className="px-2 py-1 text-muted-foreground hover:text-foreground">×</button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4  p-4">
         <div>
           <label className="block text-sm font-semibold text-foreground mb-2">
-            Nombre de la Empresa *
+            {t('admin.providers.modal.form.company_name', 'Nombre de la empresa')} *
           </label>
           <input
             type="text"
@@ -76,14 +78,14 @@ export default function SupplierModal({
             value={formData.name}
             onChange={handleChange}
             className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-primary transition"
-            placeholder="Ej: Iluminación Global S.A."
+            placeholder={t('admin.providers.modal.form.company_placeholder', 'Ej: Iluminación Global S.A.')}
             required
           />
         </div>
 
         <div>
           <label className="block text-sm font-semibold text-foreground mb-2">
-            Nombre del Encargado
+            {t('admin.providers.modal.form.contact_name', 'Nombre del encargado')}
           </label>
           <input
             type="text"
@@ -91,14 +93,14 @@ export default function SupplierModal({
             value={formData.contact_name}
             onChange={handleChange}
             className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-primary transition"
-            placeholder="Ej: Carlos Martínez"
+            placeholder={t('admin.providers.modal.form.contact_placeholder', 'Ej: Carlos Martínez')}
           />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-semibold text-foreground mb-2">
-              Teléfono
+              {t('admin.providers.modal.form.phone', 'Teléfono')}
             </label>
             <input
               type="tel"
@@ -112,7 +114,7 @@ export default function SupplierModal({
 
           <div>
             <label className="block text-sm font-semibold text-foreground mb-2">
-              Email
+              {t('admin.providers.modal.form.email', 'Email')}
             </label>
             <input
               type="email"
@@ -120,21 +122,21 @@ export default function SupplierModal({
               value={formData.email}
               onChange={handleChange}
               className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-primary transition"
-              placeholder="contacto@empresa.com"
+              placeholder={t('admin.providers.modal.form.email_placeholder', 'contacto@empresa.com')}
             />
           </div>
         </div>
 
         <div>
           <label className="block text-sm font-semibold text-foreground mb-2">
-            Dirección
+            {t('admin.providers.modal.form.address', 'Dirección')}
           </label>
           <textarea
             name="address"
             value={formData.address}
             onChange={handleChange}
             className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-primary transition resize-none"
-            placeholder="Dirección del proveedor..."
+            placeholder={t('admin.providers.modal.form.address_placeholder', 'Dirección del proveedor...')}
             rows={4}
           />
         </div>
@@ -145,13 +147,13 @@ export default function SupplierModal({
             onClick={onClose}
             className="flex-1 px-4 py-2 border border-border rounded-lg text-foreground hover:bg-muted transition"
           >
-            Cancelar
+            {t('admin.providers.modal.actions.cancel', 'Cancelar')}
           </button>
           <button
             type="submit"
             className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition font-medium"
           >
-            {editingSupplier ? 'Actualizar' : 'Crear'}
+            {editingSupplier ? t('admin.providers.modal.actions.update', 'Actualizar') : t('admin.providers.modal.actions.create', 'Crear')}
           </button>
         </div>
         </form>

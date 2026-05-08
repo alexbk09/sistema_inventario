@@ -1,6 +1,7 @@
 import { Filter, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useI18n } from '@/Hooks/useI18n'
+import { useLocaleFormat } from '@/Hooks/useLocaleFormat'
 
 
 const SORT_OPTIONS = [
@@ -17,6 +18,7 @@ export default function ProductFilters({
   categories = [],
 }) {
   const { t } = useI18n()
+  const { formatNumber } = useLocaleFormat()
   const [isOpen, setIsOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [selectedCategories, setSelectedCategories] = useState([])
@@ -163,7 +165,7 @@ export default function ProductFilters({
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">$0</span>
                 <span className="font-semibold text-primary">
-                  ${priceRange[1].toLocaleString('es-AR')}
+                  ${formatNumber(priceRange[1])}
                 </span>
               </div>
             </div>

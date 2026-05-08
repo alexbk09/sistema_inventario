@@ -1,27 +1,26 @@
 
-import { Link, useForm, usePage } from '@inertiajs/react';
+import { Link, usePage, router } from '@inertiajs/react';
 import { useState, useEffect } from 'react'
 import { ShoppingCart as ShoppingCartIcon, Menu, X } from 'lucide-react'
 import ShoppingCartModal from '@/Components/shop/ShoppingCart'
 import { useCart } from '@/Hooks/useCart'
 import { useDisplayCurrency } from '@/Hooks/useDisplayCurrency'
 import { useI18n } from '@/Hooks/useI18n'
+import LanguageSwitcher from '@/Components/i18n/LanguageSwitcher'
 
 export default function NavLayout() {
     const [isOpen, setIsOpen] = useState(false)
     const [isCartOpen, setIsCartOpen] = useState(false)
     const { cart } = useCart()
-    const { displayCurrency, setDisplayCurrency, baseCurrency, secondaryCurrency } = useDisplayCurrency()
+  const { displayCurrency, setDisplayCurrency, availableCurrencies } = useDisplayCurrency()
     const page = usePage()
-    const currentLocale = page.props?.locale || 'es'
-    const { post, processing, setData } = useForm({})
     const { t } = useI18n()
     const isAuthenticated = !!page.props?.auth?.user;
     const userRoles = page.props?.auth?.roles || [];
     const isCliente = userRoles.includes('cliente');
     const handleLogout = (e) => {
       e.preventDefault();
-      post(route('logout'));
+      router.post(route('logout'));
     };
     return (
 <>
@@ -32,7 +31,7 @@ export default function NavLayout() {
           <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
             <span className="text-primary-foreground font-bold">⚡</span>
           </div>
-          <span className="font-bold text-lg text-primary">Inventario</span>
+          <span className="font-bold text-lg text-primary">{t('nav.brand', 'Inventario')}</span>
         </Link>
 
         {/* Menu desktop */}
@@ -48,35 +47,17 @@ export default function NavLayout() {
               href={isCliente ? '/mi-panel' : '/dashboard'}
               className="text-foreground hover:text-primary transition"
             >
-              {t('nav.dashboard', isCliente ? (currentLocale === 'en' ? 'My Panel' : 'Mi Panel') : 'Dashboard')}
+              {t(isCliente ? 'nav.dashboard_client' : 'nav.dashboard_admin', isCliente ? 'Mi Panel' : 'Dashboard')}
             </Link>
           )}
         </div>
 
         {/* Selector de idioma + moneda + Carrito y Auth */}
         <div className="flex items-center gap-4">
-          <div className="hidden md:flex items-center gap-1 text-xs border border-border rounded-full px-2 py-1 bg-muted/60">
-            {['es', 'en'].map((loc) => (
-              <button
-                key={loc}
-                type="button"
-                onClick={() => {
-                  if (loc === currentLocale || processing) return
-                  post(route('locale.switch', loc))
-                }}
-                className={`px-1.5 py-0.5 rounded-full transition text-[11px] ${
-                  currentLocale === loc
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-foreground/70 hover:bg-background'
-                }`}
-              >
-                {loc.toUpperCase()}
-              </button>
-            ))}
-          </div>
-          {secondaryCurrency && (
+          <LanguageSwitcher className="hidden md:block" />
+          {availableCurrencies.length > 1 && (
             <div className="hidden md:flex items-center gap-1 text-xs border border-border rounded-full px-2 py-1 bg-muted/60">
-              {[baseCurrency, secondaryCurrency].map((cur) => (
+              {availableCurrencies.map((cur) => (
                 <button
                   key={cur}
                   type="button"
@@ -121,7 +102,7 @@ export default function NavLayout() {
               onClick={handleLogout}
               className="px-4 py-2 bg-destructive text-white rounded-lg hover:bg-destructive/90 transition"
             >
-              {t('nav.logout', currentLocale === 'en' ? 'Logout' : 'Cerrar sesión')}
+              {t('nav.logout', 'Cerrar sesión')}
             </button>
           )}
 
@@ -154,9 +135,10 @@ export default function NavLayout() {
                 href={isCliente ? '/mi-panel' : '/dashboard'}
                 className="text-foreground hover:text-primary transition"
               >
-                {t('nav.dashboard', isCliente ? (currentLocale === 'en' ? 'My Panel' : 'Mi Panel') : 'Dashboard')}
+                {t(isCliente ? 'nav.dashboard_client' : 'nav.dashboard_admin', isCliente ? 'Mi Panel' : 'Dashboard')}
               </Link>
             )}
+            <LanguageSwitcher mobile />
             {!isAuthenticated && (
               <div className="flex gap-2 pt-2">
                 <Link

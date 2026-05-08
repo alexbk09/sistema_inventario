@@ -1,8 +1,20 @@
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.jsx';
+import AdminPagination from '@/Components/admin/AdminPagination.jsx';
+import AdminIndexShell from '@/Components/admin/AdminIndexShell.jsx';
+import { useI18n } from '@/Hooks/useI18n';
+import { useLocaleFormat } from '@/Hooks/useLocaleFormat';
+import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates';
 
 export default function SalesReportIndex({ invoices, filters = {}, metrics, warehouses = [], customers = [], paymentMethods = [], sellers = [] }) {
+  const { t } = useI18n();
+  const { formatDateTime, formatNumber } = useLocaleFormat();
+  const { displayCurrency, comparisonCurrency, formatPriceFromUsd, hasRateForCurrency } = useConfiguredCurrencyRates();
+  const secondaryCurrency = comparisonCurrency && comparisonCurrency !== displayCurrency && hasRateForCurrency(comparisonCurrency)
+    ? comparisonCurrency
+    : null;
+  const formatActiveAmount = (value, currency = displayCurrency) => formatPriceFromUsd(Number(value || 0), currency);
   const [localFilters, setLocalFilters] = useState({
     date_from: filters.date_from || '',
     date_to: filters.date_to || '',
@@ -61,102 +73,60 @@ export default function SalesReportIndex({ invoices, filters = {}, metrics, ware
   };
 
   const typeLabels = {
-    invoice: 'Factura',
-    delivery_note: 'Nota de entrega',
-    proforma: 'Proforma',
+    invoice: t('admin.reports.sales.document_types.invoice', 'Factura'),
+    delivery_note: t('admin.reports.sales.document_types.delivery_note', 'Nota de entrega'),
+    proforma: t('admin.reports.sales.document_types.proforma', 'Proforma'),
   };
 
   const statusLabels = {
-    pending: 'Pendiente',
-    paid: 'Pagado',
-    shipped: 'Enviado',
-    delivered: 'Entregado',
-    cancelled: 'Cancelado',
+    pending: t('admin.reports.sales.statuses.pending', 'Pendiente'),
+    paid: t('admin.reports.sales.statuses.paid', 'Pagado'),
+    shipped: t('admin.reports.sales.statuses.shipped', 'Enviado'),
+    delivered: t('admin.reports.sales.statuses.delivered', 'Entregado'),
+    cancelled: t('admin.reports.sales.statuses.cancelled', 'Cancelado'),
   };
+
+  const activeFilters = Object.values(filters || {}).filter((value) => value !== null && value !== undefined && value !== '').length;
 
   return (
     <AuthenticatedLayout>
-      <Head title="Reporte de ventas" />
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground mb-1">Reporte de ventas</h1>
-            <p className="text-muted-foreground text-sm">Filtra por rango de fechas, sucursal, cliente, tipo de documento y estado. Exporta millones de filas vía CSV optimizado.</p>
-          </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={handleExport}
-              className="px-3 py-2 rounded border border-border text-xs font-medium hover:bg-muted"
-            >
-              CSV (masivo)
-            </button>
-            <button
-              type="button"
-              onClick={handleExportExcel}
-              className="px-3 py-2 rounded bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90"
-            >
-              Excel
-            </button>
-            <button
-              type="button"
-              onClick={handleExportPdf}
-              className="px-3 py-2 rounded bg-secondary text-secondary-foreground text-xs font-medium hover:bg-secondary/90"
-            >
-              PDF
-            </button>
-          </div>
-        </div>
-
-        {/* Navegaci\u00f3n entre vistas de ventas */}
-        <div className="flex gap-2 border-b border-border pb-2">
-          <button
-            type="button"
-            className="px-3 py-1.5 text-xs rounded bg-primary text-primary-foreground"
-          >
-            Reporte de facturas
-          </button>
-          <button
-            type="button"
-            onClick={() => router.get(route('admin.reports.sales.top_products'), {}, { replace: true })}
-            className="px-3 py-1.5 text-xs rounded border border-border text-muted-foreground hover:bg-muted"
-          >
-            Ranking de productos
-          </button>
-          <button
-            type="button"
-            onClick={() => router.get(route('admin.reports.sales.by_category'), {}, { replace: true })}
-            className="px-3 py-1.5 text-xs rounded border border-border text-muted-foreground hover:bg-muted"
-          >
-            Ventas por categor\u00eda
-          </button>
-        </div>
-
-        {/* Métricas rápidas */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="rounded-lg border border-border bg-white p-4">
-            <div className="text-xs uppercase text-muted-foreground mb-1">Facturas</div>
-            <div className="text-2xl font-semibold">{metrics.total_invoices}</div>
-          </div>
-          <div className="rounded-lg border border-border bg-white p-4">
-            <div className="text-xs uppercase text-muted-foreground mb-1">Total USD</div>
-            <div className="text-2xl font-semibold">{metrics.total_usd.toFixed(2)}</div>
-          </div>
-          <div className="rounded-lg border border-border bg-white p-4">
-            <div className="text-xs uppercase text-muted-foreground mb-1">Total BS</div>
-            <div className="text-2xl font-semibold">{metrics.total_bs.toFixed(2)}</div>
-          </div>
-          <div className="rounded-lg border border-border bg-white p-4">
-            <div className="text-xs uppercase text-muted-foreground mb-1">Ticket promedio (USD)</div>
-            <div className="text-2xl font-semibold">{metrics.avg_ticket_usd.toFixed(2)}</div>
-          </div>
-        </div>
-
-        {/* Filtros */}
-        <div className="rounded-lg border border-border bg-white p-4 space-y-3 text-sm">
+      <Head title={t('admin.reports.sales.page_title', 'Reporte de ventas')} />
+      <AdminIndexShell
+        title={t('admin.reports.sales.hero_title', 'Analiza ventas con un tablero más claro para consulta y exportación')}
+        description={t('admin.reports.sales.hero_description', 'La vista reúne métricas, navegación entre reportes, filtros comerciales y exportaciones sin obligar al usuario a recorrer una pantalla plana.')}
+        stats={[
+          { label: t('admin.reports.sales.stats.invoices', 'Facturas'), value: metrics.total_invoices },
+          { label: `${t('admin.reports.sales.stats.total_usd', 'Total')} ${displayCurrency}`, value: formatActiveAmount(metrics.total_usd || 0) },
+          { label: secondaryCurrency ? `${t('admin.reports.sales.stats.total_bs', 'Total')} ${secondaryCurrency}` : t('admin.reports.sales.stats.total_bs', 'Referencia'), value: secondaryCurrency ? formatActiveAmount(metrics.total_usd || 0, secondaryCurrency) : '—' },
+          { label: `${t('admin.reports.sales.stats.avg_ticket', 'Ticket')} ${displayCurrency}`, value: formatActiveAmount(metrics.avg_ticket_usd || 0) },
+        ]}
+        contextTitle={t('admin.reports.sales.context_title', 'Reporte de ventas')}
+        contextDescription={t('admin.reports.sales.context_description', 'Cruza fechas, sucursal, cliente, vendedor y método de pago con acceso inmediato a exportaciones del resultado actual.')}
+        contextItems={[
+          { label: t('admin.reports.sales.context_items.active_filters', 'Filtros activos'), value: activeFilters },
+          { label: t('admin.reports.sales.context_items.page', 'Página'), value: `${page}/${totalPages}` },
+          { label: t('admin.reports.sales.context_items.view', 'Vista'), value: t('admin.reports.sales.context_items.invoices_view', 'Facturas') },
+        ]}
+        primaryAction={
+          <button type="button" onClick={handleExportExcel} className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800">{t('admin.reports.sales.actions.excel', 'Excel')}</button>
+        }
+        secondaryActions={
+          <>
+            <button type="button" onClick={handleExport} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">{t('admin.reports.sales.actions.csv', 'CSV')}</button>
+            <button type="button" onClick={handleExportPdf} className="rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-200">{t('admin.reports.sales.actions.pdf', 'PDF')}</button>
+          </>
+        }
+        filters={
+          <div className="space-y-4 text-sm">
+            <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+              <button type="button" className="rounded-2xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white">{t('admin.reports.sales.tabs.invoices', 'Reporte de facturas')}</button>
+              <button type="button" onClick={() => router.get(route('admin.reports.sales.top_products'), {}, { replace: true })} className="rounded-2xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50">{t('admin.reports.sales.tabs.top_products', 'Ranking de productos')}</button>
+              <button type="button" onClick={() => router.get(route('admin.reports.sales.by_category'), {}, { replace: true })} className="rounded-2xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50">{t('admin.reports.sales.tabs.by_category', 'Ventas por categoría')}</button>
+            </div>
+            <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4 space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">Desde</label>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">{t('admin.reports.sales.filters.date_from', 'Desde')}</label>
               <input
                 type="date"
                 className="w-full border border-border rounded px-2 py-1 bg-background"
@@ -165,7 +135,7 @@ export default function SalesReportIndex({ invoices, filters = {}, metrics, ware
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">Hasta</label>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">{t('admin.reports.sales.filters.date_to', 'Hasta')}</label>
               <input
                 type="date"
                 className="w-full border border-border rounded px-2 py-1 bg-background"
@@ -174,13 +144,13 @@ export default function SalesReportIndex({ invoices, filters = {}, metrics, ware
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">Sucursal/Bodega</label>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">{t('admin.reports.sales.filters.warehouse', 'Sucursal/Bodega')}</label>
               <select
                 className="w-full border border-border rounded px-2 py-1 bg-background"
                 value={localFilters.warehouse_id}
                 onChange={(e) => setLocalFilters((f) => ({ ...f, warehouse_id: e.target.value }))}
               >
-                <option value="">Todas</option>
+                <option value="">{t('admin.reports.sales.filters.all_female', 'Todas')}</option>
                 {warehouses.map((w) => (
                   <option key={w.id} value={w.id}>
                     {w.name} {w.code ? `(${w.code})` : ''}
@@ -192,68 +162,68 @@ export default function SalesReportIndex({ invoices, filters = {}, metrics, ware
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">Cliente</label>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">{t('admin.reports.sales.filters.customer', 'Cliente')}</label>
               <select
                 className="w-full border border-border rounded px-2 py-1 bg-background"
                 value={localFilters.customer_id}
                 onChange={(e) => setLocalFilters((f) => ({ ...f, customer_id: e.target.value }))}
               >
-                <option value="">Todos</option>
+                <option value="">{t('admin.reports.sales.filters.all_male', 'Todos')}</option>
                 {customers.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
-              <p className="text-[11px] text-muted-foreground mt-1">Lista limitada a 200 clientes más usados.</p>
+              <p className="text-[11px] text-muted-foreground mt-1">{t('admin.reports.sales.filters.customer_help', 'Lista limitada a 200 clientes más usados.')}</p>
             </div>
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">Estado</label>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">{t('admin.reports.sales.filters.status', 'Estado')}</label>
               <select
                 className="w-full border border-border rounded px-2 py-1 bg-background"
                 value={localFilters.status}
                 onChange={(e) => setLocalFilters((f) => ({ ...f, status: e.target.value }))}
               >
-                <option value="">Todos</option>
-                <option value="pending">Pendiente</option>
-                <option value="paid">Pagado</option>
-                <option value="shipped">Enviado</option>
-                <option value="delivered">Entregado</option>
-                <option value="cancelled">Cancelado</option>
+                <option value="">{t('admin.reports.sales.filters.all_male', 'Todos')}</option>
+                <option value="pending">{statusLabels.pending}</option>
+                <option value="paid">{statusLabels.paid}</option>
+                <option value="shipped">{statusLabels.shipped}</option>
+                <option value="delivered">{statusLabels.delivered}</option>
+                <option value="cancelled">{statusLabels.cancelled}</option>
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">Tipo de documento</label>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">{t('admin.reports.sales.filters.document_type', 'Tipo de documento')}</label>
               <select
                 className="w-full border border-border rounded px-2 py-1 bg-background"
                 value={localFilters.document_type}
                 onChange={(e) => setLocalFilters((f) => ({ ...f, document_type: e.target.value }))}
               >
-                <option value="">Todos</option>
-                <option value="invoice">Factura</option>
-                <option value="delivery_note">Nota de entrega</option>
-                <option value="proforma">Proforma</option>
+                <option value="">{t('admin.reports.sales.filters.all_male', 'Todos')}</option>
+                <option value="invoice">{typeLabels.invoice}</option>
+                <option value="delivery_note">{typeLabels.delivery_note}</option>
+                <option value="proforma">{typeLabels.proforma}</option>
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">Método de pago</label>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">{t('admin.reports.sales.filters.payment_method', 'Método de pago')}</label>
               <select
                 className="w-full border border-border rounded px-2 py-1 bg-background"
                 value={localFilters.payment_method}
                 onChange={(e) => setLocalFilters((f) => ({ ...f, payment_method: e.target.value }))}
               >
-                <option value="">Todos</option>
+                <option value="">{t('admin.reports.sales.filters.all_male', 'Todos')}</option>
                 {paymentMethods.map((m) => (
                   <option key={m} value={m}>{m}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">Vendedor</label>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">{t('admin.reports.sales.filters.seller', 'Vendedor')}</label>
               <select
                 className="w-full border border-border rounded px-2 py-1 bg-background"
                 value={localFilters.seller_id}
                 onChange={(e) => setLocalFilters((f) => ({ ...f, seller_id: e.target.value }))}
               >
-                <option value="">Todos</option>
+                <option value="">{t('admin.reports.sales.filters.all_male', 'Todos')}</option>
                 {sellers.map((u) => (
                   <option key={u.id} value={u.id}>{u.name}</option>
                 ))}
@@ -264,7 +234,7 @@ export default function SalesReportIndex({ invoices, filters = {}, metrics, ware
           <div className="flex justify-end gap-2 pt-1">
             <button
               type="button"
-              className="px-3 py-1.5 text-xs rounded border border-border text-muted-foreground hover:bg-muted"
+              className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-100"
               onClick={() => {
                 setLocalFilters({
                   date_from: '',
@@ -279,50 +249,53 @@ export default function SalesReportIndex({ invoices, filters = {}, metrics, ware
                 router.get(route('admin.reports.sales.index'), {}, { replace: true });
               }}
             >
-              Limpiar filtros
+              {t('admin.reports.sales.actions.clear_filters', 'Limpiar filtros')}
             </button>
             <button
               type="button"
-              className="px-3 py-1.5 text-xs rounded bg-primary text-primary-foreground hover:bg-primary/90"
+              className="rounded-2xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-800"
               onClick={submitFilters}
             >
-              Aplicar filtros
+              {t('admin.reports.sales.actions.apply_filters', 'Aplicar filtros')}
             </button>
           </div>
         </div>
+          </div>
+        }
+      >
+        <div className="space-y-4 p-6">
 
-        {/* Tabla */}
         <div className="overflow-x-auto rounded-lg border border-border bg-white">
           <table className="w-full text-sm">
             <thead className="bg-muted border-b border-border">
               <tr>
-                <th className="px-3 py-2 text-left font-semibold">Fecha</th>
-                <th className="px-3 py-2 text-left font-semibold">Número</th>
-                <th className="px-3 py-2 text-left font-semibold">Tipo</th>
-                <th className="px-3 py-2 text-left font-semibold">Cliente</th>
-                <th className="px-3 py-2 text-left font-semibold">Sucursal</th>
-                <th className="px-3 py-2 text-left font-semibold">Estado</th>
-                <th className="px-3 py-2 text-right font-semibold">USD</th>
-                <th className="px-3 py-2 text-right font-semibold">BS</th>
+                <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.sales.table.date', 'Fecha')}</th>
+                <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.sales.table.number', 'Número')}</th>
+                <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.sales.table.type', 'Tipo')}</th>
+                <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.sales.table.customer', 'Cliente')}</th>
+                <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.sales.table.branch', 'Sucursal')}</th>
+                <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.sales.table.status', 'Estado')}</th>
+                <th className="px-3 py-2 text-right font-semibold">{displayCurrency}</th>
+                <th className="px-3 py-2 text-right font-semibold">{secondaryCurrency || t('admin.reports.sales.table.reference', 'Ref.')}</th>
               </tr>
             </thead>
             <tbody>
               {invoices.data.map((inv) => (
                 <tr key={inv.id} className="border-b border-border hover:bg-muted/40">
-                  <td className="px-3 py-2 text-xs">{new Date(inv.created_at).toLocaleString('es-ES')}</td>
+                  <td className="px-3 py-2 text-xs">{formatDateTime(inv.created_at)}</td>
                   <td className="px-3 py-2 text-xs">{inv.number}</td>
                   <td className="px-3 py-2 text-xs">{typeLabels[inv.document_type] ?? inv.document_type}</td>
-                  <td className="px-3 py-2 text-xs">{inv.customer?.name ?? 'N/A'}</td>
+                  <td className="px-3 py-2 text-xs">{inv.customer?.name ?? t('admin.reports.sales.table.na', 'N/A')}</td>
                   <td className="px-3 py-2 text-xs">{inv.warehouse?.name ?? inv.warehouse?.code ?? '-'}</td>
                   <td className="px-3 py-2 text-xs">{statusLabels[inv.status] ?? inv.status}</td>
-                  <td className="px-3 py-2 text-xs text-right">{Number(inv.total_usd).toFixed(2)}</td>
-                  <td className="px-3 py-2 text-xs text-right">{Number(inv.total_bs).toFixed(2)}</td>
+                  <td className="px-3 py-2 text-xs text-right">{formatActiveAmount(inv.total_usd)}</td>
+                  <td className="px-3 py-2 text-xs text-right">{secondaryCurrency ? formatActiveAmount(inv.total_usd, secondaryCurrency) : '—'}</td>
                 </tr>
               ))}
               {invoices.data.length === 0 && (
                 <tr>
                   <td colSpan={8} className="px-3 py-6 text-center text-sm text-muted-foreground">
-                    No hay facturas para los filtros seleccionados.
+                    {t('admin.reports.sales.empty', 'No hay facturas para los filtros seleccionados.')}
                   </td>
                 </tr>
               )}
@@ -330,31 +303,9 @@ export default function SalesReportIndex({ invoices, filters = {}, metrics, ware
           </table>
         </div>
 
-        {/* Paginación */}
-        <div className="flex items-center justify-between mt-2 text-sm text-muted-foreground">
-          <div>
-            Página {page} de {totalPages}
-          </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => handlePageChange(page - 1)}
-              disabled={page <= 1}
-              className="px-3 py-1 border rounded disabled:opacity-50"
-            >
-              Anterior
-            </button>
-            <button
-              type="button"
-              onClick={() => handlePageChange(page + 1)}
-              disabled={page >= totalPages}
-              className="px-3 py-1 border rounded disabled:opacity-50"
-            >
-              Siguiente
-            </button>
-          </div>
+        <AdminPagination page={page} totalPages={totalPages} onPageChange={handlePageChange} />
         </div>
-      </div>
+      </AdminIndexShell>
     </AuthenticatedLayout>
   );
 }

@@ -11,7 +11,7 @@ class UserController extends Controller
     public function index(Request $request)
     {
         if (!$request->user() || !$request->user()->can('view users')) {
-            return redirect()->route('dashboard')->with('error', 'No tienes permiso para acceder al módulo de usuarios.');
+            return redirect()->route('dashboard')->with('error', __('app.admin.users.permissions.module_denied'));
         }
 
         $search = trim((string) $request->input('search', ''));
@@ -39,7 +39,7 @@ class UserController extends Controller
     public function show(Request $request, User $user)
     {
         if (!$request->user() || !$request->user()->can('view users')) {
-            return redirect()->route('dashboard')->with('error', 'No tienes permiso para acceder al módulo de usuarios.');
+            return redirect()->route('dashboard')->with('error', __('app.admin.users.permissions.module_denied'));
         }
 
         $user->load('roles');

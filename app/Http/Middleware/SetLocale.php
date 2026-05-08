@@ -10,8 +10,9 @@ class SetLocale
 {
     public function handle(Request $request, Closure $next): Response
     {
+        $supportedLocales = array_keys(config('locales.supported', []));
         $locale = session('locale', config('app.locale'));
-        if (!in_array($locale, ['es', 'en'], true)) {
+        if (!in_array($locale, $supportedLocales, true)) {
             $locale = config('app.locale');
         }
 

@@ -13,14 +13,18 @@ class InvoiceCreated extends Mailable implements ShouldQueue
     use Queueable, SerializesModels;
 
     public Invoice $invoice;
+    public string $mailLocale;
 
     public function __construct(Invoice $invoice)
     {
         $this->invoice = $invoice->loadMissing(['customer', 'contact', 'items.product']);
+        $this->mailLocale = app()->getLocale();
     }
 
     public function build(): self
     {
+        app()->setLocale($this->mailLocale);
+
         $invoice = $this->invoice;
         $contact = $invoice->contact;
 
@@ -29,13 +33,14 @@ class InvoiceCreated extends Mailable implements ShouldQueue
         ]);
 
         $mail = \App\Support\Settings::get('mail', [
-            'invoice_subject_prefix' => 'Factura',
+            'invoice_subject_prefix' => __('app.email_invoice.subject_prefix'),
         ]);
 
-        $prefix = (string) ($mail['invoice_subject_prefix'] ?? 'Factura');
+        $prefix = (string) ($mail['invoice_subject_prefix'] ?? __('app.email_invoice.subject_prefix'));
         $company = (string) ($general['company_name'] ?? config('app.name', 'Sistema Inventario'));
 
         return $this
+            ->locale($this->mailLocale)
             ->subject(trim($prefix.' '.$invoice->number.' · '.$company))
             ->view('emails.invoice_created')
             ->with([

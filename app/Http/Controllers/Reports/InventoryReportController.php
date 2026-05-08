@@ -94,7 +94,7 @@ class InventoryReportController extends Controller
             })
             ->orderBy('name');
 
-        $fileName = 'reporte_inventario_'.now()->format('Ymd_His').'.csv';
+        $fileName = __('app.report_exports.inventory.file_prefix').'_'.now()->format('Ymd_His').'.csv';
 
         $headers = [
             'Content-Type' => 'text/csv; charset=UTF-8',
@@ -108,14 +108,14 @@ class InventoryReportController extends Controller
             fwrite($handle, "\xEF\xBB\xBF");
 
             fputcsv($handle, [
-                'Producto',
-                'SKU',
-                'Categorías',
-                'Stock',
-                'Costo prom. USD',
-                'Precio USD',
-                'Valor costo (USD)',
-                'Valor venta (USD)',
+                __('app.report_exports.inventory.columns.product'),
+                __('app.report_exports.inventory.columns.sku'),
+                __('app.report_exports.inventory.columns.categories'),
+                __('app.report_exports.inventory.columns.stock'),
+                __('app.report_exports.inventory.columns.avg_cost_usd'),
+                __('app.report_exports.inventory.columns.price_usd'),
+                __('app.report_exports.inventory.columns.value_cost_usd'),
+                __('app.report_exports.inventory.columns.value_price_usd'),
             ]);
 
             $query->chunk(2000, function ($chunk) use ($handle) {
@@ -154,7 +154,7 @@ class InventoryReportController extends Controller
             'low_stock_only' => $request->boolean('low_stock_only'),
         ];
 
-        $fileName = 'reporte_inventario_'.now()->format('Ymd_His').'.xlsx';
+        $fileName = __('app.report_exports.inventory.file_prefix').'_'.now()->format('Ymd_His').'.xlsx';
 
         return Excel::download(new InventoryReportExport($filters), $fileName);
     }
@@ -205,7 +205,7 @@ class InventoryReportController extends Controller
             'maxRows' => $maxRows,
         ])->setPaper('a4', 'landscape');
 
-        $fileName = 'reporte_inventario_'.now()->format('Ymd_His').'.pdf';
+        $fileName = __('app.report_exports.inventory.file_prefix').'_'.now()->format('Ymd_His').'.pdf';
 
         return $pdf->download($fileName);
     }

@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\CurrencyService;
+use App\Support\CurrencySettings;
 use App\Support\Settings;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -45,11 +47,7 @@ class SettingsController extends Controller
             'enable_igtf' => false,
         ]);
 
-        $currency = Settings::get('currency', [
-            'base_currency' => 'USD',
-            'secondary_currency' => 'VES',
-            'rate_source' => 'dolarapi',
-        ]);
+        $currency = CurrencySettings::normalize(Settings::get('currency', CurrencySettings::defaults()));
 
         $store = Settings::get('store', [
             'home_title' => 'Tienda',
@@ -169,7 +167,26 @@ class SettingsController extends Controller
 
             'currency.base_currency' => ['required', 'string', 'max:10'],
             'currency.secondary_currency' => ['nullable', 'string', 'max:10'],
+            'currency.default_display_currency' => ['nullable', 'string', 'max:10'],
             'currency.rate_source' => ['required', 'string', 'max:50'],
+            'currency.rate_provider' => ['nullable', 'string', 'max:50'],
+            'currency.auto_refresh_enabled' => ['nullable', 'boolean'],
+            'currency.auto_refresh_interval_minutes' => ['nullable', 'integer', 'min:5', 'max:1440'],
+            'currency.supported_currencies' => ['nullable', 'array'],
+            'currency.supported_currencies.*.code' => ['required', 'string', 'max:10'],
+            'currency.supported_currencies.*.name' => ['required', 'string', 'max:100'],
+            'currency.supported_currencies.*.symbol' => ['required', 'string', 'max:20'],
+            'currency.supported_currencies.*.enabled' => ['nullable', 'boolean'],
+            'currency.supported_currencies.*.visible_in_store' => ['nullable', 'boolean'],
+            'currency.supported_currencies.*.visible_in_admin' => ['nullable', 'boolean'],
+            'currency.supported_currencies.*.allow_checkout' => ['nullable', 'boolean'],
+            'currency.supported_currencies.*.rate_mode' => ['nullable', 'in:auto,manual'],
+            'currency.supported_currencies.*.rate_provider' => ['nullable', 'string', 'max:50'],
+            'currency.supported_currencies.*.manual_rate' => ['nullable', 'numeric', 'min:0'],
+            'currency.supported_currencies.*.last_rate' => ['nullable', 'numeric', 'min:0'],
+            'currency.supported_currencies.*.last_synced_at' => ['nullable', 'string', 'max:100'],
+            'currency.supported_currencies.*.markup_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'currency.supported_currencies.*.rounding_mode' => ['nullable', 'string', 'max:50'],
 
             'store.home_title' => ['required', 'string', 'max:255'],
             'store.home_subtitle' => ['nullable', 'string', 'max:255'],
@@ -238,7 +255,7 @@ class SettingsController extends Controller
         \App\Support\Settings::set('location', $validated['location']);
         \App\Support\Settings::set('branding', $validated['branding']);
         \App\Support\Settings::set('billing', $validated['billing']);
-        \App\Support\Settings::set('currency', $validated['currency']);
+        \App\Support\Settings::set('currency', CurrencySettings::normalize($validated['currency'] ?? []));
         \App\Support\Settings::set('store', $validated['store']);
         \App\Support\Settings::set('inventory', $validated['inventory']);
         \App\Support\Settings::set('warehouses', $validated['warehouses']);
@@ -247,6 +264,14 @@ class SettingsController extends Controller
         \App\Support\Settings::set('mail', $validated['mail']);
         \App\Support\Settings::set('payments', $validated['payments']);
 
-        return back()->with('success', 'Configuración actualizada correctamente.');
+        return back()->with('success', __('app.admin.settings.notifications.updated'));
+    }
+
+    public function syncCurrencyRates(CurrencyService $currencyService): RedirectResponse
+    {
+        $synced = $currencyService->syncConfiguredRates();
+        Settings::set('currency', $synced);
+
+        return back()->with('success', __('app.admin.settings.notifications.currency_synced'));
     }
 }

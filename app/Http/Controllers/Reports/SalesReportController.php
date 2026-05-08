@@ -258,7 +258,7 @@ class SalesReportController extends Controller
             })
             ->orderByDesc('created_at');
 
-        $fileName = 'reporte_ventas_'.now()->format('Ymd_His').'.csv';
+        $fileName = __('app.report_exports.sales.file_prefix').'_'.now()->format('Ymd_His').'.csv';
 
         $headers = [
             'Content-Type' => 'text/csv; charset=UTF-8',
@@ -267,40 +267,41 @@ class SalesReportController extends Controller
         ];
 
         $callback = function () use ($query) {
+            $locale = app()->getLocale();
             $handle = fopen('php://output', 'w');
 
             // BOM para Excel/UTF-8
             fwrite($handle, "\xEF\xBB\xBF");
 
             fputcsv($handle, [
-                'Fecha',
-                'Número',
-                'Tipo',
-                'Cliente',
-                'Sucursal/Bodega',
-                'Estado',
-                'Total USD',
-                'Total BS',
+                __('app.report_exports.sales.columns.date'),
+                __('app.report_exports.sales.columns.number'),
+                __('app.report_exports.sales.columns.type'),
+                __('app.report_exports.sales.columns.customer'),
+                __('app.report_exports.sales.columns.branch_warehouse'),
+                __('app.report_exports.sales.columns.status'),
+                __('app.report_exports.sales.columns.total_usd'),
+                __('app.report_exports.sales.columns.total_bs'),
             ]);
 
             $typeLabels = [
-                'invoice' => 'Factura',
-                'delivery_note' => 'Nota de entrega',
-                'proforma' => 'Proforma',
+                'invoice' => __('app.report_exports.sales.document_types.invoice'),
+                'delivery_note' => __('app.report_exports.sales.document_types.delivery_note'),
+                'proforma' => __('app.report_exports.sales.document_types.proforma'),
             ];
 
             $statusLabels = [
-                'pending' => 'Pendiente',
-                'paid' => 'Pagado',
-                'shipped' => 'Enviado',
-                'delivered' => 'Entregado',
-                'cancelled' => 'Cancelado',
+                'pending' => __('app.report_exports.sales.statuses.pending'),
+                'paid' => __('app.report_exports.sales.statuses.paid'),
+                'shipped' => __('app.report_exports.sales.statuses.shipped'),
+                'delivered' => __('app.report_exports.sales.statuses.delivered'),
+                'cancelled' => __('app.report_exports.sales.statuses.cancelled'),
             ];
 
-            $query->chunk(2000, function ($chunk) use ($handle, $typeLabels, $statusLabels) {
+            $query->chunk(2000, function ($chunk) use ($handle, $typeLabels, $statusLabels, $locale) {
                 foreach ($chunk as $invoice) {
                     fputcsv($handle, [
-                        optional($invoice->created_at)->format('Y-m-d H:i:s'),
+                        $invoice->created_at?->copy()->locale($locale)->isoFormat('L LT'),
                         $invoice->number,
                         $typeLabels[$invoice->document_type] ?? $invoice->document_type,
                         optional($invoice->customer)->name,
@@ -336,7 +337,7 @@ class SalesReportController extends Controller
             }
         }
 
-        $fileName = 'reporte_ventas_'.now()->format('Ymd_His').'.xlsx';
+        $fileName = __('app.report_exports.sales.file_prefix').'_'.now()->format('Ymd_His').'.xlsx';
 
         return Excel::download(new SalesReportExport($filters), $fileName);
     }
@@ -404,7 +405,7 @@ class SalesReportController extends Controller
             'maxRows' => $maxRows,
         ])->setPaper('a4', 'landscape');
 
-        $fileName = 'reporte_ventas_'.now()->format('Ymd_His').'.pdf';
+        $fileName = __('app.report_exports.sales.file_prefix').'_'.now()->format('Ymd_His').'.pdf';
 
         return $pdf->download($fileName);
     }

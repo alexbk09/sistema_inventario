@@ -19,6 +19,7 @@ use App\Http\Controllers\NewsletterSubscriptionController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\QrController;
 use App\Http\Controllers\AuditLogController;
+use App\Http\Controllers\AdminNotificationController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Reports\SalesReportController;
 use App\Http\Controllers\Reports\InventoryReportController;
@@ -40,6 +41,10 @@ Route::middleware(['auth', 'verified', 'role:cliente', 'permission:view customer
 
 Route::middleware(['auth', 'verified', 'role:admin|supervisor|cashier|warehouse'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::post('/admin/notifications/read-all', [AdminNotificationController::class, 'markAllRead'])->name('admin.notifications.read_all');
+    Route::post('/admin/notifications/{notification}/read', [AdminNotificationController::class, 'markRead'])->name('admin.notifications.read');
+    Route::delete('/admin/notifications/{notification}', [AdminNotificationController::class, 'destroy'])->name('admin.notifications.destroy');
+
     Route::get('/admin/qr', function () {
         return Inertia::render('Admin/QRScanner');
     })->name('admin.qr');
@@ -53,6 +58,9 @@ Route::middleware(['auth', 'verified', 'role:admin|supervisor|cashier|warehouse'
     Route::put('/admin/settings', [SettingsController::class, 'update'])
         ->middleware('permission:manage settings')
         ->name('admin.settings.update');
+    Route::post('/admin/settings/currency/sync', [SettingsController::class, 'syncCurrencyRates'])
+        ->middleware('permission:manage settings')
+        ->name('admin.settings.currency.sync');
 
     // Productos (solo para admin, supervisor, cashier, warehouse)
     // Los clientes no pueden acceder a estas rutas

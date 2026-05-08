@@ -7,8 +7,10 @@ import SupplierModal from '@/Components/admin/provider/SuplimerModal.jsx';
 import ConfirmDialog from '@/Components/common/ConfirmDialog.jsx';
 import AdminIndexShell from '@/Components/admin/AdminIndexShell.jsx';
 import toast from 'react-hot-toast';
+import { useI18n } from '@/Hooks/useI18n';
 
 export default function Index({ providers, filters }) {
+  const { t } = useI18n();
   const { data } = providers;
   const page = providers.current_page ?? providers?.meta?.current_page ?? 1;
   const totalPages = providers.last_page ?? providers?.meta?.last_page ?? 1;
@@ -58,16 +60,16 @@ export default function Index({ providers, filters }) {
     if (!confirmItem) return;
     setConfirmBusy(true);
     const loadingId = `loading-delete-${confirmItem.id}`;
-    toast.loading('Eliminando proveedor...', { id: loadingId, position: 'top-center' });
+    toast.loading(t('admin.providers.notifications.deleting', 'Eliminando proveedor...'), { id: loadingId, position: 'top-center' });
     router.delete(route('admin.providers.destroy', confirmItem.id), {
       preserveScroll: true,
       onSuccess: () => {
-        toast.success('Proveedor eliminado correctamente', { id: loadingId, position: 'top-center' });
+        toast.success(t('admin.providers.notifications.deleted', 'Proveedor eliminado correctamente'), { id: loadingId, position: 'top-center' });
         setConfirmOpen(false);
         setConfirmItem(null);
       },
       onError: () => {
-        toast.error('No se pudo eliminar el proveedor', { id: loadingId, position: 'top-center' });
+        toast.error(t('admin.providers.notifications.delete_error', 'No se pudo eliminar el proveedor'), { id: loadingId, position: 'top-center' });
       },
       onFinish: () => {
         setConfirmBusy(false);
@@ -94,16 +96,16 @@ export default function Index({ providers, filters }) {
     };
     if (payload.id) {
       const loadingId = `update-supplier-${payload.id}`;
-      toast.loading('Actualizando proveedor...', { id: loadingId, position: 'top-center' });
+      toast.loading(t('admin.providers.notifications.updating', 'Actualizando proveedor...'), { id: loadingId, position: 'top-center' });
       router.put(route('admin.providers.update', payload.id), data, {
         preserveScroll: true,
         onSuccess: () => {
           setIsModalOpen(false);
           setEditingSupplier(null);
-          toast.success('Proveedor actualizado correctamente', { id: loadingId, position: 'top-center' });
+          toast.success(t('admin.providers.notifications.updated', 'Proveedor actualizado correctamente'), { id: loadingId, position: 'top-center' });
         },
         onError: () => {
-          toast.error('No se pudo actualizar el proveedor', { id: loadingId, position: 'top-center' });
+          toast.error(t('admin.providers.notifications.update_error', 'No se pudo actualizar el proveedor'), { id: loadingId, position: 'top-center' });
         },
         onFinish: () => {
           setTimeout(() => toast.dismiss(loadingId), 800);
@@ -111,16 +113,16 @@ export default function Index({ providers, filters }) {
       });
     } else {
       const loadingId = 'create-supplier';
-      toast.loading('Creando proveedor...', { id: loadingId, position: 'top-center' });
+      toast.loading(t('admin.providers.notifications.creating', 'Creando proveedor...'), { id: loadingId, position: 'top-center' });
       router.post(route('admin.providers.store'), data, {
         preserveScroll: true,
         onSuccess: () => {
           setIsModalOpen(false);
           setEditingSupplier(null);
-          toast.success('Proveedor creado correctamente', { id: loadingId, position: 'top-center' });
+          toast.success(t('admin.providers.notifications.created', 'Proveedor creado correctamente'), { id: loadingId, position: 'top-center' });
         },
         onError: () => {
-          toast.error('No se pudo crear el proveedor', { id: loadingId, position: 'top-center' });
+          toast.error(t('admin.providers.notifications.create_error', 'No se pudo crear el proveedor'), { id: loadingId, position: 'top-center' });
         },
         onFinish: () => {
           setTimeout(() => toast.dismiss(loadingId), 800);
@@ -132,17 +134,17 @@ export default function Index({ providers, filters }) {
   const columns = [
     {
       key: 'name',
-      label: 'Empresa',
+      label: t('admin.providers.index.table.company', 'Empresa'),
       width: '25%',
     },
     {
       key: 'contact_name',
-      label: 'Encargado',
+      label: t('admin.providers.index.table.contact', 'Encargado'),
       width: '20%',
     },
     {
       key: 'email',
-      label: 'Email',
+      label: t('admin.providers.index.table.email', 'Email'),
       width: '25%',
       render: (value) => (
         <a href={`mailto:${value}`} className="text-accent hover:underline">
@@ -152,17 +154,17 @@ export default function Index({ providers, filters }) {
     },
     {
       key: 'phone',
-      label: 'Teléfono',
+      label: t('admin.providers.index.table.phone', 'Teléfono'),
       width: '20%',
-      render: (value) => value || '-',
+      render: (value) => value || t('admin.providers.values.empty', '-'),
     },
     {
       key: 'address',
-      label: 'Dirección',
+      label: t('admin.providers.index.table.address', 'Dirección'),
       width: '10%',
       render: (value) => (
         <p className="truncate" title={value}>
-          {value || '-'}
+          {value || t('admin.providers.values.empty', '-')}
         </p>
       ),
     },
@@ -170,21 +172,21 @@ export default function Index({ providers, filters }) {
 
   return (
     <AuthenticatedLayout>
-      <Head title="Proveedores" />
+      <Head title={t('admin.providers.index.page_title', 'Proveedores')} />
       <AdminIndexShell
-        title="Ordena proveedores con mejor contexto operativo y menos fricción"
-        description="La vista reúne búsqueda, alta rápida, edición y limpieza del padrón de proveedores en un mismo flujo consistente con el resto del panel."
+        title={t('admin.providers.index.hero_title', 'Ordena proveedores con mejor contexto operativo y menos fricción')}
+        description={t('admin.providers.index.hero_description', 'La vista reúne búsqueda, alta rápida, edición y limpieza del padrón de proveedores en un mismo flujo consistente con el resto del panel.')}
         stats={[
-          { label: 'Proveedores visibles', value: data.length },
-          { label: 'Página', value: `${page}/${totalPages}` },
-          { label: 'Búsqueda', value: debounced ? 'Activa' : 'General' },
+          { label: t('admin.providers.index.stats.visible', 'Proveedores visibles'), value: data.length },
+          { label: t('admin.providers.index.stats.page', 'Página'), value: `${page}/${totalPages}` },
+          { label: t('admin.providers.index.stats.search', 'Búsqueda'), value: debounced ? t('admin.providers.values.active_female', 'Activa') : t('admin.providers.values.general', 'General') },
         ]}
-        contextTitle="Proveedores"
-        contextDescription="Gestiona contactos comerciales, datos de empresa y mantenimiento del catálogo de abastecimiento desde una sola pantalla."
+        contextTitle={t('admin.providers.index.context_title', 'Proveedores')}
+        contextDescription={t('admin.providers.index.context_description', 'Gestiona contactos comerciales, datos de empresa y mantenimiento del catálogo de abastecimiento desde una sola pantalla.')}
         contextItems={[
-          { label: 'Resultados visibles', value: data.length },
-          { label: 'Filtro', value: debounced || 'Sin filtro' },
-          { label: 'Modal', value: isModalOpen ? 'Abierto' : 'Disponible' },
+          { label: t('admin.providers.index.context_items.visible_results', 'Resultados visibles'), value: data.length },
+          { label: t('admin.providers.index.context_items.filter', 'Filtro'), value: debounced || t('admin.providers.values.no_filter', 'Sin filtro') },
+          { label: t('admin.providers.index.context_items.modal', 'Modal'), value: isModalOpen ? t('admin.providers.values.open', 'Abierto') : t('admin.providers.values.available', 'Disponible') },
         ]}
         primaryAction={
           <button
@@ -192,12 +194,12 @@ export default function Index({ providers, filters }) {
             onClick={handleAddNew}
             className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
           >
-            Nuevo proveedor
+            {t('admin.providers.index.actions.new', 'Nuevo proveedor')}
           </button>
         }
         filters={
           <AdminFilters
-            searchPlaceholder="Buscar por empresa, encargado o email..."
+            searchPlaceholder={t('admin.providers.index.filters.search_placeholder', 'Buscar por empresa, encargado o email...')}
             searchValue={search}
             onSearchChange={setSearch}
           />
@@ -225,10 +227,10 @@ export default function Index({ providers, filters }) {
 
       <ConfirmDialog
         isOpen={confirmOpen}
-        title="Confirmar eliminación"
-        message={confirmItem ? `¿Eliminar al proveedor "${confirmItem.name}"?` : ''}
-        confirmText="Eliminar"
-        cancelText="Cancelar"
+        title={t('admin.providers.confirm.title', 'Confirmar eliminación')}
+        message={confirmItem ? `${t('admin.providers.confirm.message_prefix', '¿Eliminar al proveedor')} "${confirmItem.name}"?` : ''}
+        confirmText={t('admin.providers.confirm.confirm', 'Eliminar')}
+        cancelText={t('admin.providers.confirm.cancel', 'Cancelar')}
         onConfirm={confirmDelete}
         onCancel={() => { if (!confirmBusy) { setConfirmOpen(false); setConfirmItem(null); } }}
         busy={confirmBusy}

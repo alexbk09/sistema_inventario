@@ -3,14 +3,17 @@ import Modal from '@/Components/Modal'
 import { router } from '@inertiajs/react'
 import { Download, Printer, MessageCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useI18n } from '@/Hooks/useI18n'
+import { useLocaleFormat } from '@/Hooks/useLocaleFormat'
+import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates'
 
-function formatGatewayDate(value) {
+function formatGatewayDate(value, formatter, fallback) {
   if (!value) return 'N/A'
 
   const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return 'N/A'
+  if (Number.isNaN(parsed.getTime())) return fallback
 
-  return parsed.toLocaleString('es-ES')
+  return formatter(parsed)
 }
 
 function prettyGatewayPayload(payload) {
@@ -23,20 +26,29 @@ function prettyGatewayPayload(payload) {
   }
 }
 
-const statusLabels = {
-  pending: { label: 'Pendiente', color: 'bg-yellow-50 text-yellow-700' },
-  paid: { label: 'Pagado', color: 'bg-green-50 text-green-700' },
-  shipped: { label: 'Enviado', color: 'bg-blue-50 text-blue-700' },
-  delivered: { label: 'Entregado', color: 'bg-teal-50 text-teal-700' },
-  cancelled: { label: 'Cancelado', color: 'bg-red-50 text-red-700' },
-}
-
 export default function InvoiceModal({
   isOpen,
   onClose,
   invoice,
 }) {
+  const { t } = useI18n()
+  const { formatDate, formatDateTime, formatNumber } = useLocaleFormat()
+  const { displayCurrency, comparisonCurrency, formatPriceFromUsd, hasRateForCurrency } = useConfiguredCurrencyRates()
+  const secondaryCurrency = comparisonCurrency && comparisonCurrency !== displayCurrency && hasRateForCurrency(comparisonCurrency)
+    ? comparisonCurrency
+    : null
+  const formatDisplayCurrency = (value, currency = displayCurrency) => formatPriceFromUsd(Number(value || 0), currency)
+
   if (!isOpen || !invoice) return null
+
+  const fallbackText = t('admin.invoices.modal.not_available', 'N/A')
+  const statusLabels = {
+    pending: { label: t('admin.invoices.statuses.pending', 'Pendiente'), color: 'bg-yellow-50 text-yellow-700' },
+    paid: { label: t('admin.invoices.statuses.paid', 'Pagado'), color: 'bg-green-50 text-green-700' },
+    shipped: { label: t('admin.invoices.statuses.shipped', 'Enviado'), color: 'bg-blue-50 text-blue-700' },
+    delivered: { label: t('admin.invoices.statuses.delivered', 'Entregado'), color: 'bg-teal-50 text-teal-700' },
+    cancelled: { label: t('admin.invoices.statuses.cancelled', 'Cancelado'), color: 'bg-red-50 text-red-700' },
+  }
 
   const isEditable = invoice.status === 'pending'
 
@@ -44,7 +56,7 @@ export default function InvoiceModal({
   const [items, setItems] = useState(() => (
     (invoice.items || []).map((item) => ({
       id: item.id,
-      name: item.product?.name ?? 'Producto',
+      name: item.product?.name ?? t('admin.invoices.modal.product_fallback', 'Producto'),
       quantity: item.quantity,
       price: item.price_usd,
       total: item.subtotal_usd,
@@ -76,7 +88,7 @@ export default function InvoiceModal({
     setStatus(invoice.status)
     setItems((invoice.items || []).map((item) => ({
       id: item.id,
-      name: item.product?.name ?? 'Producto',
+      name: item.product?.name ?? t('admin.invoices.modal.product_fallback', 'Producto'),
       quantity: item.quantity,
       price: item.price_usd,
       total: item.subtotal_usd,
@@ -99,7 +111,7 @@ export default function InvoiceModal({
         amount_usd: a.amount_usd,
         description: a.description ?? '',
       })))
-  }, [invoice])
+  }, [invoice, t])
 
   const currentStatus = statusLabels[status] || {
     label: status,
@@ -121,14 +133,12 @@ export default function InvoiceModal({
   const total = typeof invoice.total_usd === 'number' ? invoice.total_usd : itemsSubtotal + shippingCost
   const tax = total - itemsSubtotal - shippingCost
 
-  const totalBs = typeof invoice.total_bs === 'number' ? invoice.total_bs : Math.round(total * 57);
-
   const whatsappUrl = (() => {
     const phone = contact.phone || '';
     if (!phone) return null;
     const digits = phone.replace(/[^0-9]/g, '');
     if (!digits) return null;
-    const text = encodeURIComponent(`Hola, tengo una consulta sobre la factura ${invoice.number}`);
+    const text = encodeURIComponent(t('admin.invoices.modal.whatsapp_message', 'Hola, tengo una consulta sobre la factura :number', { number: invoice.number }));
     return `https://wa.me/${digits}?text=${text}`;
   })();
 
@@ -144,7 +154,7 @@ export default function InvoiceModal({
           <div>
             <h3 className="text-2xl font-bold text-foreground">{invoice.number}</h3>
             <p className="text-muted-foreground">
-              Emitida el {contact.payment_date ? new Date(contact.payment_date).toLocaleDateString('es-ES') : 'N/A'}
+              {t('admin.invoices.modal.issued_on', 'Emitida el')} {contact.payment_date ? formatDate(contact.payment_date) : fallbackText}
             </p>
           </div>
           <div className="flex gap-2">
@@ -156,16 +166,16 @@ export default function InvoiceModal({
                 className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white hover:bg-green-700 rounded-lg transition text-sm"
               >
                 <MessageCircle className="w-4 h-4" />
-                WhatsApp cliente
+                {t('admin.invoices.modal.customer_whatsapp', 'WhatsApp cliente')}
               </a>
             )}
             <button className="flex items-center gap-2 px-4 py-2 bg-muted hover:bg-muted/80 text-foreground rounded-lg transition">
               <Printer className="w-4 h-4" />
-              Imprimir
+              {t('admin.invoices.modal.print', 'Imprimir')}
             </button>
             <button className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg transition">
               <Download className="w-4 h-4" />
-              Descargar
+              {t('admin.invoices.modal.download', 'Descargar')}
             </button>
           </div>
         </div>
@@ -182,9 +192,9 @@ export default function InvoiceModal({
                 onChange={(e) => setStatus(e.target.value)}
                 className="border border-border rounded px-2 py-1 text-xs bg-background text-foreground"
               >
-                <option value="pending">Pendiente</option>
-                <option value="paid">Pagada / Confirmada</option>
-                <option value="cancelled">Cancelada</option>
+                <option value="pending">{t('admin.invoices.statuses.pending', 'Pendiente')}</option>
+                <option value="paid">{t('admin.invoices.modal.status_options.paid_confirmed', 'Pagada / Confirmada')}</option>
+                <option value="cancelled">{t('admin.invoices.modal.status_options.cancelled', 'Cancelada')}</option>
               </select>
             </div>
           ) : (
@@ -197,13 +207,13 @@ export default function InvoiceModal({
         {/* Información del Cliente */}
         <div className="grid grid-cols-2 gap-6 bg-muted p-4 rounded-lg">
           <div>
-            <p className="text-xs text-muted-foreground font-semibold mb-1">CLIENTE</p>
-            <p className="text-foreground font-semibold">{contact.full_name ?? customer.name ?? 'N/A'}</p>
+            <p className="text-xs text-muted-foreground font-semibold mb-1">{t('admin.invoices.modal.customer_label', 'CLIENTE')}</p>
+            <p className="text-foreground font-semibold">{contact.full_name ?? customer.name ?? fallbackText}</p>
             <p className="text-sm text-muted-foreground">{contact.email}</p>
             <p className="text-sm text-muted-foreground">{contact.phone}</p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground font-semibold mb-1">DIRECCIÓN DE ENVÍO</p>
+            <p className="text-xs text-muted-foreground font-semibold mb-1">{t('admin.invoices.modal.shipping_label', 'DIRECCIÓN DE ENVÍO')}</p>
             <p className="text-foreground">{contact.address}</p>
             <p className="text-sm text-muted-foreground">{contact.city}, {contact.zip_code}</p>
           </div>
@@ -212,20 +222,20 @@ export default function InvoiceModal({
         {/* Notas */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <p className="text-xs text-muted-foreground font-semibold mb-1">Notas internas</p>
+            <p className="text-xs text-muted-foreground font-semibold mb-1">{t('admin.invoices.modal.internal_notes', 'Notas internas')}</p>
             <textarea
               className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary transition min-h-[70px]"
-              placeholder="Solo visibles dentro del panel, no para el cliente."
+              placeholder={t('admin.invoices.modal.internal_notes_placeholder', 'Solo visibles dentro del panel, no para el cliente.')}
               value={internalNotes}
               onChange={(e) => setInternalNotes(e.target.value)}
               disabled={!isEditable}
             />
           </div>
           <div>
-            <p className="text-xs text-muted-foreground font-semibold mb-1">Notas para el cliente</p>
+            <p className="text-xs text-muted-foreground font-semibold mb-1">{t('admin.invoices.modal.public_notes', 'Notas para el cliente')}</p>
             <textarea
               className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary transition min-h-[70px]"
-              placeholder="Mensaje que aparecerá en la factura o comprobante."
+              placeholder={t('admin.invoices.modal.public_notes_placeholder', 'Mensaje que aparecerá en la factura o comprobante.')}
               value={publicNotes}
               onChange={(e) => setPublicNotes(e.target.value)}
               disabled={!isEditable}
@@ -237,10 +247,10 @@ export default function InvoiceModal({
         <div className="space-y-4">
           {status === 'cancelled' && (
             <div>
-              <p className="text-xs text-red-700 font-semibold mb-1">Motivo de anulación</p>
+              <p className="text-xs text-red-700 font-semibold mb-1">{t('admin.invoices.modal.cancellation_reason', 'Motivo de anulación')}</p>
               <textarea
                 className="w-full px-3 py-2 bg-background border border-red-300 rounded-lg text-sm text-foreground focus:outline-none focus:border-red-500 transition min-h-[60px]"
-                placeholder="Describe brevemente por qué se cancela esta factura."
+                placeholder={t('admin.invoices.modal.cancellation_reason_placeholder', 'Describe brevemente por qué se cancela esta factura.')}
                 value={cancellationReason}
                 onChange={(e) => setCancellationReason(e.target.value)}
                 disabled={!isEditable}
@@ -251,8 +261,8 @@ export default function InvoiceModal({
           <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-blue-700 font-semibold mb-1">Notas de crédito / débito</p>
-                <p className="text-sm text-muted-foreground">Ajustes vinculados a esta factura (no modifican el total actual).</p>
+                <p className="text-xs text-blue-700 font-semibold mb-1">{t('admin.invoices.modal.adjustments_title', 'Notas de crédito / débito')}</p>
+                <p className="text-sm text-muted-foreground">{t('admin.invoices.modal.adjustments_description', 'Ajustes vinculados a esta factura (no modifican el total actual).')}</p>
               </div>
               {isEditable && (
                 <button
@@ -263,13 +273,13 @@ export default function InvoiceModal({
                   ]))}
                   className="px-3 py-1.5 text-xs rounded bg-blue-600 text-white hover:bg-blue-700"
                 >
-                  Añadir ajuste
+                    {t('admin.invoices.modal.add_adjustment', 'Añadir ajuste')}
                 </button>
               )}
             </div>
 
             {adjustments.length === 0 ? (
-              <p className="text-sm text-blue-700">No hay notas de crédito/débito registradas.</p>
+                <p className="text-sm text-blue-700">{t('admin.invoices.modal.no_adjustments', 'No hay notas de crédito/débito registradas.')}</p>
             ) : (
               <div className="space-y-2 max-h-40 overflow-y-auto">
                 {adjustments.map((a, idx) => (
@@ -286,14 +296,14 @@ export default function InvoiceModal({
                         setAdjustments((prev) => prev.map((adj, i) => i === idx ? { ...adj, type: value } : adj))
                       }}
                     >
-                      <option value="credit">Nota de crédito</option>
-                      <option value="debit">Nota de débito</option>
+                      <option value="credit">{t('admin.invoices.modal.adjustment_types.credit', 'Nota de crédito')}</option>
+                      <option value="debit">{t('admin.invoices.modal.adjustment_types.debit', 'Nota de débito')}</option>
                     </select>
                     <input
                       type="number"
                       min="0"
                       step="0.01"
-                      placeholder="Monto USD"
+                      placeholder={`${t('admin.invoices.modal.amount_usd', 'Monto')} ${displayCurrency}`}
                       className="md:col-span-1 border border-border rounded px-2 py-1 bg-background"
                       disabled={!isEditable}
                       value={a.amount_usd}
@@ -304,7 +314,7 @@ export default function InvoiceModal({
                     />
                     <input
                       type="text"
-                      placeholder="Descripción"
+                      placeholder={t('admin.invoices.modal.description', 'Descripción')}
                       className="md:col-span-2 border border-border rounded px-2 py-1 bg-background"
                       disabled={!isEditable}
                       value={a.description}
@@ -333,8 +343,8 @@ export default function InvoiceModal({
         <div className="bg-orange-50 border border-orange-200 p-4 rounded-lg space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-orange-700 font-semibold mb-1">PAGOS REGISTRADOS</p>
-              <p className="text-sm text-muted-foreground">Permite registrar múltiples formas de pago y referencias.</p>
+              <p className="text-xs text-orange-700 font-semibold mb-1">{t('admin.invoices.modal.payments_title', 'PAGOS REGISTRADOS')}</p>
+              <p className="text-sm text-muted-foreground">{t('admin.invoices.modal.payments_description', 'Permite registrar múltiples formas de pago y referencias.')}</p>
             </div>
             {isEditable && (
               <button
@@ -342,13 +352,13 @@ export default function InvoiceModal({
                 onClick={() => setPayments((prev) => [...prev, { method: 'efectivo', amount_usd: '', amount_bs: '', reference: '', bank: '', notes: '' }])}
                 className="px-3 py-1.5 text-xs rounded bg-orange-600 text-white hover:bg-orange-700"
               >
-                Añadir pago
+                {t('admin.invoices.modal.add_payment', 'Añadir pago')}
               </button>
             )}
           </div>
 
           {payments.length === 0 ? (
-            <p className="text-sm text-orange-700">No hay pagos registrados.</p>
+            <p className="text-sm text-orange-700">{t('admin.invoices.modal.no_payments', 'No hay pagos registrados.')}</p>
           ) : (
             <div className="space-y-2 max-h-40 overflow-y-auto">
               {payments.map((p, idx) => (
@@ -362,17 +372,17 @@ export default function InvoiceModal({
                       setPayments((prev) => prev.map((pay, i) => i === idx ? { ...pay, method: value } : pay))
                     }}
                   >
-                    <option value="efectivo">Efectivo</option>
-                    <option value="tarjeta">Tarjeta</option>
-                    <option value="transferencia">Transferencia</option>
-                    <option value="zelle">Zelle</option>
-                    <option value="otro">Otro</option>
+                    <option value="efectivo">{t('admin.invoices.create.payment_methods.cash', 'Efectivo')}</option>
+                    <option value="tarjeta">{t('admin.invoices.create.payment_methods.card', 'Tarjeta')}</option>
+                    <option value="transferencia">{t('admin.invoices.create.payment_methods.transfer', 'Transferencia')}</option>
+                    <option value="zelle">{t('admin.invoices.create.payment_methods.zelle', 'Zelle')}</option>
+                    <option value="otro">{t('admin.invoices.create.payment_methods.other', 'Otro')}</option>
                   </select>
                   <input
                     type="number"
                     min="0"
                     step="0.01"
-                    placeholder="Monto USD"
+                    placeholder={`${t('admin.invoices.modal.amount_usd', 'Monto')} ${displayCurrency}`}
                     className="md:col-span-1 border border-border rounded px-2 py-1 bg-background"
                     disabled={!isEditable}
                     value={p.amount_usd}
@@ -385,7 +395,7 @@ export default function InvoiceModal({
                     type="number"
                     min="0"
                     step="0.01"
-                    placeholder="Monto Bs"
+                    placeholder={secondaryCurrency ? `${t('admin.invoices.modal.amount_bs', 'Monto')} ${secondaryCurrency}` : t('admin.invoices.modal.amount_bs', 'Referencia')}
                     className="md:col-span-1 border border-border rounded px-2 py-1 bg-background"
                     disabled={!isEditable}
                     value={p.amount_bs}
@@ -396,7 +406,7 @@ export default function InvoiceModal({
                   />
                   <input
                     type="text"
-                    placeholder="Banco / Cuenta"
+                    placeholder={t('admin.invoices.modal.bank_account', 'Banco / Cuenta')}
                     className="md:col-span-1 border border-border rounded px-2 py-1 bg-background"
                     disabled={!isEditable}
                     value={p.bank}
@@ -407,7 +417,7 @@ export default function InvoiceModal({
                   />
                   <input
                     type="text"
-                    placeholder="Referencia"
+                    placeholder={t('admin.invoices.modal.reference', 'Referencia')}
                     className="md:col-span-1 border border-border rounded px-2 py-1 bg-background"
                     disabled={!isEditable}
                     value={p.reference}
@@ -419,7 +429,7 @@ export default function InvoiceModal({
                   <div className="md:col-span-1 flex items-center gap-2">
                     <input
                       type="text"
-                      placeholder="Notas"
+                      placeholder={t('admin.invoices.modal.notes', 'Notas')}
                       className="flex-1 border border-border rounded px-2 py-1 bg-background"
                       disabled={!isEditable}
                       value={p.notes}
@@ -445,20 +455,20 @@ export default function InvoiceModal({
 
           {payments.length > 0 && (
             <div className="flex justify-between text-xs text-orange-800 pt-1 border-t border-orange-200 mt-2">
-              <span>Total pagos USD:</span>
-              <span>{paymentsTotalUsd.toFixed(2)}</span>
+              <span>{`${t('admin.invoices.modal.total_payments_usd', 'Total pagos')}: ${displayCurrency}`}</span>
+              <span>{formatDisplayCurrency(paymentsTotalUsd)}</span>
             </div>
           )}
         </div>
 
         <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-lg space-y-3">
           <div>
-            <p className="text-xs text-emerald-700 font-semibold mb-1">AUDITORIA DE PASARELA</p>
-            <p className="text-sm text-muted-foreground">Registro verificado de respuestas del gateway asociado a esta factura.</p>
+            <p className="text-xs text-emerald-700 font-semibold mb-1">{t('admin.invoices.modal.gateway_audit_title', 'AUDITORIA DE PASARELA')}</p>
+            <p className="text-sm text-muted-foreground">{t('admin.invoices.modal.gateway_audit_description', 'Registro verificado de respuestas del gateway asociado a esta factura.')}</p>
           </div>
 
           {gatewayTransactions.length === 0 ? (
-            <p className="text-sm text-emerald-800">No hay transacciones de pasarela asociadas.</p>
+            <p className="text-sm text-emerald-800">{t('admin.invoices.modal.no_gateway_transactions', 'No hay transacciones de pasarela asociadas.')}</p>
           ) : (
             <div className="space-y-3 max-h-72 overflow-y-auto">
               {gatewayTransactions.map((transaction, index) => {
@@ -472,30 +482,30 @@ export default function InvoiceModal({
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <p className="text-sm font-semibold text-foreground">
-                          {(transaction.provider || 'gateway').toUpperCase()} / {transaction.event_type || 'evento'}
+                          {(transaction.provider || 'gateway').toUpperCase()} / {transaction.event_type || t('admin.invoices.modal.gateway_event_fallback', 'evento')}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          Metodo: {transaction.payment_method || 'N/A'}
+                          {t('admin.invoices.modal.method', 'Método')}: {transaction.payment_method || fallbackText}
                         </p>
                       </div>
                       <span className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
-                        {transaction.status || 'N/A'}
+                        {transaction.status || fallbackText}
                       </span>
                     </div>
 
                     <div className="grid grid-cols-1 gap-2 text-xs text-slate-700 md:grid-cols-2">
-                      <p><span className="font-semibold text-foreground">Order ID:</span> {transaction.external_order_id || 'N/A'}</p>
-                      <p><span className="font-semibold text-foreground">Capture ID:</span> {transaction.external_capture_id || 'N/A'}</p>
-                      <p><span className="font-semibold text-foreground">Transaction ID:</span> {transaction.external_transaction_id || 'N/A'}</p>
-                      <p><span className="font-semibold text-foreground">Monto:</span> {transaction.currency || 'USD'} {Number(transaction.amount || 0).toFixed(2)}</p>
-                      <p><span className="font-semibold text-foreground">Verificado:</span> {formatGatewayDate(transaction.verified_at)}</p>
-                      <p><span className="font-semibold text-foreground">Asociado a factura:</span> {formatGatewayDate(transaction.consumed_at)}</p>
+                      <p><span className="font-semibold text-foreground">{t('admin.invoices.modal.order_id', 'Order ID')}:</span> {transaction.external_order_id || fallbackText}</p>
+                      <p><span className="font-semibold text-foreground">{t('admin.invoices.modal.capture_id', 'Capture ID')}:</span> {transaction.external_capture_id || fallbackText}</p>
+                      <p><span className="font-semibold text-foreground">{t('admin.invoices.modal.transaction_id', 'Transaction ID')}:</span> {transaction.external_transaction_id || fallbackText}</p>
+                      <p><span className="font-semibold text-foreground">{t('admin.invoices.modal.amount', 'Monto')}:</span> {transaction.currency || fallbackText} {formatNumber(transaction.amount || 0, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                      <p><span className="font-semibold text-foreground">{t('admin.invoices.modal.verified', 'Verificado')}:</span> {formatGatewayDate(transaction.verified_at, formatDateTime, fallbackText)}</p>
+                      <p><span className="font-semibold text-foreground">{t('admin.invoices.modal.linked_invoice', 'Asociado a factura')}:</span> {formatGatewayDate(transaction.consumed_at, formatDateTime, fallbackText)}</p>
                     </div>
 
                     {payload && (
                       <details className="rounded-lg border border-emerald-100 bg-emerald-50/70">
                         <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-emerald-800">
-                          Ver payload del gateway
+                          {t('admin.invoices.modal.view_gateway_payload', 'Ver payload del gateway')}
                         </summary>
                         <pre className="max-h-64 overflow-auto border-t border-emerald-100 px-3 py-3 text-[11px] leading-5 text-slate-700 whitespace-pre-wrap break-words">
                           {payload}
@@ -511,15 +521,15 @@ export default function InvoiceModal({
 
         {/* Productos */}
         <div>
-          <h4 className="text-lg font-bold text-foreground mb-3">Productos</h4>
+          <h4 className="text-lg font-bold text-foreground mb-3">{t('admin.invoices.modal.products_title', 'Productos')}</h4>
           <div className="overflow-x-auto max-h-64 overflow-y-auto rounded-lg border border-border">
             <table className="w-full">
               <thead className="bg-muted border-b border-border">
                 <tr>
-                  <th className="px-4 py-2 text-left text-sm font-semibold">Producto</th>
-                  <th className="px-4 py-2 text-center text-sm font-semibold">Cantidad</th>
-                  <th className="px-4 py-2 text-right text-sm font-semibold">Precio</th>
-                  <th className="px-4 py-2 text-right text-sm font-semibold">Total</th>
+                  <th className="px-4 py-2 text-left text-sm font-semibold">{t('admin.invoices.modal.table.product', 'Producto')}</th>
+                  <th className="px-4 py-2 text-center text-sm font-semibold">{t('admin.invoices.modal.table.quantity', 'Cantidad')}</th>
+                  <th className="px-4 py-2 text-right text-sm font-semibold">{t('admin.invoices.modal.table.price', 'Precio')}</th>
+                  <th className="px-4 py-2 text-right text-sm font-semibold">{t('admin.invoices.modal.table.total', 'Total')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -546,9 +556,9 @@ export default function InvoiceModal({
                         item.quantity
                       )}
                     </td>
-                    <td className="px-4 py-3 text-sm text-foreground text-right">${item.price.toFixed(2)}</td>
+                    <td className="px-4 py-3 text-sm text-foreground text-right">{formatDisplayCurrency(item.price)}</td>
                     <td className="px-4 py-3 text-sm font-semibold text-foreground text-right">
-                      ${item.total.toFixed(2)}
+                      {formatDisplayCurrency(item.total)}
                     </td>
                   </tr>
                 ))}
@@ -562,24 +572,24 @@ export default function InvoiceModal({
           <div />
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Subtotal:</span>
-              <span>${itemsSubtotal.toFixed(2)}</span>
+              <span className="text-muted-foreground">{t('admin.invoices.modal.totals.subtotal', 'Subtotal:')}</span>
+              <span>{formatDisplayCurrency(itemsSubtotal)}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Envío:</span>
-              <span>${shippingCost.toFixed(2)}</span>
+              <span className="text-muted-foreground">{t('admin.invoices.modal.totals.shipping', 'Envío:')}</span>
+              <span>{formatDisplayCurrency(shippingCost)}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Impuestos (15%):</span>
-              <span>${tax.toFixed(2)}</span>
+              <span className="text-muted-foreground">{t('admin.invoices.modal.totals.taxes', 'Impuestos (15%):')}</span>
+              <span>{formatDisplayCurrency(tax)}</span>
             </div>
             <div className="border-t border-border pt-2 flex justify-between font-bold text-foreground">
-              <span>Total USD:</span>
-              <span className="text-primary">${total.toFixed(2)}</span>
+              <span>{`${t('admin.invoices.modal.totals.total_usd', 'Total')}: ${displayCurrency}`}</span>
+              <span className="text-primary">{formatDisplayCurrency(total)}</span>
             </div>
             <div className="bg-accent/10 border border-accent rounded p-2 flex justify-between font-bold text-accent mt-2">
-              <span>Total Bs.:</span>
-              <span>Bs.{Number(totalBs).toLocaleString('es-VE')}</span>
+              <span>{comparisonCurrency ? `${t('admin.invoices.modal.totals.total_bs', 'Referencia')}: ${comparisonCurrency}` : t('admin.invoices.modal.totals.total_bs', 'Referencia')}</span>
+              <span>{comparisonCurrency ? formatDisplayCurrency(total, comparisonCurrency) : '—'}</span>
             </div>
           </div>
         </div>
@@ -612,15 +622,15 @@ export default function InvoiceModal({
                   })),
                 }
                 const loadingId = `update-invoice-${invoice.id}`
-                toast.loading('Actualizando factura...', { id: loadingId, position: 'top-center' })
+                toast.loading(t('admin.invoices.modal.toasts.updating', 'Actualizando factura...'), { id: loadingId, position: 'top-center' })
                 router.put(route('admin.invoices.update', invoice.id), payload, {
                   preserveScroll: true,
                   onSuccess: () => {
-                    toast.success('Factura actualizada', { id: loadingId, position: 'top-center' })
+                    toast.success(t('admin.invoices.modal.toasts.updated', 'Factura actualizada'), { id: loadingId, position: 'top-center' })
                     onClose()
                   },
                   onError: () => {
-                    toast.error('No se pudo actualizar la factura', { id: loadingId, position: 'top-center' })
+                    toast.error(t('admin.invoices.modal.toasts.update_failed', 'No se pudo actualizar la factura'), { id: loadingId, position: 'top-center' })
                   },
                   onFinish: () => {
                     setSaving(false)
@@ -631,14 +641,14 @@ export default function InvoiceModal({
               className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition disabled:opacity-50"
               disabled={saving}
             >
-              {saving ? 'Guardando...' : 'Guardar cambios'}
+              {saving ? t('admin.invoices.modal.actions.saving', 'Guardando...') : t('admin.invoices.modal.actions.save_changes', 'Guardar cambios')}
             </button>
           )}
           <button
             onClick={onClose}
             className="flex-1 px-4 py-2 border border-border rounded-lg text-foreground hover:bg-muted transition"
           >
-            Cerrar
+            {t('admin.invoices.modal.actions.close', 'Cerrar')}
           </button>
         </div>
       </div>

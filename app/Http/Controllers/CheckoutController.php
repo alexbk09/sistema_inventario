@@ -7,9 +7,11 @@ use App\Models\{Coupon, CreditMovement, Customer, Invoice, InvoiceContact, Invoi
 use App\Services\{CurrencyService, InventoryService};
 use App\Services\PayPalService;
 use App\Services\StripeService;
+use App\Support\CurrencySettings;
 use App\Support\Settings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
@@ -22,6 +24,7 @@ class CheckoutController extends Controller
         $rate = $currency->getPromedio('oficial') ?? (float) config('currency.bs_rate', 0);
         $payments = $this->paymentSettings();
         $payments = $this->publicPaymentConfiguration($payments);
+        $checkoutCurrencies = $this->checkoutCurrencies();
 
         $customer = null;
         if (auth()->check()) {
@@ -31,6 +34,8 @@ class CheckoutController extends Controller
         return Inertia::render('Checkout/Index', [
             'rate' => $rate,
             'payments' => $payments,
+            'checkoutCurrencies' => $checkoutCurrencies,
+            'defaultCheckoutCurrency' => $checkoutCurrencies[0]['code'] ?? 'USD',
             'customer' => $customer ? [
                 'fullName' => $customer->name,
                 'identification_type_id' => $customer->identification_type_id,
@@ -56,6 +61,7 @@ class CheckoutController extends Controller
             'city' => ['nullable','string','max:100'],
             'zipCode' => ['nullable','string','max:20'],
             'paymentMethod' => ['required','string','max:100'],
+            'checkoutCurrency' => ['required','string','max:10'],
             'bank' => ['nullable','string','max:100'],
             'originBank' => ['nullable','string','max:100'],
             'reference' => ['nullable','string','max:100'],
@@ -115,6 +121,7 @@ class CheckoutController extends Controller
         return DB::transaction(function () use ($payload, $currency, $inventory, $shippingUsd, $taxRate, $methodConfig, $selectedMethod) {
             $rate = isset($payload['rateBs']) ? (float) $payload['rateBs'] : null;
             $verifiedGatewayTransaction = null;
+            $checkoutCurrency = $this->resolveCheckoutCurrency((string) ($payload['checkoutCurrency'] ?? 'USD'));
 
             if ($selectedMethod === 'paypal') {
                 $verifiedGatewayTransaction = PaymentGatewayTransaction::query()
@@ -269,8 +276,13 @@ class CheckoutController extends Controller
             $totalBs = $rate !== null
                 ? round($totalUsd * $rate, 2)
                 : $currency->usdToBs($totalUsd);
+            [$chargedAmount, $chargedRate] = $this->convertUsdAmount($currency, $totalUsd, $checkoutCurrency);
 
-            if ($verifiedGatewayTransaction && round((float) $verifiedGatewayTransaction->amount, 2) !== round($totalUsd, 2)) {
+            if ($verifiedGatewayTransaction
+                && (
+                    strtoupper((string) $verifiedGatewayTransaction->currency) !== $checkoutCurrency
+                    || round((float) $verifiedGatewayTransaction->amount, 2) !== round($chargedAmount, 2)
+                )) {
                 return back()->withErrors([
                     'paymentMethod' => 'El monto validado por la pasarela no coincide con el total actual del pedido.',
                 ])->withInput();
@@ -305,10 +317,10 @@ class CheckoutController extends Controller
                 'reference' => $payload['reference'] ?: ($payload['paypalCaptureId'] ?? $payload['paypalOrderId'] ?? null),
                 'bank' => $payload['bank'] ?: ($payload['paymentMethod'] === 'paypal' ? 'PayPal' : ($payload['paymentMethod'] === 'stripe' ? 'Stripe' : null)),
                 'notes' => $payload['paymentMethod'] === 'paypal'
-                    ? 'Orden PayPal: '.($payload['paypalOrderId'] ?? 'N/A')
+                    ? 'Orden PayPal: '.($payload['paypalOrderId'] ?? 'N/A').' | Moneda: '.$checkoutCurrency.' | Tasa: '.number_format($chargedRate, 6, '.', '')
                     : ($payload['paymentMethod'] === 'stripe'
-                        ? 'Payment Intent Stripe: '.($payload['stripePaymentIntentId'] ?? 'N/A')
-                        : null),
+                        ? 'Payment Intent Stripe: '.($payload['stripePaymentIntentId'] ?? 'N/A').' | Moneda: '.$checkoutCurrency.' | Tasa: '.number_format($chargedRate, 6, '.', '')
+                        : 'Moneda de cobro: '.$checkoutCurrency.' | Tasa: '.number_format($chargedRate, 6, '.', '')),
             ]);
 
             if ($verifiedGatewayTransaction) {
@@ -359,7 +371,7 @@ class CheckoutController extends Controller
         }
 
         return Inertia::render('Checkout/Confirmation', [
-            'message' => 'Tu pedido fue registrado. ¡Gracias!',
+            'message' => __('app.confirmation.default_message'),
             'publicUrl' => $publicUrl,
             'qrUrl' => $invoiceId ? route('qr.invoice', ['invoice' => $invoiceId]) : null,
             'invoiceNumber' => $invoiceNumber,
@@ -370,6 +382,7 @@ class CheckoutController extends Controller
     {
         $payload = $request->validate([
             'paymentMethod' => ['required', 'in:paypal'],
+            'checkoutCurrency' => ['required', 'string', 'max:10'],
             'coupon_code' => ['nullable', 'string', 'max:50'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'exists:products,id'],
@@ -377,14 +390,14 @@ class CheckoutController extends Controller
         ]);
 
         if (! $payPalService->isEnabled()) {
-            return response()->json(['message' => 'PayPal no esta disponible actualmente.'], 422);
+            return response()->json(['message' => __('app.checkout.error_paypal_unavailable')], 422);
         }
 
         $payments = $this->paymentSettings();
         $methodConfig = $payments['methods']['paypal'] ?? [];
 
         if (empty($methodConfig['enabled'])) {
-            return response()->json(['message' => 'PayPal no esta habilitado en configuracion.'], 422);
+            return response()->json(['message' => __('app.checkout.error_paypal_disabled')], 422);
         }
 
         try {
@@ -393,9 +406,11 @@ class CheckoutController extends Controller
             $paymentFeeUsd = round($baseForFees * (((float) ($methodConfig['fee_percent'] ?? 0)) / 100), 2);
             $taxUsd = round($baseForFees * 0.15, 2);
             $totalUsd = $baseForFees + $taxUsd + 200.0 + $paymentFeeUsd;
+            $checkoutCurrency = $this->resolveCheckoutCurrency((string) ($payload['checkoutCurrency'] ?? 'USD'));
+            [$chargedAmount] = $this->convertUsdAmount(app(CurrencyService::class), $totalUsd, $checkoutCurrency);
 
             $general = Settings::get('general', ['company_name' => config('app.name')]);
-            $order = $payPalService->createOrder($totalUsd, 'USD', [
+            $order = $payPalService->createOrder($chargedAmount, $checkoutCurrency, [
                 'brand_name' => $general['company_name'] ?? config('app.name'),
                 'description' => 'Pedido en checkout',
                 'custom_id' => 'checkout-'.Str::lower(Str::random(10)),
@@ -404,11 +419,13 @@ class CheckoutController extends Controller
             return response()->json([
                 'orderID' => $order['id'] ?? null,
             ]);
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Throwable $e) {
             report($e);
 
             return response()->json([
-                'message' => $e->getCode() === 422 ? $e->getMessage() : 'No fue posible iniciar el pago con PayPal.',
+                'message' => $e->getCode() === 422 ? $e->getMessage() : __('app.checkout.error_paypal_start'),
             ], 422);
         }
     }
@@ -426,11 +443,11 @@ class CheckoutController extends Controller
             $captureStatus = (string) ($capture['status'] ?? '');
 
             if (! is_string($captureId) || $captureId === '') {
-                return response()->json(['message' => 'PayPal no devolvio una captura valida.'], 422);
+                return response()->json(['message' => __('app.checkout.error_paypal_invalid_capture')], 422);
             }
 
             if ($captureStatus !== 'COMPLETED') {
-                return response()->json(['message' => 'PayPal no confirmo la captura como completada.'], 422);
+                return response()->json(['message' => __('app.checkout.error_paypal_capture_not_completed')], 422);
             }
 
             $captureAmount = (float) ($capture['purchase_units'][0]['payments']['captures'][0]['amount']['value'] ?? 0);
@@ -459,10 +476,12 @@ class CheckoutController extends Controller
                 'captureID' => $captureId,
                 'status' => $captureStatus,
             ]);
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Throwable $e) {
             report($e);
 
-            return response()->json(['message' => 'No fue posible confirmar el pago con PayPal.'], 422);
+            return response()->json(['message' => __('app.checkout.error_paypal_confirm')], 422);
         }
     }
 
@@ -470,6 +489,7 @@ class CheckoutController extends Controller
     {
         $payload = $request->validate([
             'paymentMethod' => ['required', 'in:stripe'],
+            'checkoutCurrency' => ['required', 'string', 'max:10'],
             'coupon_code' => ['nullable', 'string', 'max:50'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'exists:products,id'],
@@ -477,14 +497,14 @@ class CheckoutController extends Controller
         ]);
 
         if (! $stripeService->isEnabled()) {
-            return response()->json(['message' => 'Stripe no esta disponible actualmente.'], 422);
+            return response()->json(['message' => __('app.checkout.error_stripe_unavailable')], 422);
         }
 
         $payments = $this->paymentSettings();
         $methodConfig = $payments['methods']['stripe'] ?? [];
 
         if (empty($methodConfig['enabled'])) {
-            return response()->json(['message' => 'Stripe no esta habilitado en configuracion.'], 422);
+            return response()->json(['message' => __('app.checkout.error_stripe_disabled')], 422);
         }
 
         try {
@@ -493,8 +513,10 @@ class CheckoutController extends Controller
             $paymentFeeUsd = round($baseForFees * (((float) ($methodConfig['fee_percent'] ?? 0)) / 100), 2);
             $taxUsd = round($baseForFees * 0.15, 2);
             $totalUsd = $baseForFees + $taxUsd + 200.0 + $paymentFeeUsd;
+            $checkoutCurrency = $this->resolveCheckoutCurrency((string) ($payload['checkoutCurrency'] ?? 'USD'));
+            [$chargedAmount] = $this->convertUsdAmount(app(CurrencyService::class), $totalUsd, $checkoutCurrency);
 
-            $intent = $stripeService->createPaymentIntent($totalUsd, 'usd', [
+            $intent = $stripeService->createPaymentIntent($chargedAmount, strtolower($checkoutCurrency), [
                 'description' => 'Pedido en checkout',
                 'checkout_ref' => 'checkout-'.Str::lower(Str::random(10)),
             ]);
@@ -507,7 +529,7 @@ class CheckoutController extends Controller
             report($e);
 
             return response()->json([
-                'message' => 'No fue posible preparar el pago con Stripe.',
+                'message' => __('app.checkout.error_stripe_prepare'),
             ], 422);
         }
     }
@@ -524,7 +546,7 @@ class CheckoutController extends Controller
             $status = (string) ($intent['status'] ?? '');
 
             if ($status !== 'succeeded') {
-                return response()->json(['message' => 'Stripe no confirmo el pago como exitoso.'], 422);
+                return response()->json(['message' => __('app.checkout.error_stripe_not_confirmed')], 422);
             }
 
             $chargeId = $intent['latest_charge']['id'] ?? null;
@@ -556,7 +578,7 @@ class CheckoutController extends Controller
         } catch (\Throwable $e) {
             report($e);
 
-            return response()->json(['message' => 'No fue posible verificar el pago con Stripe.'], 422);
+            return response()->json(['message' => __('app.checkout.error_stripe_verify')], 422);
         }
     }
 
@@ -664,6 +686,59 @@ class CheckoutController extends Controller
         }
 
         return [$itemsTotalUsd, $discountUsd];
+    }
+
+    protected function currencySettings(): array
+    {
+        return CurrencySettings::normalize(Settings::get('currency', CurrencySettings::defaults()));
+    }
+
+    protected function checkoutCurrencies(): array
+    {
+        $settings = $this->currencySettings();
+
+        return array_values(array_map(
+            fn (array $currency) => [
+                'code' => $currency['code'],
+                'name' => $currency['name'],
+                'symbol' => $currency['symbol'],
+            ],
+            array_filter(
+                $settings['supported_currencies'] ?? [],
+                fn (array $currency) => (bool) ($currency['enabled'] ?? false) && (bool) ($currency['allow_checkout'] ?? false)
+            )
+        ));
+    }
+
+    protected function resolveCheckoutCurrency(string $requestedCurrency): string
+    {
+        $allowed = array_map(fn (array $currency) => $currency['code'], $this->checkoutCurrencies());
+        $requestedCurrency = strtoupper(trim($requestedCurrency));
+
+        if (in_array($requestedCurrency, $allowed, true)) {
+            return $requestedCurrency;
+        }
+
+        return $allowed[0] ?? 'USD';
+    }
+
+    protected function convertUsdAmount(CurrencyService $currencyService, float $amountUsd, string $targetCurrency): array
+    {
+        $targetCurrency = strtoupper($targetCurrency);
+        if ($targetCurrency === 'USD') {
+            return [round($amountUsd, 2), 1.0];
+        }
+
+        $configured = $currencyService->getConfiguredExchangeRates($this->currencySettings());
+        $rate = (float) ($configured['rates'][$targetCurrency] ?? 0);
+
+        if ($rate <= 0) {
+            throw ValidationException::withMessages([
+                'checkoutCurrency' => 'No hay una tasa válida para la moneda seleccionada en checkout.',
+            ]);
+        }
+
+        return [round($amountUsd * $rate, 2), $rate];
     }
 
     protected function markInvoiceAsPaid(Invoice $invoice, InventoryService $inventory): void

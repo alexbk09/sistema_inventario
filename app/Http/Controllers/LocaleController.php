@@ -9,7 +9,9 @@ class LocaleController extends Controller
 {
     public function switch(string $locale, Request $request): RedirectResponse
     {
-        if (!in_array($locale, ['es', 'en'], true)) {
+        $supportedLocales = array_keys(config('locales.supported', []));
+
+        if (!in_array($locale, $supportedLocales, true)) {
             $locale = config('app.locale');
         }
 

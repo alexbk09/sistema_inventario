@@ -47,14 +47,14 @@ class InventoryReportExport implements FromQuery, WithHeadings, WithMapping
     public function headings(): array
     {
         return [
-            'Producto',
-            'SKU',
-            'Categorías',
-            'Stock',
-            'Costo prom. USD',
-            'Precio USD',
-            'Valor costo (USD)',
-            'Valor venta (USD)',
+            __('app.report_exports.inventory.columns.product'),
+            __('app.report_exports.inventory.columns.sku'),
+            __('app.report_exports.inventory.columns.categories'),
+            __('app.report_exports.inventory.columns.stock'),
+            __('app.report_exports.inventory.columns.avg_cost_usd'),
+            __('app.report_exports.inventory.columns.price_usd'),
+            __('app.report_exports.inventory.columns.value_cost_usd'),
+            __('app.report_exports.inventory.columns.value_price_usd'),
         ];
     }
 

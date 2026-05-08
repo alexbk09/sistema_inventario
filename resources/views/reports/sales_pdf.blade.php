@@ -1,8 +1,28 @@
+@php
+    $locale = app()->getLocale();
+    $thousandsSeparator = $locale === 'en' ? ',' : '.';
+    $decimalSeparator = $locale === 'en' ? '.' : ',';
+    $formatNumber = static fn ($value) => number_format((float) $value, 2, $decimalSeparator, $thousandsSeparator);
+    $formatDateTime = static fn ($value) => $value ? $value->copy()->locale($locale)->isoFormat('L LT') : '';
+    $typeLabels = [
+        'invoice' => __('app.report_exports.sales.document_types.invoice'),
+        'delivery_note' => __('app.report_exports.sales.document_types.delivery_note'),
+        'proforma' => __('app.report_exports.sales.document_types.proforma'),
+    ];
+    $statusLabels = [
+        'pending' => __('app.report_exports.sales.statuses.pending'),
+        'paid' => __('app.report_exports.sales.statuses.paid'),
+        'shipped' => __('app.report_exports.sales.statuses.shipped'),
+        'delivered' => __('app.report_exports.sales.statuses.delivered'),
+        'cancelled' => __('app.report_exports.sales.statuses.cancelled'),
+    ];
+@endphp
+
 <!DOCTYPE html>
-<html lang="es">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="UTF-8">
-    <title>Reporte de ventas</title>
+    <title>{{ __('app.report_exports.sales.title') }}</title>
     <style>
         body { font-family: DejaVu Sans, sans-serif; font-size: 11px; }
         h1 { font-size: 18px; margin-bottom: 4px; }
@@ -15,60 +35,46 @@
     </style>
 </head>
 <body>
-    <h1>Reporte de ventas</h1>
+    <h1>{{ __('app.report_exports.sales.title') }}</h1>
     <div class="meta">
-        Generado: {{ now()->format('d/m/Y H:i') }}<br>
+        {{ __('app.report_exports.sales.generated_at') }} {{ $formatDateTime(now()) }}<br>
         @if(!empty($filters['date_from']) || !empty($filters['date_to']))
-            Rango: {{ $filters['date_from'] ?? 'inicio' }} - {{ $filters['date_to'] ?? 'hoy' }}<br>
+            {{ __('app.report_exports.sales.range') }} {{ $filters['date_from'] ?? __('app.report_exports.sales.range_start') }} - {{ $filters['date_to'] ?? __('app.report_exports.sales.range_today') }}<br>
         @endif
-        Total facturas: {{ $metrics['total_invoices'] }} | Total USD: {{ number_format($metrics['total_usd'], 2, ',', '.') }} | Total BS: {{ number_format($metrics['total_bs'], 2, ',', '.') }} | Ticket prom. USD: {{ number_format($metrics['avg_ticket_usd'] ?? 0, 2, ',', '.') }}
+        {{ __('app.report_exports.sales.metrics.total_invoices') }} {{ $metrics['total_invoices'] }} | {{ __('app.report_exports.sales.metrics.total_usd') }} {{ $formatNumber($metrics['total_usd']) }} | {{ __('app.report_exports.sales.metrics.total_bs') }} {{ $formatNumber($metrics['total_bs']) }} | {{ __('app.report_exports.sales.metrics.avg_ticket_usd') }} {{ $formatNumber($metrics['avg_ticket_usd'] ?? 0) }}
         @if($invoices->count() >= $maxRows)
-            <br><span class="small">* Se muestran solo las primeras {{ $maxRows }} filas para el PDF.</span>
+            <br><span class="small">* {{ __('app.report_exports.sales.max_rows_notice', ['rows' => $maxRows]) }}</span>
         @endif
     </div>
 
     <table>
         <thead>
         <tr>
-            <th>Fecha</th>
-            <th>Número</th>
-            <th>Tipo</th>
-            <th>Cliente</th>
-            <th>Sucursal/Bodega</th>
-            <th>Estado</th>
-            <th class="right">Total USD</th>
-            <th class="right">Total BS</th>
+            <th>{{ __('app.report_exports.sales.columns.date') }}</th>
+            <th>{{ __('app.report_exports.sales.columns.number') }}</th>
+            <th>{{ __('app.report_exports.sales.columns.type') }}</th>
+            <th>{{ __('app.report_exports.sales.columns.customer') }}</th>
+            <th>{{ __('app.report_exports.sales.columns.branch_warehouse') }}</th>
+            <th>{{ __('app.report_exports.sales.columns.status') }}</th>
+            <th class="right">{{ __('app.report_exports.sales.columns.total_usd') }}</th>
+            <th class="right">{{ __('app.report_exports.sales.columns.total_bs') }}</th>
         </tr>
         </thead>
         <tbody>
-        @php
-            $typeLabels = [
-                'invoice' => 'Factura',
-                'delivery_note' => 'Nota de entrega',
-                'proforma' => 'Proforma',
-            ];
-            $statusLabels = [
-                'pending' => 'Pendiente',
-                'paid' => 'Pagado',
-                'shipped' => 'Enviado',
-                'delivered' => 'Entregado',
-                'cancelled' => 'Cancelado',
-            ];
-        @endphp
         @forelse($invoices as $invoice)
             <tr>
-                <td>{{ optional($invoice->created_at)->format('d/m/Y H:i') }}</td>
+                <td>{{ $formatDateTime($invoice->created_at) }}</td>
                 <td>{{ $invoice->number }}</td>
                 <td>{{ $typeLabels[$invoice->document_type] ?? $invoice->document_type }}</td>
                 <td>{{ optional($invoice->customer)->name }}</td>
                 <td>{{ $invoice->warehouse->name ?? $invoice->warehouse->code ?? '' }}</td>
                 <td>{{ $statusLabels[$invoice->status] ?? $invoice->status }}</td>
-                <td class="right">{{ number_format((float) $invoice->total_usd, 2, ',', '.') }}</td>
-                <td class="right">{{ number_format((float) $invoice->total_bs, 2, ',', '.') }}</td>
+                <td class="right">{{ $formatNumber((float) $invoice->total_usd) }}</td>
+                <td class="right">{{ $formatNumber((float) $invoice->total_bs) }}</td>
             </tr>
         @empty
             <tr>
-                <td colspan="8" class="small">No hay facturas para los filtros seleccionados.</td>
+                <td colspan="8" class="small">{{ __('app.report_exports.sales.no_results') }}</td>
             </tr>
         @endforelse
         </tbody>

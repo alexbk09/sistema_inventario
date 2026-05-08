@@ -5,8 +5,18 @@ import AdminTable from '@/Components/admin/provider/AdminTableProviders.jsx';
 import AdminFilters from '@/Components/common/AdminFilters.jsx';
 import InvoiceModal from '@/Components/admin/invoice/InvoiceModal.jsx';
 import AdminIndexShell from '@/Components/admin/AdminIndexShell.jsx';
+import { useI18n } from '@/Hooks/useI18n';
+import { useLocaleFormat } from '@/Hooks/useLocaleFormat';
+import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates';
 
 export default function Index({ invoices, filters }) {
+  const { t } = useI18n();
+  const { formatNumber } = useLocaleFormat();
+  const { displayCurrency, comparisonCurrency, formatPriceFromUsd, hasRateForCurrency } = useConfiguredCurrencyRates();
+  const secondaryCurrency = comparisonCurrency && comparisonCurrency !== displayCurrency && hasRateForCurrency(comparisonCurrency)
+    ? comparisonCurrency
+    : null;
+  const formatActiveAmount = (value, currency = displayCurrency) => formatPriceFromUsd(Number(value || 0), currency);
   const { data } = invoices;
   const page = invoices.current_page ?? invoices?.meta?.current_page ?? 1;
   const totalPages = invoices.last_page ?? invoices?.meta?.last_page ?? 1;
@@ -30,28 +40,30 @@ export default function Index({ invoices, filters }) {
   const handlePageChange = (nextPage) => { if (nextPage < 1 || nextPage > totalPages) return; router.get(route('admin.invoices.index'), { page: nextPage, search: debounced }, { preserveScroll: true, replace: true }); };
 
   const typeLabels = {
-    invoice: 'Factura',
-    delivery_note: 'Nota de entrega',
-    proforma: 'Proforma',
+    invoice: t('admin.invoices.document_types.invoice', 'Factura'),
+    delivery_note: t('admin.invoices.document_types.delivery_note', 'Nota de entrega'),
+    proforma: t('admin.invoices.document_types.proforma', 'Proforma'),
+  };
+
+  const statusNames = {
+    pending: t('admin.invoices.statuses.pending', 'Pendiente'),
+    paid: t('admin.invoices.statuses.paid', 'Pagado'),
+    shipped: t('admin.invoices.statuses.shipped', 'Enviado'),
+    delivered: t('admin.invoices.statuses.delivered', 'Entregado'),
+    cancelled: t('admin.invoices.statuses.cancelled', 'Cancelado'),
   };
 
   const columns = [
-    { key: 'number', label: 'Número', width: '20%' },
-    { key: 'document_type', label: 'Tipo', width: '15%', render: (v, row) => typeLabels[row?.document_type] ?? 'Factura' },
-    { key: 'customer', label: 'Cliente', width: '25%', render: (v, row) => row?.contact?.full_name ?? v?.name ?? 'N/A' },
+    { key: 'number', label: t('admin.invoices.index.table.number', 'Número'), width: '20%' },
+    { key: 'document_type', label: t('admin.invoices.index.table.type', 'Tipo'), width: '15%', render: (v, row) => typeLabels[row?.document_type] ?? typeLabels.invoice },
+    { key: 'customer', label: t('admin.invoices.index.table.customer', 'Cliente'), width: '25%', render: (v, row) => row?.contact?.full_name ?? v?.name ?? t('admin.invoices.index.table.not_available', 'N/A') },
     {
       key: 'status',
-      label: 'Estado',
+      label: t('admin.invoices.index.table.status', 'Estado'),
       width: '15%',
       render: (value, row) => {
         const code = row?.status ?? row?.invoice_status?.code ?? '';
-        const name = row?.invoice_status?.name ?? {
-          pending: 'Pendiente',
-          paid: 'Pagado',
-          shipped: 'Enviado',
-          delivered: 'Entregado',
-          cancelled: 'Cancelado',
-        }[code] ?? value;
+        const name = row?.invoice_status?.name ?? statusNames[code] ?? value;
 
         const color = statusStyles[code] ?? 'bg-muted text-foreground';
 
@@ -62,8 +74,8 @@ export default function Index({ invoices, filters }) {
         );
       },
     },
-    { key: 'total_usd', label: 'USD', width: '15%', render: (v) => Number(v).toFixed(2) },
-    { key: 'total_bs', label: 'BS', width: '15%', render: (v) => Number(v).toFixed(2) },
+    { key: 'total_usd', label: displayCurrency, width: '15%', render: (v) => formatActiveAmount(v) },
+    { key: 'total_bs', label: secondaryCurrency || t('admin.invoices.index.table.total_bs', 'Referencia'), width: '15%', render: (v, row) => secondaryCurrency ? formatActiveAmount(row?.total_usd ?? 0, secondaryCurrency) : '—' },
   ];
 
   const handleViewInvoice = (invoice) => {
@@ -78,27 +90,27 @@ export default function Index({ invoices, filters }) {
 
   return (
     <AuthenticatedLayout>
-      <Head title="Facturas" />
+      <Head title={t('admin.invoices.index.page_title', 'Facturas')} />
       <AdminIndexShell
-        title="Consulta facturas con un panel más claro para ventas y seguimiento"
-        description="La vista prioriza búsqueda, acceso rápido a nuevas facturas y revisión del historial sin obligar al usuario a recorrer una página lineal y plana."
+        title={t('admin.invoices.index.hero_title', 'Consulta facturas con un panel más claro para ventas y seguimiento')}
+        description={t('admin.invoices.index.hero_description', 'La vista prioriza búsqueda, acceso rápido a nuevas facturas y revisión del historial sin obligar al usuario a recorrer una página lineal y plana.')}
         stats={[
-          { label: 'Facturas visibles', value: data.length },
-          { label: 'Página', value: `${page}/${totalPages}` },
-          { label: 'Filtro', value: debounced ? 'Activo' : 'General' },
+          { label: t('admin.invoices.index.stats.visible_invoices', 'Facturas visibles'), value: data.length },
+          { label: t('admin.invoices.index.stats.page', 'Página'), value: `${page}/${totalPages}` },
+          { label: t('admin.invoices.index.stats.filter', 'Filtro'), value: debounced ? t('admin.invoices.index.values.active', 'Activo') : t('admin.invoices.index.values.general', 'General') },
         ]}
-        contextTitle="Facturas"
-        contextDescription="Revisa estados, totales y detalle comercial desde una tabla central con acceso inmediato al modal de consulta."
+        contextTitle={t('admin.invoices.index.context_title', 'Facturas')}
+        contextDescription={t('admin.invoices.index.context_description', 'Revisa estados, totales y detalle comercial desde una tabla central con acceso inmediato al modal de consulta.')}
         contextItems={[
-          { label: 'Búsqueda', value: debounced || 'Sin filtro' },
-          { label: 'Modal', value: isModalOpen ? 'Abierto' : 'Disponible' },
-          { label: 'Nueva factura', value: 'Acceso directo' },
+          { label: t('admin.invoices.index.context_items.search', 'Búsqueda'), value: debounced || t('admin.invoices.index.values.without_filter', 'Sin filtro') },
+          { label: t('admin.invoices.index.context_items.modal', 'Modal'), value: isModalOpen ? t('admin.invoices.index.values.open', 'Abierto') : t('admin.invoices.index.values.available', 'Disponible') },
+          { label: t('admin.invoices.index.context_items.new_invoice', 'Nueva factura'), value: t('admin.invoices.index.values.direct_access', 'Acceso directo') },
         ]}
         primaryAction={
-          <Link href={route('admin.invoices.create')} className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800">Nueva factura</Link>
+          <Link href={route('admin.invoices.create')} className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800">{t('admin.invoices.index.actions.new_invoice', 'Nueva factura')}</Link>
         }
         filters={
-          <AdminFilters searchPlaceholder="Buscar por número, cliente o estado" searchValue={search} onSearchChange={setSearch} />
+          <AdminFilters searchPlaceholder={t('admin.invoices.index.filters.search_placeholder', 'Buscar por número, cliente o estado')} searchValue={search} onSearchChange={setSearch} />
         }
       >
         <AdminTable

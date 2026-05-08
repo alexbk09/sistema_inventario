@@ -1,8 +1,12 @@
 import React, { useEffect, useState } from 'react'
 import { router, usePage } from '@inertiajs/react'
 import toast from 'react-hot-toast'
+import { useI18n } from '@/Hooks/useI18n';
+import { useDisplayCurrency } from '@/Hooks/useDisplayCurrency';
 
 export default function ProductModal({ isOpen, onClose, onSave, editingProduct }) {
+  const { t } = useI18n();
+  const { displayCurrency } = useDisplayCurrency();
   const { props } = usePage()
   const defaultMinStock = props?.settings?.inventory?.default_min_stock ?? 0
 
@@ -48,7 +52,7 @@ export default function ProductModal({ isOpen, onClose, onSave, editingProduct }
   const handleSubmit = (e) => {
     e.preventDefault()
     if (!formData.name.trim() || !formData.sku.trim()) {
-      toast.error('Nombre y SKU son requeridos', { position: 'top-center' })
+      toast.error(t('admin.products.modal.validation.required_name_sku', 'Nombre y SKU son requeridos'), { position: 'top-center' })
       return
     }
     onSave({ ...formData, id: editingProduct?.id, images })
@@ -60,47 +64,47 @@ export default function ProductModal({ isOpen, onClose, onSave, editingProduct }
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative w-full max-w-lg mx-4 bg-card border border-border rounded-xl shadow-lg">
         <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-foreground">{editingProduct ? 'Editar Producto' : 'Nuevo Producto'}</h2>
+          <h2 className="text-lg font-semibold text-foreground">{editingProduct ? t('admin.products.modal.edit_title', 'Editar producto') : t('admin.products.modal.create_title', 'Nuevo producto')}</h2>
           <button onClick={onClose} className="px-2 py-1 text-muted-foreground hover:text-foreground">×</button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4 px-5 py-4">
           <div>
-            <label className="block text-sm font-semibold text-foreground mb-2">Nombre *</label>
+            <label className="block text-sm font-semibold text-foreground mb-2">{t('admin.products.modal.form.name', 'Nombre')} *</label>
             <input type="text" name="name" value={formData.name} onChange={handleChange} className="w-full px-4 py-2 bg-background border border-border rounded-lg" required />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-foreground mb-2">SKU *</label>
+            <label className="block text-sm font-semibold text-foreground mb-2">{t('admin.products.modal.form.sku', 'SKU')} *</label>
             <input type="text" name="sku" value={formData.sku} onChange={handleChange} className="w-full px-4 py-2 bg-background border border-border rounded-lg" required />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-foreground mb-2">Código de barras (opcional)</label>
+            <label className="block text-sm font-semibold text-foreground mb-2">{t('admin.products.modal.form.barcode_optional', 'Código de barras (opcional)')}</label>
             <input
               type="text"
               name="barcode"
               value={formData.barcode}
               onChange={handleChange}
-              placeholder="Ej: EAN-13, UPC, código interno"
+              placeholder={t('admin.products.modal.form.barcode_placeholder', 'Ej: EAN-13, UPC, código interno')}
               className="w-full px-4 py-2 bg-background border border-border rounded-lg"
             />
             {formData.barcode && (
               <div className="mt-2 p-2 border border-dashed border-border rounded-lg bg-muted/40">
-                <p className="text-xs text-muted-foreground mb-1">Previsualización de código (texto almacenado, uso futuro):</p>
+                <p className="text-xs text-muted-foreground mb-1">{t('admin.products.modal.form.barcode_preview', 'Previsualización de código (texto almacenado, uso futuro):')}</p>
                 <p className="font-mono text-sm tracking-widest text-foreground">{formData.barcode}</p>
               </div>
             )}
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-semibold text-foreground mb-2">Precio USD *</label>
+              <label className="block text-sm font-semibold text-foreground mb-2">{`${t('admin.products.modal.form.price_usd', 'Precio')} ${displayCurrency}`} *</label>
               <input type="number" step="0.01" name="price_usd" value={formData.price_usd} onChange={handleChange} className="w-full px-4 py-2 bg-background border border-border rounded-lg" required />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-foreground mb-2">Stock *</label>
+              <label className="block text-sm font-semibold text-foreground mb-2">{t('admin.products.modal.form.stock', 'Stock')} *</label>
               <input type="number" name="stock" readOnly value={formData.stock} onChange={handleChange} className="w-full px-4 py-2 bg-background border border-border rounded-lg" required />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-semibold text-foreground mb-2">Stock mínimo (alerta)</label>
+            <label className="block text-sm font-semibold text-foreground mb-2">{t('admin.products.modal.form.min_stock', 'Stock mínimo (alerta)')}</label>
             <input
               type="number"
               name="min_stock"
@@ -109,10 +113,10 @@ export default function ProductModal({ isOpen, onClose, onSave, editingProduct }
               className="w-full px-4 py-2 bg-background border border-border rounded-lg"
               min={0}
             />
-            <p className="mt-1 text-xs text-muted-foreground">Si se deja vacío, se usará el valor por defecto de configuración.</p>
+            <p className="mt-1 text-xs text-muted-foreground">{t('admin.products.modal.form.min_stock_help', 'Si se deja vacío, se usará el valor por defecto de configuración.')}</p>
           </div>
           <div>
-            <label className="block text-sm font-semibold text-foreground mb-2">Descripción</label>
+            <label className="block text-sm font-semibold text-foreground mb-2">{t('admin.products.modal.form.description', 'Descripción')}</label>
             <textarea name="description" value={formData.description} onChange={handleChange} className="w-full px-4 py-2 bg-background border border-border rounded-lg resize-none" rows={3} />
           </div>
           <div className="flex items-center gap-2">
@@ -130,12 +134,12 @@ export default function ProductModal({ isOpen, onClose, onSave, editingProduct }
               className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
             />
             <label htmlFor="is_featured" className="text-sm text-foreground">
-              Destacado en la tienda (aparece en el home y recomendaciones)
+              {t('admin.products.modal.form.featured', 'Destacado en la tienda (aparece en el home y recomendaciones)')}
             </label>
           </div>
           {editingProduct && existingImages.length > 0 && (
             <div>
-              <label className="block text-sm font-semibold text-foreground mb-2">Imágenes actuales</label>
+              <label className="block text-sm font-semibold text-foreground mb-2">{t('admin.products.modal.form.current_images', 'Imágenes actuales')}</label>
               <div className="grid grid-cols-3 gap-2">
                 {existingImages.map((img) => (
                   <div key={img.id} className="relative h-20 rounded-lg overflow-hidden border border-border bg-muted/40">
@@ -151,10 +155,10 @@ export default function ProductModal({ isOpen, onClose, onSave, editingProduct }
                           preserveScroll: true,
                           onSuccess: () => {
                             setExistingImages((prev) => prev.filter((i) => i.id !== img.id))
-                            toast.success('Imagen eliminada', { position: 'top-center' })
+                            toast.success(t('admin.products.modal.notifications.image_deleted', 'Imagen eliminada'), { position: 'top-center' })
                           },
                           onError: () => {
-                            toast.error('No se pudo eliminar la imagen', { position: 'top-center' })
+                            toast.error(t('admin.products.modal.notifications.image_delete_error', 'No se pudo eliminar la imagen'), { position: 'top-center' })
                           },
                         })
                       }}
@@ -165,11 +169,11 @@ export default function ProductModal({ isOpen, onClose, onSave, editingProduct }
                   </div>
                 ))}
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">Estas son las imágenes que ya tiene el producto. Puedes eliminarlas individualmente.</p>
+              <p className="mt-1 text-xs text-muted-foreground">{t('admin.products.modal.form.current_images_help', 'Estas son las imágenes que ya tiene el producto. Puedes eliminarlas individualmente.')}</p>
             </div>
           )}
           <div>
-            <label className="block text-sm font-semibold text-foreground mb-2">Imágenes del producto</label>
+            <label className="block text-sm font-semibold text-foreground mb-2">{t('admin.products.modal.form.product_images', 'Imágenes del producto')}</label>
             <input
               type="file"
               accept="image/*"
@@ -189,11 +193,11 @@ export default function ProductModal({ isOpen, onClose, onSave, editingProduct }
                 ))}
               </div>
             )}
-            <p className="mt-1 text-xs text-muted-foreground">Puedes subir una o varias imágenes. La primera se tomará como principal.</p>
+            <p className="mt-1 text-xs text-muted-foreground">{t('admin.products.modal.form.product_images_help', 'Puedes subir una o varias imágenes. La primera se tomará como principal.')}</p>
           </div>
           <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 border border-border rounded-lg">Cancelar</button>
-            <button type="submit" className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg">{editingProduct ? 'Actualizar' : 'Crear'}</button>
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 border border-border rounded-lg">{t('admin.products.modal.actions.cancel', 'Cancelar')}</button>
+            <button type="submit" className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg">{editingProduct ? t('admin.products.modal.actions.update', 'Actualizar') : t('admin.products.modal.actions.create', 'Crear')}</button>
           </div>
         </form>
       </div>

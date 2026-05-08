@@ -2,7 +2,7 @@ import GuestLayout from '@/Layouts/GuestLayout.jsx'
 import { Head, Link, usePage } from '@inertiajs/react'
 import { useCart } from '@/Hooks/useCart'
 import { ShoppingCart, ArrowLeft, Star } from 'lucide-react'
-import { useDisplayCurrency } from '@/Hooks/useDisplayCurrency'
+import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates'
 import { useI18n } from '@/Hooks/useI18n'
 
 export default function ProductShow({ product, related = [], rate }) {
@@ -10,7 +10,7 @@ export default function ProductShow({ product, related = [], rate }) {
   const page = usePage()
   const settings = page.props?.settings || {}
   const pageRate = rate ?? page.props?.rate ?? null
-  const { displayCurrency, baseCurrency, secondaryCurrency } = useDisplayCurrency()
+  const { displayCurrency, baseCurrency, comparisonCurrency, formatPriceFromUsd, hasRateForCurrency } = useConfiguredCurrencyRates()
   const { t } = useI18n()
 
   if (!product) {
@@ -43,9 +43,25 @@ export default function ProductShow({ product, related = [], rate }) {
 
   const priceUsd = Number(product.price ?? product.price_usd ?? 0)
   const effectiveRate = pageRate ?? settings.currency?.bs_rate ?? 0
-  const priceBs = Number(
-    product.price_bs ?? (priceUsd * (effectiveRate || 0))
-  )
+
+  const renderPrice = (amountUsd) => {
+    const comparisonPrice = comparisonCurrency && comparisonCurrency !== displayCurrency && hasRateForCurrency(comparisonCurrency)
+      ? formatPriceFromUsd(amountUsd, comparisonCurrency)
+      : (displayCurrency !== baseCurrency ? formatPriceFromUsd(amountUsd, baseCurrency) : null)
+
+    return (
+      <>
+        <p className="text-3xl font-bold text-primary mb-1">
+          {formatPriceFromUsd(amountUsd, displayCurrency)}
+        </p>
+        {comparisonPrice && (
+          <p className="text-sm text-muted-foreground">
+            {comparisonPrice}
+          </p>
+        )}
+      </>
+    )
+  }
 
   const handleAddToCart = () => {
     if ((product.stock ?? 0) <= 0) return
@@ -80,13 +96,13 @@ export default function ProductShow({ product, related = [], rate }) {
                   {images[0] ? (
                     <img
                       src={images[0].url}
-                      alt={product.name}
+                      alt={t('product.image_alt', 'Imagen de :name', { name: product.name })}
                       className="object-cover w-full h-full"
                     />
                   ) : (
                     <img
                       src="/placeholder.svg"
-                      alt={product.name}
+                      alt={t('product.image_alt', 'Imagen de :name', { name: product.name })}
                       className="object-cover w-full h-full"
                     />
                   )}
@@ -97,7 +113,7 @@ export default function ProductShow({ product, related = [], rate }) {
                       <div key={img.id} className="aspect-square rounded border border-border overflow-hidden">
                         <img
                           src={img.url}
-                          alt={product.name}
+                          alt={t('product.image_alt', 'Imagen de :name', { name: product.name })}
                           className="object-cover w-full h-full"
                         />
                       </div>
@@ -131,36 +147,14 @@ export default function ProductShow({ product, related = [], rate }) {
                     </span>
                   </div>
                   {product.sku && (
-                    <p className="text-xs text-muted-foreground">SKU: {product.sku}</p>
+                    <p className="text-xs text-muted-foreground">{t('product.sku_label', 'SKU')}: {product.sku}</p>
                   )}
                   {product.barcode && (
-                    <p className="text-xs text-muted-foreground">Código: {product.barcode}</p>
+                    <p className="text-xs text-muted-foreground">{t('product.barcode_label', 'Código')}: {product.barcode}</p>
                   )}
                 </div>
 
-                <div>
-                  {displayCurrency === (secondaryCurrency || 'VES') ? (
-                    <>
-                      <p className="text-3xl font-bold text-primary mb-1">
-                        {secondaryCurrency || 'Bs.'}{' '}
-                        {priceBs.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {baseCurrency || 'USD'} ${priceUsd.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-3xl font-bold text-primary mb-1">
-                        {baseCurrency || 'USD'} ${priceUsd.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {secondaryCurrency || 'Bs.'}{' '}
-                        {priceBs.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                      </p>
-                    </>
-                  )}
-                </div>
+                <div>{renderPrice(priceUsd)}</div>
 
                 {product.description && (
                   <div>
@@ -204,6 +198,13 @@ export default function ProductShow({ product, related = [], rate }) {
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                   {related.map((rel) => (
+                    (() => {
+                      const relatedUsd = Number(rel.price ?? rel.price_usd ?? 0)
+                      const relatedComparisonPrice = comparisonCurrency && comparisonCurrency !== displayCurrency && hasRateForCurrency(comparisonCurrency)
+                        ? formatPriceFromUsd(relatedUsd, comparisonCurrency)
+                        : (displayCurrency !== baseCurrency ? formatPriceFromUsd(relatedUsd, baseCurrency) : null)
+
+                      return (
                     <Link
                       key={rel.id}
                       href={route('product.show', rel.id)}
@@ -212,7 +213,7 @@ export default function ProductShow({ product, related = [], rate }) {
                       <div className="w-full aspect-video bg-muted overflow-hidden">
                         <img
                           src={rel.image || '/placeholder.svg'}
-                          alt={rel.name}
+                          alt={t('product.image_alt', 'Imagen de :name', { name: rel.name })}
                           className="object-cover w-full h-full"
                         />
                       </div>
@@ -223,11 +224,20 @@ export default function ProductShow({ product, related = [], rate }) {
                         <p className="text-sm font-semibold text-foreground line-clamp-2">
                           {rel.name}
                         </p>
-                        <p className="text-sm font-bold text-primary mt-1">
-                          ${Number(rel.price).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                        </p>
+                        <div className="mt-1">
+                          <p className="text-sm font-bold text-primary">
+                            {formatPriceFromUsd(relatedUsd, displayCurrency)}
+                          </p>
+                          {relatedComparisonPrice && (
+                            <p className="text-xs text-muted-foreground">
+                              {relatedComparisonPrice}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </Link>
+                      )
+                    })()
                   ))}
                 </div>
               </section>

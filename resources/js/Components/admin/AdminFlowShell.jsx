@@ -1,4 +1,5 @@
 import { Link } from '@inertiajs/react';
+import { useI18n } from '@/Hooks/useI18n';
 
 export function AdminFlowSection({ eyebrow, title, description, children, contentClassName = 'p-6' }) {
     return (
@@ -17,7 +18,7 @@ export default function AdminFlowShell({
     title,
     description,
     backHref,
-    backLabel = 'Volver',
+    backLabel,
     stats = [],
     sections = [],
     activeSection,
@@ -29,14 +30,16 @@ export default function AdminFlowShell({
     actions,
     children,
 }) {
+    const { t } = useI18n();
     const currentSection = sections.find((section) => section.key === activeSection) ?? sections[0];
+    const resolvedBackLabel = backLabel ?? t('admin.shell.back', 'Volver');
 
     return (
         <div className="space-y-8">
             <section className="overflow-hidden rounded-[36px] border border-slate-200 bg-[linear-gradient(135deg,_#f8fafc,_#e0f2fe_52%,_#fff7ed)] shadow-sm">
                 <div className="grid gap-6 px-6 py-7 lg:grid-cols-[minmax(0,1fr)_320px] lg:px-8">
                     <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.26em] text-sky-700">Backoffice</p>
+                        <p className="text-xs font-semibold uppercase tracking-[0.26em] text-sky-700">{t('admin.shell.backoffice', 'Backoffice')}</p>
                         <h1 className="mt-3 max-w-3xl text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">{title}</h1>
                         <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">{description}</p>
                         {backHref ? (
@@ -45,7 +48,7 @@ export default function AdminFlowShell({
                                     href={backHref}
                                     className="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                                 >
-                                    {backLabel}
+                                    {resolvedBackLabel}
                                 </Link>
                             </div>
                         ) : null}
@@ -66,7 +69,7 @@ export default function AdminFlowShell({
             <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)_320px]">
                 <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
                     <div className="rounded-[28px] border border-slate-200 bg-white p-3 shadow-sm">
-                        <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Flujo</p>
+                        <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">{t('admin.shell.views', 'Flujo')}</p>
                         <div className="space-y-3">
                             {sections.map((section) => {
                                 const isActive = section.key === currentSection?.key;
@@ -97,7 +100,7 @@ export default function AdminFlowShell({
                     </div>
 
                     <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Contexto</p>
+                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">{t('admin.shell.context', 'Contexto')}</p>
                         <h2 className="mt-2 text-xl font-semibold text-slate-900">{contextTitle ?? currentSection?.title}</h2>
                         <p className="mt-2 text-sm leading-6 text-slate-600">{contextDescription ?? currentSection?.description}</p>
                         {contextItems.length > 0 ? (

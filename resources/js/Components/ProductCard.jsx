@@ -2,7 +2,7 @@ import { useCart } from '@/Hooks/useCart'
 import { usePage, router, Link } from '@inertiajs/react'
 import { Star, ShoppingCart, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useState, useEffect } from 'react'
-import { useDisplayCurrency } from '@/Hooks/useDisplayCurrency'
+import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates'
 import { useI18n } from '@/Hooks/useI18n'
 export default function ProductCard({
   product,
@@ -12,10 +12,9 @@ export default function ProductCard({
   const user = usePage().props?.auth?.user
   const [isAdding, setIsAdding] = useState(false)
   const [showNotification, setShowNotification] = useState(false)
-  const pageRate = usePage().props?.rate ?? null
   const [imageIndex, setImageIndex] = useState(0)
   const [isHovered, setIsHovered] = useState(false)
-  const { displayCurrency, baseCurrency, secondaryCurrency } = useDisplayCurrency()
+  const { displayCurrency, baseCurrency, comparisonCurrency, formatPriceFromUsd, hasRateForCurrency } = useConfiguredCurrencyRates()
   const { t } = useI18n()
 
   const primaryImageUrl = Array.isArray(product.images) && product.images.length > 0
@@ -53,9 +52,9 @@ export default function ProductCard({
 
   const isOutOfStock = product.stock <= 0
   const priceUsd = Number(product.price ?? product.price_usd ?? 0)
-  const priceBs = Number(
-    product.price_bs ?? (priceUsd * ((pageRate ?? window?.BS_RATE ?? 0)))
-  )
+  const comparisonPrice = comparisonCurrency && comparisonCurrency !== displayCurrency && hasRateForCurrency(comparisonCurrency)
+    ? formatPriceFromUsd(priceUsd, comparisonCurrency)
+    : null
 
   const images = Array.isArray(product.images) && product.images.length > 0
     ? product.images
@@ -154,7 +153,7 @@ export default function ProductCard({
           )}
           {product.stock > 0 && (
             <div className="absolute top-2 right-2 bg-destructive text-destructive-foreground px-3 py-1 rounded-full text-xs font-semibold text-white">
-              {t('product.stock_label', `${product.stock} disponibles`, { count: product.stock })}
+              {t('product.stock_badge', ':count disponibles', { count: product.stock })}
             </div>
           )}
         </div>
@@ -205,27 +204,18 @@ export default function ProductCard({
 
         {/* Precio */}
         <div>
-          {displayCurrency === (secondaryCurrency || 'VES') ? (
-            <>
-              <p className="text-2xl font-bold text-primary">
-                {secondaryCurrency || 'Bs.'}{' '}
-                {priceBs.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {baseCurrency || 'USD'} ${priceUsd.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-              </p>
-            </>
-          ) : (
-            <>
-              <p className="text-2xl font-bold text-primary">
-                {baseCurrency || 'USD'} ${priceUsd.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {secondaryCurrency || 'Bs.'}{' '}
-                {priceBs.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-              </p>
-            </>
-          )}
+          <p className="text-2xl font-bold text-primary">
+            {formatPriceFromUsd(priceUsd, displayCurrency)}
+          </p>
+          {comparisonPrice ? (
+            <p className="text-sm text-muted-foreground">
+              {comparisonPrice}
+            </p>
+          ) : displayCurrency !== baseCurrency ? (
+            <p className="text-sm text-muted-foreground">
+              {formatPriceFromUsd(priceUsd, baseCurrency)}
+            </p>
+          ) : null}
         </div>
 
         {/* Botón Agregar al carrito */}

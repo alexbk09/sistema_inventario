@@ -1,6 +1,8 @@
 import React from "react"
 
 import { ChevronLeft, ChevronRight, Edit, Trash2, Eye } from 'lucide-react'
+import AdminPagination from '@/Components/admin/AdminPagination.jsx'
+import { useI18n } from '@/Hooks/useI18n'
 
 export default function AdminTable({
   columns = [],
@@ -13,6 +15,8 @@ export default function AdminTable({
   onView,
   loading = false,
 }) {
+  const { t } = useI18n()
+
   return (
     <div className="space-y-4">
       <div className="overflow-x-auto rounded-lg border border-border">
@@ -30,7 +34,7 @@ export default function AdminTable({
               ))}
               {(onEdit || onDelete || onView) && (
                 <th className="px-4 py-3 text-left text-sm font-semibold text-foreground">
-                  Acciones
+                  {t('admin.providers.index.table.actions', 'Acciones')}
                 </th>
               )}
             </tr>
@@ -39,13 +43,13 @@ export default function AdminTable({
             {loading ? (
               <tr>
                 <td colSpan={columns.length + (onEdit || onDelete || onView ? 1 : 0)} className="px-4 py-8 text-center text-muted-foreground">
-                  Cargando...
+                  {t('admin.providers.index.states.loading', 'Cargando...')}
                 </td>
               </tr>
             ) : data.length === 0 ? (
               <tr>
                 <td colSpan={columns.length + (onEdit || onDelete || onView ? 1 : 0)} className="px-4 py-8 text-center text-muted-foreground">
-                  No hay registros
+                  {t('admin.providers.index.states.empty', 'No hay registros')}
                 </td>
               </tr>
             ) : (
@@ -65,7 +69,7 @@ export default function AdminTable({
                           <button
                             onClick={() => onView(row)}
                             className="p-1 hover:bg-muted rounded transition text-foreground"
-                            title="Ver"
+                            title={t('admin.providers.index.actions.view', 'Ver')}
                           >
                             <Eye className="w-4 h-4" />
                           </button>
@@ -74,7 +78,7 @@ export default function AdminTable({
                           <button
                             onClick={() => onEdit(row)}
                             className="p-1 hover:bg-muted rounded transition text-accent"
-                            title="Editar"
+                            title={t('admin.providers.index.actions.edit', 'Editar')}
                           >
                             <Edit className="w-4 h-4" />
                           </button>
@@ -83,7 +87,7 @@ export default function AdminTable({
                           <button
                             onClick={() => onDelete(row)}
                             className="p-1 hover:bg-destructive/10 rounded transition text-destructive"
-                            title="Eliminar"
+                            title={t('admin.providers.index.actions.delete', 'Eliminar')}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -98,28 +102,7 @@ export default function AdminTable({
         </table>
       </div>
 
-      {/* Paginación */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          Página {page} de {totalPages}
-        </p>
-        <div className="flex gap-2">
-          <button
-            onClick={() => onPageChange(page - 1)}
-            disabled={page === 1}
-            className="p-2 hover:bg-muted rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <button
-            onClick={() => onPageChange(page + 1)}
-            disabled={page === totalPages}
-            className="p-2 hover:bg-muted rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
+      <AdminPagination page={page} totalPages={totalPages} onPageChange={onPageChange} />
     </div>
   )
 }

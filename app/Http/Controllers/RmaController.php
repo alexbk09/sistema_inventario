@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\{Rma, RmaItem, Invoice, InvoiceItem, Product, Customer, InvoiceStatus, MovementType};
-use App\Services\{CurrencyService, InventoryService};
+use App\Services\{AdminNotificationService, CurrencyService, InventoryService};
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
@@ -14,7 +14,7 @@ class RmaController extends Controller
     public function index(Request $request)
     {
         if (!$request->user() || !$request->user()->can('view rmas')) {
-            return redirect()->route('dashboard')->with('error', 'No tienes permiso para acceder al módulo de devoluciones.');
+            return redirect()->route('dashboard')->with('error', __('app.rmas.permissions.module_denied'));
         }
 
         $search = trim((string) $request->input('search', ''));
@@ -50,7 +50,7 @@ class RmaController extends Controller
     public function create(Request $request)
     {
         if (!$request->user() || !$request->user()->can('manage rmas')) {
-            return redirect()->route('dashboard')->with('error', 'No tienes permiso para crear devoluciones.');
+            return redirect()->route('dashboard')->with('error', __('app.rmas.permissions.create_denied'));
         }
 
         $invoices = Invoice::whereIn('status', ['paid','completed'])
@@ -69,10 +69,10 @@ class RmaController extends Controller
         ]);
     }
 
-    public function store(Request $request, CurrencyService $currency)
+    public function store(Request $request, CurrencyService $currency, AdminNotificationService $notificationService)
     {
         if (!$request->user() || !$request->user()->can('manage rmas')) {
-            return redirect()->route('dashboard')->with('error', 'No tienes permiso para crear devoluciones.');
+            return redirect()->route('dashboard')->with('error', __('app.rmas.permissions.create_denied'));
         }
 
         $data = $request->validate([
@@ -88,7 +88,7 @@ class RmaController extends Controller
             'items.*.reason' => ['nullable','string'],
         ]);
 
-        return DB::transaction(function () use ($data, $currency) {
+        return DB::transaction(function () use ($data, $currency, $notificationService) {
             $rma = new Rma();
             $rma->number = 'RMA-'.Str::upper(Str::random(8));
             $rma->invoice_id = $data['invoice_id'] ?? null;
@@ -137,14 +137,30 @@ class RmaController extends Controller
                 'total_bs' => $currency->usdToBs($totalUsd),
             ]);
 
-            return redirect()->route('admin.rmas.index')->with('success', 'Devolución creada correctamente.');
+            $notificationService->notifyStaff(
+                'rma_created',
+                'Nuevo RMA '.$rma->number,
+                'Estado inicial: '.$rma->status,
+                [
+                    'severity' => 'warning',
+                    'action_url' => route('admin.rmas.show', $rma->id),
+                    'action_label' => 'Revisar RMA',
+                    'dedupe_key' => 'rma_created:'.$rma->id,
+                    'data' => [
+                        'rma_id' => $rma->id,
+                        'status' => $rma->status,
+                    ],
+                ]
+            );
+
+            return redirect()->route('admin.rmas.index')->with('success', __('app.rmas.notifications.created'));
         });
     }
 
     public function show(Request $request, Rma $rma)
     {
         if (!$request->user() || !$request->user()->can('view rmas')) {
-            return redirect()->route('dashboard')->with('error', 'No tienes permiso para ver devoluciones.');
+            return redirect()->route('dashboard')->with('error', __('app.rmas.permissions.view_denied'));
         }
 
         $rma->load(['invoice', 'customer', 'items.product']);
@@ -186,10 +202,10 @@ class RmaController extends Controller
         ]);
     }
 
-    public function update(Request $request, Rma $rma, InventoryService $inventory, CurrencyService $currency)
+    public function update(Request $request, Rma $rma, InventoryService $inventory, CurrencyService $currency, AdminNotificationService $notificationService)
     {
         if (!$request->user() || !$request->user()->can('manage rmas')) {
-            return redirect()->route('dashboard')->with('error', 'No tienes permiso para actualizar devoluciones.');
+            return redirect()->route('dashboard')->with('error', __('app.rmas.permissions.update_denied'));
         }
 
         $data = $request->validate([
@@ -199,7 +215,7 @@ class RmaController extends Controller
 
         $oldStatus = $rma->status;
 
-        return DB::transaction(function () use ($rma, $data, $inventory, $currency, $oldStatus) {
+        return DB::transaction(function () use ($rma, $data, $inventory, $currency, $oldStatus, $notificationService) {
             $rma->status = $data['status'];
             if (isset($data['resolution_type'])) {
                 $rma->resolution_type = $data['resolution_type'];
@@ -228,7 +244,26 @@ class RmaController extends Controller
                 }
             }
 
-            return redirect()->route('admin.rmas.show', $rma->id)->with('success', 'Devolución actualizada correctamente.');
+            if ($oldStatus !== $rma->status) {
+                $notificationService->notifyStaff(
+                    'rma_status_changed',
+                    'RMA '.$rma->number.' actualizado',
+                    'Estado: '.$oldStatus.' -> '.$rma->status,
+                    [
+                        'severity' => in_array($rma->status, ['approved', 'completed'], true) ? 'success' : 'warning',
+                        'action_url' => route('admin.rmas.show', $rma->id),
+                        'action_label' => 'Ver RMA',
+                        'dedupe_key' => 'rma_status_changed:'.$rma->id.':'.$rma->status,
+                        'data' => [
+                            'rma_id' => $rma->id,
+                            'old_status' => $oldStatus,
+                            'new_status' => $rma->status,
+                        ],
+                    ]
+                );
+            }
+
+            return redirect()->route('admin.rmas.show', $rma->id)->with('success', __('app.rmas.notifications.updated'));
         });
     }
 }

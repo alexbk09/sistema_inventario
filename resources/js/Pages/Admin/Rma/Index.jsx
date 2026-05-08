@@ -3,15 +3,16 @@ import { useEffect, useRef, useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.jsx';
 import AdminTable from '@/Components/admin/provider/AdminTableProviders.jsx';
 import AdminFilters from '@/Components/common/AdminFilters.jsx';
-
-const statusLabels = {
-  pending: 'Pendiente',
-  approved: 'Aprobada',
-  rejected: 'Rechazada',
-  completed: 'Completada',
-};
+import AdminIndexShell from '@/Components/admin/AdminIndexShell.jsx';
+import { useI18n } from '@/Hooks/useI18n';
+import { useLocaleFormat } from '@/Hooks/useLocaleFormat';
+import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates';
 
 export default function Index({ rmas, filters }) {
+  const { t } = useI18n();
+  const { formatNumber } = useLocaleFormat();
+  const { displayCurrency, formatPriceFromUsd } = useConfiguredCurrencyRates();
+  const formatActiveAmount = (value) => formatPriceFromUsd(Number(value || 0), displayCurrency);
   const { data } = rmas;
   const page = rmas.current_page ?? rmas?.meta?.current_page ?? 1;
   const totalPages = rmas.last_page ?? rmas?.meta?.last_page ?? 1;
@@ -50,78 +51,96 @@ export default function Index({ rmas, filters }) {
     router.get(route('admin.rmas.show', item.id));
   };
 
+  const statusLabels = {
+    pending: t('admin.rmas.statuses.pending', 'Pendiente'),
+    approved: t('admin.rmas.statuses.approved', 'Aprobada'),
+    rejected: t('admin.rmas.statuses.rejected', 'Rechazada'),
+    completed: t('admin.rmas.statuses.completed', 'Completada'),
+  };
+
   const columns = [
     {
       key: 'number',
-      label: 'Número',
+      label: t('admin.rmas.index.table.number', 'Número'),
       width: '20%',
     },
     {
       key: 'invoice',
-      label: 'Factura',
+      label: t('admin.rmas.index.table.invoice', 'Factura'),
       width: '20%',
-      render: (_value, row) => row.invoice?.number ?? 'N/A',
+      render: (_value, row) => row.invoice?.number ?? t('admin.rmas.values.not_available', 'N/A'),
     },
     {
       key: 'customer',
-      label: 'Cliente',
+      label: t('admin.rmas.index.table.customer', 'Cliente'),
       width: '25%',
-      render: (_value, row) => row.customer?.name ?? 'N/A',
+      render: (_value, row) => row.customer?.name ?? t('admin.rmas.values.not_available', 'N/A'),
     },
     {
       key: 'status',
-      label: 'Estado',
+      label: t('admin.rmas.index.table.status', 'Estado'),
       width: '15%',
       render: (value) => statusLabels[value] ?? value,
     },
     {
       key: 'total_usd',
-      label: 'Total USD',
+      label: `${t('admin.rmas.index.table.total_usd', 'Total')} ${displayCurrency}`,
       width: '20%',
-      render: (v) => `$${Number(v).toFixed(2)}`,
+      render: (v) => formatActiveAmount(v),
     },
   ];
 
   return (
     <AuthenticatedLayout>
-      <Head title="Devoluciones" />
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground mb-2">Devoluciones y Garantías</h1>
-            <p className="text-muted-foreground">Gestiona RMA de productos defectuosos y notas de crédito.</p>
-          </div>
+      <Head title={t('admin.rmas.index.page_title', 'Devoluciones')} />
+      <AdminIndexShell
+        title={t('admin.rmas.index.hero_title', 'Administra devoluciones y garantías con mejor lectura de caso')}
+        description={t('admin.rmas.index.hero_description', 'La vista concentra búsqueda, filtro por estado y acceso a nuevos RMA en una sola estructura consistente con el resto del backoffice.')}
+        stats={[
+          { label: t('admin.rmas.index.stats.visible', 'RMA visibles'), value: data.length },
+          { label: t('admin.rmas.index.stats.page', 'Página'), value: `${page}/${totalPages}` },
+          { label: t('admin.rmas.index.stats.status', 'Estado'), value: statusLabels[status] ?? t('admin.rmas.values.all', 'Todos') },
+        ]}
+        contextTitle={t('admin.rmas.index.context_title', 'Devoluciones y garantías')}
+        contextDescription={t('admin.rmas.index.context_description', 'Consulta casos por factura, cliente y estado sin perder la acción de registrar una nueva devolución.')}
+        contextItems={[
+          { label: t('admin.rmas.index.context_items.search', 'Filtro de búsqueda'), value: debounced || t('admin.rmas.values.general', 'General') },
+          { label: t('admin.rmas.index.context_items.status', 'Filtro de estado'), value: statusLabels[status] ?? t('admin.rmas.values.all', 'Todos') },
+          { label: t('admin.rmas.index.context_items.creation', 'Alta'), value: t('admin.rmas.index.actions.new', 'Nueva devolución') },
+        ]}
+        primaryAction={
           <button
             type="button"
             onClick={() => router.get(route('admin.rmas.create'))}
-            className="px-3 py-2 bg-primary text-primary-foreground rounded text-sm hover:bg-primary/90 transition"
+            className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
           >
-            Nueva devolución
+            {t('admin.rmas.index.actions.new', 'Nueva devolución')}
           </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_220px] gap-4 items-end">
-          <AdminFilters
-            searchPlaceholder="Buscar por número, factura o cliente..."
-            searchValue={search}
-            onSearchChange={setSearch}
-          />
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-muted-foreground">Estado</label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground"
-            >
-              <option value="">Todos</option>
-              <option value="pending">Pendiente</option>
-              <option value="approved">Aprobada</option>
-              <option value="rejected">Rechazada</option>
-              <option value="completed">Completada</option>
-            </select>
+        }
+        filters={
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_220px] md:items-end">
+            <AdminFilters
+              searchPlaceholder={t('admin.rmas.index.filters.search_placeholder', 'Buscar por número, factura o cliente...')}
+              searchValue={search}
+              onSearchChange={setSearch}
+            />
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t('admin.rmas.index.filters.status', 'Estado')}</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-900"
+              >
+                <option value="">{t('admin.rmas.values.all', 'Todos')}</option>
+                <option value="pending">{statusLabels.pending}</option>
+                <option value="approved">{statusLabels.approved}</option>
+                <option value="rejected">{statusLabels.rejected}</option>
+                <option value="completed">{statusLabels.completed}</option>
+              </select>
+            </div>
           </div>
-        </div>
-
+        }
+      >
         <AdminTable
           columns={columns}
           data={data}
@@ -130,7 +149,7 @@ export default function Index({ rmas, filters }) {
           onPageChange={handlePageChange}
           onView={handleView}
         />
-      </div>
+      </AdminIndexShell>
     </AuthenticatedLayout>
   );
 }

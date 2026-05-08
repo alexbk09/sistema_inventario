@@ -11,7 +11,7 @@ class WarehouseController extends Controller
     public function index(Request $request)
     {
         if (!$request->user() || !$request->user()->can('view warehouses')) {
-            return redirect()->route('dashboard')->with('error', 'No tienes permiso para acceder al módulo de sucursales.');
+            return redirect()->route('dashboard')->with('error', __('app.admin.warehouses.permissions.view_denied'));
         }
 
         $warehouses = Warehouse::orderBy('name')->paginate(20)->withQueryString();
@@ -24,7 +24,7 @@ class WarehouseController extends Controller
     public function store(Request $request)
     {
         if (!$request->user() || !$request->user()->can('manage warehouses')) {
-            return redirect()->route('dashboard')->with('error', 'No tienes permiso para crear o editar sucursales.');
+            return redirect()->route('dashboard')->with('error', __('app.admin.warehouses.permissions.manage_denied'));
         }
 
         $data = $request->validate([
@@ -37,6 +37,6 @@ class WarehouseController extends Controller
 
         Warehouse::create($data);
 
-        return redirect()->route('admin.warehouses.index')->with('success', 'Sucursal creada correctamente.');
+        return redirect()->route('admin.warehouses.index')->with('success', __('app.admin.warehouses.notifications.created'));
     }
 }

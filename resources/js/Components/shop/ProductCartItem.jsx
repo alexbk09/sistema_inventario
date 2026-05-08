@@ -1,8 +1,11 @@
 import React from 'react'
 import { Trash2 } from 'lucide-react'
+import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates'
 
 // Componente idéntico a la tarjeta del carrito de compra
 export default function ProductCartItem({ item, t, onRemove, onQuantityChange }) {
+  const { formatPriceFromUsd } = useConfiguredCurrencyRates()
+
   return (
     <div className="flex flex-col gap-4 rounded-2xl border border-border/70 bg-card p-4 transition hover:border-primary/50 sm:flex-row sm:items-start">
       {/* Imagen */}
@@ -23,7 +26,7 @@ export default function ProductCartItem({ item, t, onRemove, onQuantityChange })
           <p className="truncate text-xs text-muted-foreground sm:text-sm">{item.category}</p>
         </div>
         <p className="mt-3 text-sm font-bold text-primary sm:text-base">
-          ${item.price.toLocaleString('es-AR')}
+          {formatPriceFromUsd(Number(item.price ?? 0))}
         </p>
       </div>
 

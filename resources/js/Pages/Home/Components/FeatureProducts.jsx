@@ -1,10 +1,12 @@
 import { Link } from '@inertiajs/react'
 import { useEffect, useState } from 'react'
 import { useI18n } from '@/Hooks/useI18n'
+import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates'
 
 function FeaturedProductCard({ product }) {
   const [imageIndex, setImageIndex] = useState(0)
   const [isHovered, setIsHovered] = useState(false)
+  const { displayCurrency, baseCurrency, comparisonCurrency, formatPriceFromUsd, hasRateForCurrency } = useConfiguredCurrencyRates()
 
   const images = Array.isArray(product.images) && product.images.length > 0
     ? product.images
@@ -27,6 +29,11 @@ function FeaturedProductCard({ product }) {
 
     return () => clearInterval(interval)
   }, [images.length, isHovered])
+
+  const priceUsd = Number(product.price ?? product.price_usd ?? 0)
+  const comparisonPrice = comparisonCurrency && comparisonCurrency !== displayCurrency && hasRateForCurrency(comparisonCurrency)
+    ? formatPriceFromUsd(priceUsd, comparisonCurrency)
+    : (displayCurrency !== baseCurrency ? formatPriceFromUsd(priceUsd, baseCurrency) : null)
 
   return (
     <div
@@ -75,10 +82,12 @@ function FeaturedProductCard({ product }) {
         </h3>
 
         <div className="flex flex-col gap-1 mb-3">
-          <p className="text-primary font-bold">USD ${Number(product.price).toFixed(2)}</p>
-          <p className="text-muted-foreground text-xs">
-            BS {Number(product.price_bs ?? product.priceBs ?? 0).toFixed(2)}
-          </p>
+          <p className="text-primary font-bold">{formatPriceFromUsd(priceUsd, displayCurrency)}</p>
+          {comparisonPrice && (
+            <p className="text-muted-foreground text-xs">
+              {comparisonPrice}
+            </p>
+          )}
         </div>
       </div>
     </div>

@@ -91,6 +91,6 @@ class ProductInventoryController extends Controller
             return redirect()->back()->withInput()->with('error', $e->getMessage());
         }
 
-        return redirect()->back()->with('success', 'Movimiento de inventario registrado correctamente.');
+        return redirect()->back()->with('success', __('app.admin.products.inventory.notifications.movement_registered'));
     }
 }

@@ -1,8 +1,17 @@
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.jsx';
+import AdminPagination from '@/Components/admin/AdminPagination.jsx';
+import AdminIndexShell from '@/Components/admin/AdminIndexShell.jsx';
+import { useI18n } from '@/Hooks/useI18n';
+import { useLocaleFormat } from '@/Hooks/useLocaleFormat';
+import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates';
 
 export default function InventoryByWarehouse({ rows, filters = {}, warehouses = [], valuation }) {
+  const { t } = useI18n();
+  const { formatNumber } = useLocaleFormat();
+  const { displayCurrency, formatPriceFromUsd } = useConfiguredCurrencyRates();
+  const formatActiveAmount = (value) => formatPriceFromUsd(Number(value || 0), displayCurrency);
   const [localFilters, setLocalFilters] = useState({
     warehouse_id: filters.warehouse_id || '',
     search: filters.search || '',
@@ -10,6 +19,7 @@ export default function InventoryByWarehouse({ rows, filters = {}, warehouses = 
 
   const page = rows.current_page ?? rows?.meta?.current_page ?? 1;
   const totalPages = rows.last_page ?? rows?.meta?.last_page ?? 1;
+  const activeFilters = Object.values(filters || {}).filter((value) => value !== null && value !== undefined && value !== '').length;
 
   const submitFilters = () => {
     router.get(route('admin.reports.inventory.by_warehouse'), {
@@ -28,73 +38,41 @@ export default function InventoryByWarehouse({ rows, filters = {}, warehouses = 
 
   return (
     <AuthenticatedLayout>
-      <Head title="Inventario por bodega" />
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground mb-1">Inventario por bodega</h1>
-            <p className="text-muted-foreground text-sm">Valorización de stock actual por producto y sucursal/bodega usando movimientos.</p>
-          </div>
-        </div>
-
-        {/* Navegación entre vistas de inventario */}
-        <div className="flex gap-2 border-b border-border pb-2">
-          <button
-            type="button"
-            onClick={() => router.get(route('admin.reports.inventory.index'), {}, { replace: true })}
-            className="px-3 py-1.5 text-xs rounded border border-border text-muted-foreground hover:bg-muted"
-          >
-            Valorización global
-          </button>
-          <button
-            type="button"
-            className="px-3 py-1.5 text-xs rounded bg-primary text-primary-foreground"
-          >
-            Por producto y bodega
-          </button>
-          <button
-            type="button"
-            onClick={() => router.get(route('admin.reports.inventory.kardex'), {}, { replace: true })}
-            className="px-3 py-1.5 text-xs rounded border border-border text-muted-foreground hover:bg-muted"
-          >
-            Kardex de inventario
-          </button>
-          <button
-            type="button"
-            onClick={() => router.get(route('admin.reports.inventory.rotation'), {}, { replace: true })}
-            className="px-3 py-1.5 text-xs rounded border border-border text-muted-foreground hover:bg-muted"
-          >
-            Rotación de productos
-          </button>
-        </div>
-
-        {/* Métricas rápidas */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="rounded-lg border border-border bg-white p-4">
-            <div className="text-xs uppercase text-muted-foreground mb-1">Unidades totales (página)</div>
-            <div className="text-2xl font-semibold">{Number(valuation.total_units || 0).toFixed(0)}</div>
-          </div>
-          <div className="rounded-lg border border-border bg-white p-4">
-            <div className="text-xs uppercase text-muted-foreground mb-1">Valor costo USD (página)</div>
-            <div className="text-2xl font-semibold">{Number(valuation.total_cost_usd || 0).toFixed(2)}</div>
-          </div>
-          <div className="rounded-lg border border-border bg-white p-4">
-            <div className="text-xs uppercase text-muted-foreground mb-1">Valor venta USD (página)</div>
-            <div className="text-2xl font-semibold">{Number(valuation.total_price_usd || 0).toFixed(2)}</div>
-          </div>
-        </div>
-
-        {/* Filtros */}
-        <div className="rounded-lg border border-border bg-white p-4 space-y-3 text-sm">
+      <Head title={t('admin.reports.inventory.by_warehouse.page_title', 'Inventario por bodega')} />
+      <AdminIndexShell
+        title={t('admin.reports.inventory.by_warehouse.hero_title', 'Observa inventario por bodega con más contexto de operación')}
+        description={t('admin.reports.inventory.by_warehouse.hero_description', 'La vista muestra stock, valor costo y valor venta por sede y producto dentro del mismo marco visual de reportes administrativos.')}
+        stats={[
+          { label: t('admin.reports.inventory.by_warehouse.stats.units', 'Unidades página'), value: formatNumber(valuation.total_units || 0, { maximumFractionDigits: 0 }) },
+          { label: `${t('admin.reports.inventory.by_warehouse.stats.cost_usd', 'Costo')} ${displayCurrency}`, value: formatActiveAmount(valuation.total_cost_usd || 0) },
+          { label: `${t('admin.reports.inventory.by_warehouse.stats.price_usd', 'Venta')} ${displayCurrency}`, value: formatActiveAmount(valuation.total_price_usd || 0) },
+          { label: t('admin.reports.inventory.by_warehouse.stats.filters', 'Filtros'), value: activeFilters },
+        ]}
+        contextTitle={t('admin.reports.inventory.by_warehouse.context_title', 'Inventario por bodega')}
+        contextDescription={t('admin.reports.inventory.by_warehouse.context_description', 'Úsalo para comparar stock y valorización entre sucursales sin salir del ecosistema de reportes de inventario.')}
+        contextItems={[
+          { label: t('admin.reports.inventory.by_warehouse.context_items.view', 'Vista'), value: t('admin.reports.inventory.by_warehouse.context_items.view_value', 'Producto y bodega') },
+          { label: t('admin.reports.inventory.by_warehouse.context_items.page', 'Página'), value: `${page}/${totalPages}` },
+          { label: t('admin.reports.inventory.by_warehouse.context_items.visible_rows', 'Filas visibles'), value: rows.data.length },
+        ]}
+        filters={
+          <div className="space-y-4 text-sm">
+            <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+              <button type="button" onClick={() => router.get(route('admin.reports.inventory.index'), {}, { replace: true })} className="rounded-2xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50">{t('admin.reports.inventory.tabs.global', 'Valorización global')}</button>
+              <button type="button" className="rounded-2xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white">{t('admin.reports.inventory.tabs.by_warehouse', 'Por producto y bodega')}</button>
+              <button type="button" onClick={() => router.get(route('admin.reports.inventory.kardex'), {}, { replace: true })} className="rounded-2xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50">{t('admin.reports.inventory.tabs.kardex', 'Kardex de inventario')}</button>
+              <button type="button" onClick={() => router.get(route('admin.reports.inventory.rotation'), {}, { replace: true })} className="rounded-2xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50">{t('admin.reports.inventory.tabs.rotation', 'Rotación de productos')}</button>
+            </div>
+            <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4 space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">Sucursal/Bodega</label>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">{t('admin.reports.inventory.filters.warehouse', 'Sucursal/Bodega')}</label>
               <select
                 className="w-full border border-border rounded px-2 py-1 bg-background"
                 value={localFilters.warehouse_id}
                 onChange={(e) => setLocalFilters((f) => ({ ...f, warehouse_id: e.target.value }))}
               >
-                <option value="">Todas</option>
+                <option value="">{t('admin.reports.inventory.filters.all_female', 'Todas')}</option>
                 {warehouses.map((w) => (
                   <option key={w.id} value={w.id}>
                     {w.name} {w.code ? `(${w.code})` : ''}
@@ -103,11 +81,11 @@ export default function InventoryByWarehouse({ rows, filters = {}, warehouses = 
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">Buscar producto</label>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">{t('admin.reports.inventory.by_warehouse.filters.search_product', 'Buscar producto')}</label>
               <input
                 type="text"
                 className="w-full border border-border rounded px-2 py-1 bg-background"
-                placeholder="Nombre, SKU o código de barras"
+                placeholder={t('admin.reports.inventory.filters.search_placeholder', 'Nombre, SKU o código de barras')}
                 value={localFilters.search}
                 onChange={(e) => setLocalFilters((f) => ({ ...f, search: e.target.value }))}
               />
@@ -117,37 +95,41 @@ export default function InventoryByWarehouse({ rows, filters = {}, warehouses = 
           <div className="flex justify-end gap-2 pt-1">
             <button
               type="button"
-              className="px-3 py-1.5 text-xs rounded border border-border text-muted-foreground hover:bg-muted"
+              className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-100"
               onClick={() => {
                 setLocalFilters({ warehouse_id: '', search: '' });
                 router.get(route('admin.reports.inventory.by_warehouse'), {}, { replace: true });
               }}
             >
-              Limpiar filtros
+              {t('admin.reports.inventory.actions.clear_filters', 'Limpiar filtros')}
             </button>
             <button
               type="button"
-              className="px-3 py-1.5 text-xs rounded bg-primary text-primary-foreground hover:bg-primary/90"
+              className="rounded-2xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-800"
               onClick={submitFilters}
             >
-              Aplicar filtros
+              {t('admin.reports.inventory.actions.apply_filters', 'Aplicar filtros')}
             </button>
           </div>
         </div>
+          </div>
+        }
+      >
+        <div className="space-y-4 p-6">
 
         {/* Tabla de inventario por bodega */}
         <div className="overflow-x-auto rounded-lg border border-border bg-white">
           <table className="w-full text-sm">
             <thead className="bg-muted border-b border-border">
               <tr>
-                <th className="px-3 py-2 text-left font-semibold">Sucursal</th>
-                <th className="px-3 py-2 text-left font-semibold">Producto</th>
-                <th className="px-3 py-2 text-left font-semibold">SKU / Código</th>
-                <th className="px-3 py-2 text-right font-semibold">Stock unidades</th>
-                <th className="px-3 py-2 text-right font-semibold">Costo prom. USD</th>
-                <th className="px-3 py-2 text-right font-semibold">Precio USD</th>
-                <th className="px-3 py-2 text-right font-semibold">Valor costo USD</th>
-                <th className="px-3 py-2 text-right font-semibold">Valor venta USD</th>
+                <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.inventory.by_warehouse.table.branch', 'Sucursal')}</th>
+                <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.inventory.by_warehouse.table.product', 'Producto')}</th>
+                <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.inventory.by_warehouse.table.sku_barcode', 'SKU / Código')}</th>
+                <th className="px-3 py-2 text-right font-semibold">{t('admin.reports.inventory.by_warehouse.table.stock_units', 'Stock unidades')}</th>
+                <th className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.inventory.by_warehouse.table.avg_cost', 'Costo prom.')} ${displayCurrency}`}</th>
+                <th className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.inventory.by_warehouse.table.price', 'Precio')} ${displayCurrency}`}</th>
+                <th className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.inventory.by_warehouse.table.cost_value', 'Valor costo')} ${displayCurrency}`}</th>
+                <th className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.inventory.by_warehouse.table.sales_value', 'Valor venta')} ${displayCurrency}`}</th>
               </tr>
             </thead>
             <tbody>
@@ -160,20 +142,20 @@ export default function InventoryByWarehouse({ rows, filters = {}, warehouses = 
                 return (
                   <tr key={`${row.product_id}-${row.warehouse_id}`} className="border-b border-border hover:bg-muted/40">
                     <td className="px-3 py-2 text-xs">{row.warehouse?.name || row.warehouse?.code || '—'}</td>
-                    <td className="px-3 py-2 text-xs">{row.product?.name || 'Producto eliminado'}</td>
+                    <td className="px-3 py-2 text-xs">{row.product?.name || t('admin.reports.inventory.by_warehouse.table.deleted_product', 'Producto eliminado')}</td>
                     <td className="px-3 py-2 text-xs">{row.product?.sku || row.product?.barcode || '—'}</td>
-                    <td className="px-3 py-2 text-xs text-right">{units.toFixed(0)}</td>
-                    <td className="px-3 py-2 text-xs text-right">{cost.toFixed(2)}</td>
-                    <td className="px-3 py-2 text-xs text-right">{price.toFixed(2)}</td>
-                    <td className="px-3 py-2 text-xs text-right">{valueCost.toFixed(2)}</td>
-                    <td className="px-3 py-2 text-xs text-right">{valuePrice.toFixed(2)}</td>
+                    <td className="px-3 py-2 text-xs text-right">{formatNumber(units, { maximumFractionDigits: 0 })}</td>
+                    <td className="px-3 py-2 text-xs text-right">{formatActiveAmount(cost)}</td>
+                    <td className="px-3 py-2 text-xs text-right">{formatActiveAmount(price)}</td>
+                    <td className="px-3 py-2 text-xs text-right">{formatActiveAmount(valueCost)}</td>
+                    <td className="px-3 py-2 text-xs text-right">{formatActiveAmount(valuePrice)}</td>
                   </tr>
                 );
               })}
               {rows.data.length === 0 && (
                 <tr>
                   <td colSpan={8} className="px-3 py-6 text-center text-sm text-muted-foreground">
-                    No hay registros para los filtros seleccionados.
+                    {t('admin.reports.inventory.by_warehouse.empty', 'No hay registros para los filtros seleccionados.')}
                   </td>
                 </tr>
               )}
@@ -181,31 +163,9 @@ export default function InventoryByWarehouse({ rows, filters = {}, warehouses = 
           </table>
         </div>
 
-        {/* Paginación */}
-        <div className="flex items-center justify-between mt-2 text-sm text-muted-foreground">
-          <div>
-            Página {page} de {totalPages}
-          </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => handlePageChange(page - 1)}
-              disabled={page <= 1}
-              className="px-3 py-1 border rounded disabled:opacity-50"
-            >
-              Anterior
-            </button>
-            <button
-              type="button"
-              onClick={() => handlePageChange(page + 1)}
-              disabled={page >= totalPages}
-              className="px-3 py-1 border rounded disabled:opacity-50"
-            >
-              Siguiente
-            </button>
-          </div>
+        <AdminPagination page={page} totalPages={totalPages} onPageChange={handlePageChange} />
         </div>
-      </div>
+      </AdminIndexShell>
     </AuthenticatedLayout>
   );
 }

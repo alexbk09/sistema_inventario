@@ -2,8 +2,18 @@ import { Head, Link, useForm } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.jsx';
 import AdminFlowShell, { AdminFlowSection } from '@/Components/admin/AdminFlowShell.jsx';
+import { useI18n } from '@/Hooks/useI18n';
+import { useLocaleFormat } from '@/Hooks/useLocaleFormat';
+import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates';
 
 export default function Create({ products, customers, warehouses = [], layaways = [], users = [] }) {
+  const { t } = useI18n();
+  const { formatNumber } = useLocaleFormat();
+  const { displayCurrency, comparisonCurrency, formatPriceFromUsd, hasRateForCurrency } = useConfiguredCurrencyRates();
+  const secondaryCurrency = comparisonCurrency && comparisonCurrency !== displayCurrency && hasRateForCurrency(comparisonCurrency)
+    ? comparisonCurrency
+    : null;
+  const formatActiveAmount = (value, currency = displayCurrency) => formatPriceFromUsd(Number(value || 0), currency);
   const { data, setData, post, processing } = useForm({
     customer_id: '',
     document_type: 'invoice',
@@ -73,6 +83,20 @@ export default function Create({ products, customers, warehouses = [], layaways 
     if (!data.customer_id) return layaways;
     return (layaways || []).filter((layaway) => String(layaway.customer_id) === String(data.customer_id));
   }, [layaways, data.customer_id]);
+
+  const documentTypeLabels = {
+    invoice: t('admin.invoices.document_types.invoice', 'Factura'),
+    delivery_note: t('admin.invoices.document_types.delivery_note', 'Nota de entrega'),
+    proforma: t('admin.invoices.document_types.proforma', 'Proforma'),
+  };
+
+  const paymentMethodLabels = {
+    efectivo: t('admin.invoices.create.payment_methods.cash', 'Efectivo'),
+    tarjeta: t('admin.invoices.create.payment_methods.card', 'Tarjeta'),
+    transferencia: t('admin.invoices.create.payment_methods.transfer', 'Transferencia'),
+    zelle: t('admin.invoices.create.payment_methods.zelle', 'Zelle'),
+    otro: t('admin.invoices.create.payment_methods.other', 'Otro'),
+  };
 
   const handleAddProduct = async (product) => {
     if (!product) return;
@@ -155,16 +179,16 @@ export default function Create({ products, customers, warehouses = [], layaways 
   const sections = [
     {
       key: 'context',
-      eyebrow: 'Cliente',
-      title: 'Contexto',
-      description: 'Cliente, documento, vendedor y notas visibles o internas.',
-      badge: 'Base',
+      eyebrow: t('admin.invoices.create.sections.context.eyebrow', 'Cliente'),
+      title: t('admin.invoices.create.sections.context.title', 'Contexto'),
+      description: t('admin.invoices.create.sections.context.description', 'Cliente, documento, vendedor y notas visibles o internas.'),
+      badge: t('admin.invoices.create.sections.context.badge', 'Base'),
     },
     {
       key: 'items',
-      eyebrow: 'Catalogo',
-      title: 'Productos',
-      description: 'Busca, agrega y ajusta cantidades antes de emitir la factura.',
+      eyebrow: t('admin.invoices.create.sections.items.eyebrow', 'Catálogo'),
+      title: t('admin.invoices.create.sections.items.title', 'Productos'),
+      description: t('admin.invoices.create.sections.items.description', 'Busca, agrega y ajusta cantidades antes de emitir la factura.'),
       badge: `${itemsWithDetails.length}`,
     },
   ];
@@ -172,40 +196,40 @@ export default function Create({ products, customers, warehouses = [], layaways 
   const summary = (
     <>
       <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Resumen</p>
-        <h2 className="mt-2 text-xl font-semibold text-slate-900">Factura en preparación</h2>
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">{t('admin.invoices.create.summary.title', 'Resumen')}</p>
+        <h2 className="mt-2 text-xl font-semibold text-slate-900">{t('admin.invoices.create.summary.preparing', 'Factura en preparación')}</h2>
         <div className="mt-5 max-h-52 space-y-3 overflow-y-auto border-b border-slate-200 pb-4">
           {itemsWithDetails.length === 0 ? (
-            <p className="text-sm text-slate-500">No hay productos agregados todavía.</p>
+            <p className="text-sm text-slate-500">{t('admin.invoices.create.summary.empty', 'No hay productos agregados todavía.')}</p>
           ) : itemsWithDetails.map((item, index) => (
             <div key={`${item.product?.id ?? index}-summary`} className="flex justify-between gap-3 text-sm">
               <div className="min-w-0 flex-1">
-                <p className="truncate font-medium text-slate-900">{item.product?.name ?? 'Producto'}</p>
+                <p className="truncate font-medium text-slate-900">{item.product?.name ?? t('admin.invoices.create.summary.product_fallback', 'Producto')}</p>
                 <p className="text-xs text-slate-500">x{item.quantity}</p>
               </div>
-              <p className="font-semibold text-slate-900">${item.subtotal.toFixed(2)}</p>
+              <p className="font-semibold text-slate-900">{formatActiveAmount(item.subtotal)}</p>
             </div>
           ))}
         </div>
         <div className="mt-4 space-y-3 text-sm text-slate-600">
           <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
-            <span>Subtotal USD</span>
-            <strong className="text-slate-900">${subtotalUsd.toFixed(2)}</strong>
+            <span>{`${t('admin.invoices.create.summary.subtotal_usd', 'Subtotal')} ${displayCurrency}`}</span>
+            <strong className="text-slate-900">{formatActiveAmount(subtotalUsd)}</strong>
           </div>
           <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
-            <span>Subtotal Bs</span>
-            <strong className="text-slate-900">Bs {subtotalBs.toLocaleString('es-VE')}</strong>
+            <span>{secondaryCurrency ? `${t('admin.invoices.create.summary.subtotal_bs', 'Referencia')} ${secondaryCurrency}` : t('admin.invoices.create.summary.subtotal_bs', 'Referencia')}</span>
+            <strong className="text-slate-900">{secondaryCurrency ? formatActiveAmount(subtotalUsd, secondaryCurrency) : '—'}</strong>
           </div>
           <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
-            <span>Pagos cargados</span>
-            <strong className="text-slate-900">${paymentsTotalUsd.toFixed(2)}</strong>
+            <span>{`${t('admin.invoices.create.summary.payments_loaded', 'Pagos cargados')} ${displayCurrency}`}</span>
+            <strong className="text-slate-900">{formatActiveAmount(paymentsTotalUsd)}</strong>
           </div>
         </div>
       </div>
 
       <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Cobros rápidos</p>
-        <p className="mt-2 text-sm leading-6 text-slate-600">Puedes adelantar formas de pago básicas sin salir de la creación de factura.</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">{t('admin.invoices.create.quick_payments.title', 'Cobros rápidos')}</p>
+        <p className="mt-2 text-sm leading-6 text-slate-600">{t('admin.invoices.create.quick_payments.description', 'Puedes adelantar formas de pago básicas sin salir de la creación de factura.')}</p>
         <div className="mt-4 max-h-44 space-y-2 overflow-y-auto">
           {(data.payments || []).map((payment, index) => (
             <div key={`payment-${index}`} className="flex items-center gap-2 rounded-2xl bg-slate-50 p-2 text-xs">
@@ -218,17 +242,17 @@ export default function Create({ products, customers, warehouses = [], layaways 
                   setData('payments', nextPayments);
                 }}
               >
-                <option value="efectivo">Efectivo</option>
-                <option value="tarjeta">Tarjeta</option>
-                <option value="transferencia">Transferencia</option>
-                <option value="zelle">Zelle</option>
-                <option value="otro">Otro</option>
+                <option value="efectivo">{paymentMethodLabels.efectivo}</option>
+                <option value="tarjeta">{paymentMethodLabels.tarjeta}</option>
+                <option value="transferencia">{paymentMethodLabels.transferencia}</option>
+                <option value="zelle">{paymentMethodLabels.zelle}</option>
+                <option value="otro">{paymentMethodLabels.otro}</option>
               </select>
               <input
                 type="number"
                 min="0"
                 step="0.01"
-                placeholder="Monto USD"
+                placeholder={`${t('admin.invoices.create.quick_payments.amount_usd', 'Monto')} ${displayCurrency}`}
                 className="flex-1 rounded-xl border border-slate-200 bg-white px-2 py-2 text-slate-700"
                 value={payment.amount_usd}
                 onChange={(event) => {
@@ -252,7 +276,7 @@ export default function Create({ products, customers, warehouses = [], layaways 
           onClick={() => setData('payments', [...(data.payments || []), { method: 'efectivo', amount_usd: '' }])}
           className="mt-4 w-full rounded-2xl border border-dashed border-slate-300 px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
         >
-          Añadir pago
+          {t('admin.invoices.create.quick_payments.add_payment', 'Añadir pago')}
         </button>
       </div>
     </>
@@ -260,49 +284,49 @@ export default function Create({ products, customers, warehouses = [], layaways 
 
   return (
     <AuthenticatedLayout>
-      <Head title="Nueva factura" />
+      <Head title={t('admin.invoices.create.page_title', 'Nueva factura')} />
 
       <form onSubmit={submit}>
         <AdminFlowShell
-          title="Crea facturas con un flujo más claro para el equipo administrativo"
-          description="La vista se organiza por bloques para reducir ruido visual: primero defines el contexto de la operación y luego armas el detalle de productos, mientras el resumen queda siempre visible."
+          title={t('admin.invoices.create.hero_title', 'Crea facturas con un flujo más claro para el equipo administrativo')}
+          description={t('admin.invoices.create.hero_description', 'La vista se organiza por bloques para reducir ruido visual: primero defines el contexto de la operación y luego armas el detalle de productos, mientras el resumen queda siempre visible.')}
           backHref={route('admin.invoices.index')}
-          backLabel="Volver al listado"
+          backLabel={t('admin.invoices.create.back_to_list', 'Volver al listado')}
           stats={[
-            { label: 'Productos', value: itemsWithDetails.length },
-            { label: 'Total USD', value: `$${subtotalUsd.toFixed(2)}` },
-            { label: 'Pagos', value: data.payments?.length ?? 0 },
+            { label: t('admin.invoices.create.stats.products', 'Productos'), value: itemsWithDetails.length },
+            { label: `${t('admin.invoices.create.stats.total_usd', 'Total')} ${displayCurrency}`, value: formatActiveAmount(subtotalUsd) },
+            { label: t('admin.invoices.create.stats.payments', 'Pagos'), value: data.payments?.length ?? 0 },
           ]}
           sections={sections}
           activeSection={activeSection}
           onSectionChange={setActiveSection}
-          contextTitle="Factura"
-          contextDescription="Administra cliente, documento y detalle comercial sin perder de vista montos ni cobros rápidos."
+          contextTitle={t('admin.invoices.create.context_title', 'Factura')}
+          contextDescription={t('admin.invoices.create.context_description', 'Administra cliente, documento y detalle comercial sin perder de vista montos ni cobros rápidos.')}
           contextItems={[
-            { label: 'Cliente', value: data.customer_id ? 'Asignado' : 'Opcional' },
-            { label: 'Documento', value: data.document_type === 'invoice' ? 'Factura' : data.document_type === 'delivery_note' ? 'Nota de entrega' : 'Proforma' },
-            { label: 'Crédito', value: data.credit_sale ? 'Sí' : 'No' },
+            { label: t('admin.invoices.create.context_items.customer', 'Cliente'), value: data.customer_id ? t('admin.invoices.create.values.assigned', 'Asignado') : t('admin.invoices.create.values.optional', 'Opcional') },
+            { label: t('admin.invoices.create.context_items.document', 'Documento'), value: documentTypeLabels[data.document_type] ?? documentTypeLabels.invoice },
+            { label: t('admin.invoices.create.context_items.credit', 'Crédito'), value: data.credit_sale ? t('admin.invoices.create.values.yes', 'Sí') : t('admin.invoices.create.values.no', 'No') },
           ]}
           summary={summary}
           actions={
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Guardado</p>
-                <p className="mt-1 text-sm text-slate-600">Estás editando <span className="font-semibold text-slate-900">{sections.find((section) => section.key === activeSection)?.title}</span>.</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">{t('admin.invoices.create.actions.save_heading', 'Guardado')}</p>
+                <p className="mt-1 text-sm text-slate-600">{t('admin.invoices.create.actions.editing', 'Estás editando')} <span className="font-semibold text-slate-900">{sections.find((section) => section.key === activeSection)?.title}</span>.</p>
               </div>
               <div className="flex gap-3">
                 <Link
                   href={route('admin.invoices.index')}
                   className="inline-flex items-center justify-center rounded-2xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                 >
-                  Cancelar
+                  {t('admin.invoices.create.actions.cancel', 'Cancelar')}
                 </Link>
                 <button
                   type="submit"
                   disabled={processing}
                   className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
                 >
-                  {processing ? 'Guardando...' : 'Crear factura'}
+                  {processing ? t('admin.invoices.create.actions.saving', 'Guardando...') : t('admin.invoices.create.actions.submit', 'Crear factura')}
                 </button>
               </div>
             </div>
@@ -311,57 +335,57 @@ export default function Create({ products, customers, warehouses = [], layaways 
           {activeSection === 'context' ? (
             <>
               <AdminFlowSection
-                eyebrow="Documento"
-                title="Contexto comercial"
-                description="Define cliente, tipo de comprobante, bodega, vendedor y reglas opcionales de crédito antes de agregar productos."
+                eyebrow={t('admin.invoices.create.flow.document.eyebrow', 'Documento')}
+                title={t('admin.invoices.create.flow.document.title', 'Contexto comercial')}
+                description={t('admin.invoices.create.flow.document.description', 'Define cliente, tipo de comprobante, bodega, vendedor y reglas opcionales de crédito antes de agregar productos.')}
               >
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1">Cliente asociado</label>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">{t('admin.invoices.create.form.customer_associated', 'Cliente asociado')}</label>
                     <select
                       className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900"
                       value={data.customer_id}
                       onChange={(event) => setData('customer_id', event.target.value)}
                     >
-                      <option value="">Sin cliente (opcional)</option>
+                      <option value="">{t('admin.invoices.create.form.no_customer_optional', 'Sin cliente (opcional)')}</option>
                       {customers.map((customer) => (
                         <option key={customer.id} value={customer.id}>{customer.name}</option>
                       ))}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1">Tipo de comprobante</label>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">{t('admin.invoices.create.form.document_type', 'Tipo de comprobante')}</label>
                     <select
                       className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900"
                       value={data.document_type}
                       onChange={(event) => setData('document_type', event.target.value)}
                     >
-                      <option value="invoice">Factura</option>
-                      <option value="delivery_note">Nota de entrega</option>
-                      <option value="proforma">Proforma / Presupuesto</option>
+                      <option value="invoice">{documentTypeLabels.invoice}</option>
+                      <option value="delivery_note">{documentTypeLabels.delivery_note}</option>
+                      <option value="proforma">{t('admin.invoices.create.form.proforma_budget', 'Proforma / Presupuesto')}</option>
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1">Sucursal</label>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">{t('admin.invoices.create.form.warehouse', 'Sucursal')}</label>
                     <select
                       className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900"
                       value={data.warehouse_id}
                       onChange={(event) => setData('warehouse_id', event.target.value)}
                     >
-                      <option value="">Todas</option>
+                      <option value="">{t('admin.invoices.create.form.all_warehouses', 'Todas')}</option>
                       {(warehouses || []).map((warehouse) => (
                         <option key={warehouse.id} value={warehouse.id}>{warehouse.name} ({warehouse.code})</option>
                       ))}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1">Vendedor</label>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">{t('admin.invoices.create.form.seller', 'Vendedor')}</label>
                     <select
                       className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900"
                       value={data.seller_id}
                       onChange={(event) => setData('seller_id', event.target.value)}
                     >
-                      <option value="">Usuario actual</option>
+                      <option value="">{t('admin.invoices.create.form.current_user', 'Usuario actual')}</option>
                       {(users || []).map((user) => (
                         <option key={user.id} value={user.id}>{user.name}</option>
                       ))}
@@ -375,11 +399,11 @@ export default function Create({ products, customers, warehouses = [], layaways 
                         checked={data.credit_sale}
                         onChange={(event) => setData('credit_sale', event.target.checked)}
                       />
-                      <span>Registrar como venta a crédito</span>
+                      <span>{t('admin.invoices.create.form.credit_sale', 'Registrar como venta a crédito')}</span>
                     </label>
                     {data.credit_sale ? (
                       <div className="mt-3 max-w-sm">
-                        <label className="block text-xs font-semibold text-slate-700 mb-1">Fecha de vencimiento</label>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">{t('admin.invoices.create.form.credit_due_date', 'Fecha de vencimiento')}</label>
                         <input
                           type="date"
                           className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900"
@@ -390,46 +414,46 @@ export default function Create({ products, customers, warehouses = [], layaways 
                     ) : null}
                   </div>
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-semibold text-slate-700 mb-1">Apartado asociado</label>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">{t('admin.invoices.create.form.layaway_associated', 'Apartado asociado')}</label>
                     <select
                       className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900"
                       value={data.layaway_id}
                       onChange={(event) => setData('layaway_id', event.target.value)}
                     >
-                      <option value="">Sin apartado</option>
+                      <option value="">{t('admin.invoices.create.form.no_layaway', 'Sin apartado')}</option>
                       {layawaysForCustomer.map((layaway) => (
                         <option key={layaway.id} value={layaway.id}>
-                          {layaway.number} – {layaway.customer?.name ?? 'Sin cliente'} – USD {Number(layaway.total_usd ?? 0).toFixed(2)}
+                            {layaway.number} – {layaway.customer?.name ?? t('admin.invoices.create.form.no_customer', 'Sin cliente')} – {formatActiveAmount(layaway.total_usd ?? 0)}
                         </option>
                       ))}
                     </select>
                     {!data.customer_id && layawaysForCustomer.length > 0 ? (
-                      <p className="mt-2 text-xs text-slate-500">Selecciona un cliente para filtrar sus apartados activos.</p>
+                      <p className="mt-2 text-xs text-slate-500">{t('admin.invoices.create.form.layaway_help', 'Selecciona un cliente para filtrar sus apartados activos.')}</p>
                     ) : null}
                   </div>
                 </div>
               </AdminFlowSection>
 
               <AdminFlowSection
-                eyebrow="Notas"
-                title="Notas internas y para el cliente"
-                description="Separa la información operativa de la que sí verá el cliente en su factura o comprobante."
+                eyebrow={t('admin.invoices.create.flow.notes.eyebrow', 'Notas')}
+                title={t('admin.invoices.create.flow.notes.title', 'Notas internas y para el cliente')}
+                description={t('admin.invoices.create.flow.notes.description', 'Separa la información operativa de la que sí verá el cliente en su factura o comprobante.')}
               >
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1">Notas internas</label>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">{t('admin.invoices.create.form.internal_notes', 'Notas internas')}</label>
                     <textarea
                       className="min-h-[110px] w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900"
-                      placeholder="Solo visibles para el equipo interno."
+                      placeholder={t('admin.invoices.create.form.internal_notes_placeholder', 'Solo visibles para el equipo interno.')}
                       value={data.internal_notes}
                       onChange={(event) => setData('internal_notes', event.target.value)}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1">Notas para el cliente</label>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">{t('admin.invoices.create.form.public_notes', 'Notas para el cliente')}</label>
                     <textarea
                       className="min-h-[110px] w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900"
-                      placeholder="Mensaje que aparecerá en la factura o comprobante."
+                      placeholder={t('admin.invoices.create.form.public_notes_placeholder', 'Mensaje que aparecerá en la factura o comprobante.')}
                       value={data.public_notes}
                       onChange={(event) => setData('public_notes', event.target.value)}
                     />
@@ -439,25 +463,25 @@ export default function Create({ products, customers, warehouses = [], layaways 
             </>
           ) : (
             <AdminFlowSection
-              eyebrow="Catalogo"
-              title="Productos y detalle"
-              description="Busca por nombre, SKU o código de barras y arma la factura con cantidades y subtotales convertidos."
+              eyebrow={t('admin.invoices.create.flow.items.eyebrow', 'Catálogo')}
+              title={t('admin.invoices.create.flow.items.title', 'Productos y detalle')}
+              description={t('admin.invoices.create.flow.items.description', 'Busca por nombre, SKU o código de barras y arma la factura con cantidades y subtotales convertidos.')}
             >
               <div className="space-y-5">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Buscar producto</label>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">{t('admin.invoices.create.items.search_product', 'Buscar producto')}</label>
                   <input
                     type="text"
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Escribe para buscar..."
+                    placeholder={t('admin.invoices.create.items.search_placeholder', 'Escribe para buscar...')}
                     className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900"
                   />
                 </div>
 
                 <div className="overflow-hidden rounded-[24px] border border-slate-200">
                   {filteredProducts.length === 0 ? (
-                    <div className="p-4 text-center text-sm text-slate-500">No se encontraron productos.</div>
+                    <div className="p-4 text-center text-sm text-slate-500">{t('admin.invoices.create.items.no_products_found', 'No se encontraron productos.')}</div>
                   ) : (
                     <ul className="max-h-64 divide-y divide-slate-200 overflow-y-auto bg-white">
                       {filteredProducts.map((product) => (
@@ -465,8 +489,8 @@ export default function Create({ products, customers, warehouses = [], layaways 
                           <div className="flex flex-col">
                             <span className="text-sm font-medium text-slate-900">{product.name}</span>
                             <span className="text-xs text-slate-500">
-                              USD {Number(product.price_usd ?? 0).toFixed(2)}
-                              {typeof product.stock !== 'undefined' ? ` · Stock: ${product.stock}` : ''}
+                              {formatActiveAmount(product.price_usd ?? 0)}
+                              {typeof product.stock !== 'undefined' ? ` · ${t('admin.invoices.create.items.stock', 'Stock')}: ${product.stock}` : ''}
                             </span>
                           </div>
                           <button
@@ -474,7 +498,7 @@ export default function Create({ products, customers, warehouses = [], layaways 
                             onClick={() => handleAddProduct(product)}
                             className="rounded-2xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-800"
                           >
-                            Agregar
+                            {t('admin.invoices.create.items.add', 'Agregar')}
                           </button>
                         </li>
                       ))}
@@ -483,27 +507,27 @@ export default function Create({ products, customers, warehouses = [], layaways 
                 </div>
 
                 <div>
-                  <h3 className="mb-2 text-sm font-semibold text-slate-900">Ítems de la factura</h3>
+                  <h3 className="mb-2 text-sm font-semibold text-slate-900">{t('admin.invoices.create.items.invoice_items', 'Ítems de la factura')}</h3>
                   {itemsWithDetails.length === 0 ? (
-                    <p className="text-sm text-slate-500">Aún no has agregado productos. Usa el buscador para añadirlos.</p>
+                    <p className="text-sm text-slate-500">{t('admin.invoices.create.items.empty', 'Aún no has agregado productos. Usa el buscador para añadirlos.')}</p>
                   ) : (
                     <div className="overflow-hidden rounded-[24px] border border-slate-200">
                       <div className="max-h-[420px] overflow-auto bg-white">
                         <table className="w-full text-sm">
                           <thead className="bg-slate-50 text-slate-600">
                             <tr>
-                              <th className="px-4 py-3 text-left">Producto</th>
-                              <th className="px-4 py-3 text-center w-28">Cantidad</th>
-                              <th className="px-4 py-3 text-right w-24">Precio</th>
-                              <th className="px-4 py-3 text-right w-28">Subtotal USD</th>
-                              <th className="px-4 py-3 text-right w-32">Subtotal Bs</th>
+                              <th className="px-4 py-3 text-left">{t('admin.invoices.create.items.table.product', 'Producto')}</th>
+                              <th className="px-4 py-3 text-center w-28">{t('admin.invoices.create.items.table.quantity', 'Cantidad')}</th>
+                              <th className="px-4 py-3 text-right w-24">{`${t('admin.invoices.create.items.table.price', 'Precio')} ${displayCurrency}`}</th>
+                              <th className="px-4 py-3 text-right w-28">{`${t('admin.invoices.create.items.table.subtotal_usd', 'Subtotal')} ${displayCurrency}`}</th>
+                              <th className="px-4 py-3 text-right w-32">{secondaryCurrency ? `${t('admin.invoices.create.items.table.subtotal_bs', 'Referencia')} ${secondaryCurrency}` : t('admin.invoices.create.items.table.subtotal_bs', 'Referencia')}</th>
                               <th className="px-4 py-3 w-16" />
                             </tr>
                           </thead>
                           <tbody>
                             {itemsWithDetails.map((item, index) => (
                               <tr key={`${item.product?.id ?? index}-${index}`} className="border-t border-slate-200">
-                                <td className="px-4 py-3 text-slate-900">{item.product?.name ?? 'Producto'}</td>
+                                <td className="px-4 py-3 text-slate-900">{item.product?.name ?? t('admin.invoices.create.summary.product_fallback', 'Producto')}</td>
                                 <td className="px-4 py-3 text-center">
                                   <input
                                     type="number"
@@ -513,20 +537,10 @@ export default function Create({ products, customers, warehouses = [], layaways 
                                     className="w-20 rounded-xl border border-slate-300 bg-white px-2 py-2 text-center text-xs text-slate-900"
                                   />
                                 </td>
-                                <td className="px-4 py-3 text-right text-slate-900">${item.price.toFixed(2)}</td>
-                                <td className="px-4 py-3 text-right font-semibold text-slate-900">${item.subtotal.toFixed(2)}</td>
+                                <td className="px-4 py-3 text-right text-slate-900">{formatActiveAmount(item.price)}</td>
+                                <td className="px-4 py-3 text-right font-semibold text-slate-900">{formatActiveAmount(item.subtotal)}</td>
                                 <td className="px-4 py-3 text-right font-semibold text-slate-900">
-                                  {item.bs_subtotal ? (
-                                    <span>Bs {Number(item.bs_subtotal).toLocaleString('es-VE')}</span>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      onClick={() => fetchBsForItem(index)}
-                                      className="rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                                    >
-                                      Calcular Bs
-                                    </button>
-                                  )}
+                                  {secondaryCurrency ? formatActiveAmount(item.subtotal, secondaryCurrency) : '—'}
                                 </td>
                                 <td className="px-4 py-3 text-center">
                                   <button
@@ -534,7 +548,7 @@ export default function Create({ products, customers, warehouses = [], layaways 
                                     onClick={() => handleRemoveItem(index)}
                                     className="text-xs font-semibold text-rose-600 hover:text-rose-700"
                                   >
-                                    Quitar
+                                    {t('admin.invoices.create.items.remove', 'Quitar')}
                                   </button>
                                 </td>
                               </tr>

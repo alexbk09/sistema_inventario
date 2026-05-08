@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\{CreditAccount, CreditMovement, Customer};
+use App\Services\AdminNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -12,7 +13,7 @@ class CreditAccountController extends Controller
     public function index(Request $request)
     {
         if (!$request->user() || !$request->user()->can('view credits')) {
-            return redirect()->route('dashboard')->with('error', 'No tienes permiso para ver créditos.');
+            return redirect()->route('dashboard')->with('error', __('app.admin.credits.permissions.view_denied'));
         }
 
         $accounts = CreditAccount::with('customer')
@@ -26,10 +27,10 @@ class CreditAccountController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request, AdminNotificationService $notificationService)
     {
         if (!$request->user() || !$request->user()->can('manage credits')) {
-            return redirect()->route('dashboard')->with('error', 'No tienes permiso para crear cuentas de crédito.');
+            return redirect()->route('dashboard')->with('error', __('app.admin.credits.permissions.manage_account_denied'));
         }
 
         $data = $request->validate([
@@ -54,15 +55,30 @@ class CreditAccountController extends Controller
                 $account->status = $data['status'];
             }
             $account->save();
+        } else {
+            $notificationService->notifyStaff(
+                'credit_account_created',
+                'Nueva cuenta de credito #'.$account->id,
+                'Estado: '.$account->status,
+                [
+                    'severity' => 'info',
+                    'action_url' => route('admin.credits.show', $account->id),
+                    'action_label' => 'Ver cuenta',
+                    'dedupe_key' => 'credit_account_created:'.$account->id,
+                    'data' => [
+                        'credit_account_id' => $account->id,
+                    ],
+                ]
+            );
         }
 
-        return redirect()->route('admin.credits.show', $account->id)->with('success', 'Cuenta de crédito creada/actualizada.');
+        return redirect()->route('admin.credits.show', $account->id)->with('success', __('app.admin.credits.notifications.account_saved'));
     }
 
     public function show(Request $request, CreditAccount $account)
     {
         if (!$request->user() || !$request->user()->can('view credits')) {
-            return redirect()->route('dashboard')->with('error', 'No tienes permiso para ver créditos.');
+            return redirect()->route('dashboard')->with('error', __('app.admin.credits.permissions.view_denied'));
         }
 
         $account->load(['customer','movements' => function ($q) {
@@ -74,10 +90,10 @@ class CreditAccountController extends Controller
         ]);
     }
 
-    public function storeMovement(Request $request, CreditAccount $account)
+    public function storeMovement(Request $request, CreditAccount $account, AdminNotificationService $notificationService)
     {
         if (!$request->user() || !$request->user()->can('manage credits')) {
-            return redirect()->route('dashboard')->with('error', 'No tienes permiso para registrar movimientos de crédito.');
+            return redirect()->route('dashboard')->with('error', __('app.admin.credits.permissions.manage_movement_denied'));
         }
 
         $data = $request->validate([
@@ -87,7 +103,7 @@ class CreditAccountController extends Controller
             'due_date' => ['nullable','date'],
         ]);
 
-        return DB::transaction(function () use ($data, $account) {
+        return DB::transaction(function () use ($data, $account, $notificationService) {
             $movement = new CreditMovement();
             $movement->credit_account_id = $account->id;
             $movement->type = $data['type'];
@@ -106,7 +122,24 @@ class CreditAccountController extends Controller
             }
             $account->save();
 
-            return redirect()->route('admin.credits.show', $account->id)->with('success', 'Movimiento registrado.');
+            $notificationService->notifyStaff(
+                'credit_movement_created',
+                'Movimiento de credito registrado',
+                ucfirst($movement->type).' por $'.number_format((float) $movement->amount_usd, 2),
+                [
+                    'severity' => $movement->type === 'payment' ? 'success' : 'warning',
+                    'action_url' => route('admin.credits.show', $account->id),
+                    'action_label' => 'Ver credito',
+                    'dedupe_key' => 'credit_movement_created:'.$movement->id,
+                    'data' => [
+                        'credit_account_id' => $account->id,
+                        'movement_id' => $movement->id,
+                        'type' => $movement->type,
+                    ],
+                ]
+            );
+
+            return redirect()->route('admin.credits.show', $account->id)->with('success', __('app.admin.credits.notifications.movement_created'));
         });
     }
 }

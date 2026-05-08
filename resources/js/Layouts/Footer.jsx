@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import { Mail, Phone, Facebook, Instagram, Twitter } from 'lucide-react'
+import { Facebook, Instagram, Twitter } from 'lucide-react'
 import { useI18n } from '@/Hooks/useI18n';
 export default function FooterLayout() {
     const currentYear = new Date().getFullYear()
@@ -19,7 +19,7 @@ export default function FooterLayout() {
                 <h3 className="font-bold text-lg">{general.trade_name || general.company_name || 'Inventario'}</h3>
             </div>
             <p className="text-sm text-primary-foreground/80">
-                {store.contact_text || 'Tu tienda en línea de productos.'}
+              {store.contact_text || t('footer.company_tagline', 'Tu tienda en línea de productos.')}
             </p>
           </div>
 
@@ -35,11 +35,11 @@ export default function FooterLayout() {
                 </Link>
               </li>
               <li>
-                <li>
-                  <Link href={route('shop.index')} className="hover:text-accent transition">
-                    {t('footer.navigation_shop', 'Tienda')}
-                  </Link>
-                </li>
+                <Link href={route('shop.index')} className="hover:text-accent transition">
+                  {t('footer.navigation_shop', 'Tienda')}
+                </Link>
+              </li>
+              <li>
                 <Link href="#" className="hover:text-accent transition">
                   {t('footer.navigation_about', 'Sobre nosotros')}
                 </Link>
@@ -79,18 +79,21 @@ export default function FooterLayout() {
             <div className="flex gap-3 mb-6">
               <a
                   href={general.facebook_url || '#'}
+                aria-label={t('footer.social_facebook', 'Facebook')}
                 className="w-10 h-10 bg-primary-foreground/20 rounded-lg flex items-center justify-center hover:bg-primary-foreground/30 transition"
               >
                 <Facebook className="w-5 h-5" />
               </a>
               <a
                   href={general.instagram_url || '#'}
+                aria-label={t('footer.social_instagram', 'Instagram')}
                 className="w-10 h-10 bg-primary-foreground/20 rounded-lg flex items-center justify-center hover:bg-primary-foreground/30 transition"
               >
                 <Instagram className="w-5 h-5" />
               </a>
               <a
                   href={general.twitter_url || '#'}
+                aria-label={t('footer.social_twitter', 'Twitter')}
                 className="w-10 h-10 bg-primary-foreground/20 rounded-lg flex items-center justify-center hover:bg-primary-foreground/30 transition"
               >
                 <Twitter className="w-5 h-5" />
@@ -108,10 +111,7 @@ export default function FooterLayout() {
               )}
             </p>
           <div className="flex gap-4 mt-4 md:mt-0">
-            <Link href="/" className="hover:text-accent transition">
-              <Link href={route('shop.index')} className="hover:text-accent transition">
-                {t('footer.navigation_shop', 'Tienda')}
-              </Link>
+            <Link href={route('shop.index')} className="hover:text-accent transition">
               {t('footer.navigation_shop', 'Tienda')}
             </Link>
           </div>

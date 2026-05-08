@@ -11,7 +11,7 @@ class CustomerController extends Controller
     public function index(Request $request)
     {
         if (!$request->user() || !$request->user()->can('view customers')) {
-            return redirect()->route('dashboard')->with('error', 'No tienes permiso para acceder al módulo de clientes.');
+            return redirect()->route('dashboard')->with('error', __('app.admin.customers.permissions.view_denied'));
         }
 
         $search = trim((string) $request->input('search', ''));
@@ -43,7 +43,7 @@ class CustomerController extends Controller
     public function store(Request $request)
     {
         if (!$request->user() || !$request->user()->can('manage customers')) {
-            return redirect()->route('dashboard')->with('error', 'No tienes permiso para crear clientes.');
+            return redirect()->route('dashboard')->with('error', __('app.admin.customers.permissions.manage_denied'));
         }
 
         $data = $request->validate([
@@ -57,13 +57,13 @@ class CustomerController extends Controller
 
         Customer::create($data);
 
-        return redirect()->route('admin.customers.index')->with('success', 'Cliente creado correctamente.');
+        return redirect()->route('admin.customers.index')->with('success', __('app.admin.customers.notifications.created'));
     }
 
     public function show(Request $request, Customer $customer)
     {
         if (!$request->user() || !$request->user()->can('view customers')) {
-            return redirect()->route('dashboard')->with('error', 'No tienes permiso para acceder al módulo de clientes.');
+            return redirect()->route('dashboard')->with('error', __('app.admin.customers.permissions.view_denied'));
         }
 
         $customer->load(['invoices' => function ($q) {

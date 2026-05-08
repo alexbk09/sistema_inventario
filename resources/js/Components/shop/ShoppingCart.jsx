@@ -4,30 +4,16 @@ import { X, ShoppingBag, ShoppingCart as ShoppingCartIcon } from 'lucide-react'
 import ProductCartItem from './ProductCartItem'
 import { useState, useEffect } from 'react'
 import NavLink from '@/Components/NavLink';
-import { useDisplayCurrency } from '@/Hooks/useDisplayCurrency'
+import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates'
 import { useI18n } from '@/Hooks/useI18n'
 
 export default function ShoppingCart({ isOpen, onClose }) {
   const { cart, removeFromCart, updateQuantity, clearCart, addToCart } = useCart()
   const user = usePage().props?.auth?.user
-  const [rateBs, setRateBs] = useState(null)
   const [recommendations, setRecommendations] = useState([])
   const [isLoadingRecs, setIsLoadingRecs] = useState(false)
-  const { displayCurrency, baseCurrency, secondaryCurrency } = useDisplayCurrency()
+  const { displayCurrency, comparisonCurrency, formatPriceFromUsd, hasRateForCurrency } = useConfiguredCurrencyRates()
   const { t } = useI18n()
-
-  // Obtener el promedio (tasa) desde el backend para calcular Total BS
-  useEffect(() => {
-    if (!isOpen) return
-    setRateBs(null)
-    fetch('/api/currency/promedio?fuente=oficial', { cache: 'no-store' })
-      .then((res) => res.ok ? res.json() : Promise.reject(res))
-      .then((data) => {
-        const val = typeof data?.promedio === 'number' ? data.promedio : null
-        setRateBs(val)
-      })
-      .catch(() => setRateBs(null))
-  }, [isOpen])
 
   // Recomendaciones para upselling en el carrito
   useEffect(() => {
@@ -158,7 +144,7 @@ export default function ShoppingCart({ isOpen, onClose }) {
                             {rec.category}
                           </p>
                           <p className="text-sm font-bold text-primary">
-                            ${Number(rec.price).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                            {formatPriceFromUsd(Number(rec.price ?? 0), displayCurrency)}
                           </p>
                         </div>
                         <button
@@ -203,16 +189,9 @@ export default function ShoppingCart({ isOpen, onClose }) {
                 <span className="text-muted-foreground">
                   {t('cart.subtotal', 'Subtotal:')}
                 </span>
-                {displayCurrency === (secondaryCurrency || 'VES') && rateBs != null ? (
-                  <span className="text-foreground">
-                    {(secondaryCurrency || 'Bs.') + ' '}
-                    {(cart.total * rateBs).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                  </span>
-                ) : (
-                  <span className="text-foreground">
-                    ${cart.total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                  </span>
-                )}
+                <span className="text-foreground">
+                  {formatPriceFromUsd(cart.total, displayCurrency)}
+                </span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">
@@ -226,27 +205,20 @@ export default function ShoppingCart({ isOpen, onClose }) {
                 <span className="font-bold text-foreground">
                   {t('cart.total', 'Total:')}
                 </span>
-                {displayCurrency === (secondaryCurrency || 'VES') && rateBs != null ? (
-                  <span className="font-bold text-lg text-primary">
-                    {(secondaryCurrency || 'Bs.') + ' '}
-                    {(cart.total * rateBs).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                  </span>
-                ) : (
-                  <span className="font-bold text-lg text-primary">
-                    ${cart.total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                  </span>
-                )}
-              </div>
-              <div className="border-t border-border pt-2 flex justify-between">
-                <span className="font-bold text-foreground">
-                  {t('cart.total_bs', 'Total BS:')}
-                </span>
                 <span className="font-bold text-lg text-primary">
-                  {rateBs != null
-                    ? `Bs ${ (cart.total * rateBs).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }`
-                    : '…'}
+                  {formatPriceFromUsd(cart.total, displayCurrency)}
                 </span>
               </div>
+              {comparisonCurrency && comparisonCurrency !== displayCurrency && hasRateForCurrency(comparisonCurrency) && (
+                <div className="border-t border-border pt-2 flex justify-between">
+                  <span className="font-bold text-foreground">
+                    {`Total ${comparisonCurrency}:`}
+                  </span>
+                  <span className="font-bold text-lg text-primary">
+                    {formatPriceFromUsd(cart.total, comparisonCurrency)}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Botones */}
