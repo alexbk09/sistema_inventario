@@ -7,6 +7,7 @@ use App\Models\InvoiceItem;
 use App\Models\Product;
 use App\Services\CurrencyService;
 use App\Support\Settings;
+use App\Support\TranslationKeySanitizer;
 use Inertia\Inertia;
 
 class ShopController extends Controller
@@ -21,7 +22,7 @@ class ShopController extends Controller
     {
         $currency = app(CurrencyService::class);
         $rate = $currency->getPromedio('oficial') ?? (float) config('currency.bs_rate', 0);
-        $store = Settings::get('store', null);
+        $store = TranslationKeySanitizer::sanitize(Settings::get('store', null));
         $general = Settings::get('general', null);
 
         $salesByProduct = InvoiceItem::selectRaw('product_id, SUM(quantity) as total_sold')

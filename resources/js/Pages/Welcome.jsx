@@ -1,9 +1,14 @@
 import { Head, Link } from '@inertiajs/react';
 import LanguageSwitcher from '@/Components/i18n/LanguageSwitcher';
 import { useI18n } from '@/Hooks/useI18n';
+import ApplicationLogo from '@/Components/ApplicationLogo';
+import { usePage } from '@inertiajs/react';
 
 export default function Welcome({ auth }) {
     const { t } = useI18n();
+    const { props } = usePage();
+    const general = props.settings?.general || {};
+    const brandName = general.trade_name || general.company_name || t('nav.brand', 'Inventario');
 
     return (
         <>
@@ -12,10 +17,10 @@ export default function Welcome({ auth }) {
                 <div className="mx-auto flex min-h-screen max-w-6xl flex-col px-6 py-10">
                     <header className="flex items-center justify-between gap-4">
                         <Link href={route('home')} className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary text-primary-foreground font-bold">I</div>
+                            <ApplicationLogo className="h-10 w-auto max-w-[140px] object-contain" />
                             <div>
                                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">{t('welcome.eyebrow', 'Sistema')}</p>
-                                <h1 className="text-lg font-semibold text-slate-900">{t('nav.brand', 'Inventario')}</h1>
+                                <h1 className="text-lg font-semibold text-slate-900">{brandName}</h1>
                             </div>
                         </Link>
                         <div className="flex items-center gap-3">

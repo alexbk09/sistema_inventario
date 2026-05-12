@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Product;
 use App\Support\Settings;
+use App\Support\TranslationKeySanitizer;
 use App\Services\CurrencyService;
 use Illuminate\Support\Facades\Route as RouteFacade;
 use Inertia\Inertia;
@@ -14,7 +15,7 @@ class HomeController extends Controller
     {
         $currency = app(CurrencyService::class);
         $rate = $currency->getPromedio('oficial') ?? (float) config('currency.bs_rate', 0);
-        $store = Settings::get('store', null);
+        $store = TranslationKeySanitizer::sanitize(Settings::get('store', null));
         $general = Settings::get('general', null);
 
         $featured = Product::where('is_featured', true)

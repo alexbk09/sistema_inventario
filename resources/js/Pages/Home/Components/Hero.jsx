@@ -2,82 +2,88 @@ import { useState, useEffect } from 'react'
 import { useI18n } from '@/Hooks/useI18n'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
-export default function Hero() {
+const gradients = [
+  'from-slate-950 via-slate-900 to-sky-700',
+  'from-sky-900 via-cyan-700 to-slate-900',
+  'from-indigo-900 via-slate-900 to-fuchsia-700',
+  'from-emerald-900 via-slate-900 to-cyan-700',
+  'from-slate-900 via-violet-900 to-blue-700',
+]
+
+export default function Hero({ banners = [], systemName = 'Inventario' }) {
   const { t } = useI18n()
-  const banners = [
+  const slides = banners.length > 0 ? banners : [
     {
-      id: 1,
-      title: t('home.hero.banners.0.title', 'Iluminación LED Moderna'),
-      description: t('home.hero.banners.0.description', 'Descubre nuestras luces LED de alta eficiencia'),
-      gradient: 'from-blue-600 to-cyan-500',
-    },
-    {
-      id: 2,
-      title: t('home.hero.banners.1.title', 'Bombillos Inteligentes'),
-      description: t('home.hero.banners.1.description', 'Control total desde tu dispositivo móvil'),
-      gradient: 'from-blue-700 to-blue-500',
-    },
-    {
-      id: 3,
-      title: t('home.hero.banners.2.title', 'Lámparas Decorativas'),
-      description: t('home.hero.banners.2.description', 'Estilo y funcionalidad para tu hogar'),
-      gradient: 'from-indigo-600 to-blue-600',
+      title: t('home.hero.banners.0.title', 'Productos destacados'),
+      description: t('home.hero.banners.0.description', 'Presenta tu propuesta comercial con un banner claro y editable.'),
+      image_url: '',
     },
   ]
   const [current, setCurrent] = useState(0)
 
   useEffect(() => {
+    if (slides.length <= 1) {
+      return undefined
+    }
+
     const timer = setInterval(() => {
-      setCurrent((prev) => (prev + 1) % banners.length)
+      setCurrent((prev) => (prev + 1) % slides.length)
     }, 5000)
     return () => clearInterval(timer)
-  }, [])
+  }, [slides.length])
 
-  const prev = () => setCurrent((prev) => (prev - 1 + banners.length) % banners.length)
-  const next = () => setCurrent((prev) => (prev + 1) % banners.length)
+  const prev = () => setCurrent((prev) => (prev - 1 + slides.length) % slides.length)
+  const next = () => setCurrent((prev) => (prev + 1) % slides.length)
 
   return (
-    <div className="relative w-full h-96 overflow-hidden rounded-2xl">
-      {/* Banners */}
+    <div className="relative h-[420px] w-full overflow-hidden rounded-[28px] border border-slate-200 shadow-[0_24px_80px_rgba(15,23,42,0.16)]">
       <div className="flex h-full">
-        {banners.map((banner, index) => (
+        {slides.map((banner, index) => (
           <div
-            key={banner.id}
+            key={`${banner.title}-${index}`}
             className={`absolute w-full h-full transition-opacity duration-500 ${
               index === current ? 'opacity-100' : 'opacity-0'
             }`}
           >
             <div
-              className={`w-full h-full bg-gradient-to-r ${banner.gradient} flex flex-col items-center justify-center text-white p-4`}
+              className={`relative flex h-full w-full flex-col justify-end bg-gradient-to-br ${gradients[index % gradients.length]} p-6 text-white md:p-8`}
+              style={banner.image_url ? {
+                backgroundImage: `linear-gradient(135deg, rgba(15,23,42,0.72), rgba(15,23,42,0.42)), url(${banner.image_url})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+              } : undefined}
             >
-              <h2 className="text-4xl md:text-5xl font-bold text-center mb-4 text-balance">
+              <div className="absolute left-6 top-6 inline-flex rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/90 backdrop-blur md:left-8 md:top-8">
+                {systemName}
+              </div>
+              <div className="relative z-10 max-w-md rounded-[24px] border border-white/10 bg-black/20 p-5 backdrop-blur-sm md:p-6">
+              <h2 className="text-3xl font-bold text-balance md:text-4xl">
                 {banner.title}
               </h2>
-              <p className="text-lg md:text-xl text-center text-white/90">
+              <p className="mt-3 text-base leading-7 text-white/85 md:text-lg">
                 {banner.description}
               </p>
+              </div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Controles */}
       <button
         onClick={prev}
-        className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/30 hover:bg-white/50 text-white p-2 rounded-full transition z-10"
+        className="absolute left-4 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/20 p-2 text-white transition hover:bg-white/35"
       >
         <ChevronLeft className="w-6 h-6" />
       </button>
       <button
         onClick={next}
-        className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/30 hover:bg-white/50 text-white p-2 rounded-full transition z-10"
+        className="absolute right-4 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/20 p-2 text-white transition hover:bg-white/35"
       >
         <ChevronRight className="w-6 h-6" />
       </button>
 
-      {/* Indicadores */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
-        {banners.map((_, index) => (
+        {slides.map((_, index) => (
           <button
             key={index}
             onClick={() => setCurrent(index)}

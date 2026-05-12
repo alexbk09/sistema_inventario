@@ -5,19 +5,31 @@ import Hero from '@/Pages/Home/Components/Hero.jsx';
 import FeaturedProducts from '@/Pages/Home/Components/FeatureProducts.jsx';
 import LocationContact from '@/Pages/Home/Components/LocationContact.jsx';
 import { useI18n } from '@/Hooks/useI18n';
+import { ArrowRight, ShieldCheck, Sparkles } from 'lucide-react';
 
-function Carousel() {
+function ActionLink({ href, children, primary = false }) {
+  if (!href || !children) {
+    return null;
+  }
+
+  const className = primary
+    ? 'inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800'
+    : 'inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50';
+
+  if (href.startsWith('#') || href.startsWith('http://') || href.startsWith('https://')) {
+    return (
+      <a href={href} className={className}>
+        {children}
+      </a>
+    );
+  }
+
   return (
-    <div className="w-full overflow-hidden rounded-xl shadow">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {[1,2,3].map((i) => (
-          <div key={i} className="h-40 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-lg"/>
-        ))}
-      </div>
-    </div>
+    <Link href={href} className={className}>
+      {children}
+    </Link>
   );
 }
-
 
 export default function Home({ products = [], store = null, company = null }) {
   const { t } = useI18n();
@@ -25,6 +37,35 @@ export default function Home({ products = [], store = null, company = null }) {
   const settings = props.settings || {};
   const effectiveStore = store || settings.store || {};
   const effectiveCompany = company || settings.general || {};
+  const brandName = effectiveCompany.trade_name || effectiveCompany.company_name || t('nav.brand', 'Inventario');
+  const heroBanners = Array.isArray(effectiveStore.hero_banners) && effectiveStore.hero_banners.length > 0
+    ? effectiveStore.hero_banners
+    : [
+        {
+          title: t('home.hero.banners.0.title', 'Productos destacados'),
+          description: t('home.hero.banners.0.description', 'Configura promociones, nuevas llegadas o mensajes clave desde el panel.'),
+          image_url: '',
+        },
+      ];
+  const homeHighlights = Array.isArray(effectiveStore.home_highlights) && effectiveStore.home_highlights.length > 0
+    ? effectiveStore.home_highlights
+    : [
+        {
+          eyebrow: t('home.highlights.defaults.0.eyebrow', 'Catalogo'),
+          title: t('home.highlights.defaults.0.title', 'Productos organizados'),
+          description: t('home.highlights.defaults.0.description', 'Expone lo mejor de tu inventario con categorias claras y acceso directo.'),
+        },
+        {
+          eyebrow: t('home.highlights.defaults.1.eyebrow', 'Confianza'),
+          title: t('home.highlights.defaults.1.title', 'Informacion clara desde el inicio'),
+          description: t('home.highlights.defaults.1.description', 'Muestra contacto, ubicacion y mensajes comerciales utiles desde la portada.'),
+        },
+        {
+          eyebrow: t('home.highlights.defaults.2.eyebrow', 'Accion'),
+          title: t('home.highlights.defaults.2.title', 'Llamados concretos'),
+          description: t('home.highlights.defaults.2.description', 'Lleva al cliente rapido a la tienda, a promociones o al canal de contacto.'),
+        },
+      ];
   const { data, setData, post, processing, reset, errors, recentlySuccessful } = useForm({
     email: '',
     whatsapp: '',
@@ -42,21 +83,60 @@ export default function Home({ products = [], store = null, company = null }) {
   return (
     <GuestLayout>
       <Head title={effectiveStore.home_title || t('home.title_fallback', 'Inicio')} />
-          <main className="flex flex-col min-h-screen bg-background">
-            
+          <main className="flex min-h-screen flex-col bg-background">
                 <div className="flex-1">
-                    <div className="max-w-7xl mx-auto px-4 py-8">
-                    {/* Bienvenida */}
-                    <section className="mb-12">
-                        <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-3 text-balance">
-                          {effectiveStore.home_title || t('home.title_fallback', 'Bienvenido a la Tienda')}
-                        </h1>
-                        {effectiveStore.home_subtitle && (
-                          <p className="text-lg text-slate-600 max-w-2xl">
-                            {effectiveStore.home_subtitle}
-                          </p>
-                        )}
-                        <Hero />
+                    <div className="mx-auto max-w-7xl px-4 py-8">
+                    <section className="mb-14 overflow-hidden rounded-[32px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(15,23,42,0.06),_transparent_34%),linear-gradient(135deg,_#ffffff,_#f8fafc_55%,_#e2e8f0)] p-6 shadow-sm md:p-8">
+                        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-center">
+                          <div>
+                            <div className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
+                              <Sparkles className="h-3.5 w-3.5" />
+                              {effectiveStore.hero_badge || t('home.hero_badge_fallback', 'Compra con confianza')}
+                            </div>
+                            <h1 className="mt-5 max-w-4xl text-4xl font-bold tracking-tight text-slate-950 md:text-5xl xl:text-6xl">
+                              {effectiveStore.home_title || t('home.title_fallback', 'Bienvenido a la Tienda')}
+                            </h1>
+                            <p className="mt-3 text-lg font-medium text-slate-700 md:text-xl">
+                              {effectiveStore.home_subtitle || brandName}
+                            </p>
+                            <p className="mt-5 max-w-2xl text-base leading-7 text-slate-600 md:text-lg">
+                              {effectiveStore.hero_description
+                                || effectiveStore.contact_text
+                                || t('home.hero_description_fallback', 'Presenta tu propuesta de valor, beneficios, promociones y formas de contacto desde un inicio más claro y útil para el cliente.')}
+                            </p>
+
+                            <div className="mt-8 flex flex-wrap gap-3">
+                              <ActionLink href={effectiveStore.hero_primary_cta_url || '/shop'} primary>
+                                {effectiveStore.hero_primary_cta_label || t('home.hero_primary_cta_fallback', 'Ir a la tienda')}
+                                <ArrowRight className="h-4 w-4" />
+                              </ActionLink>
+                              <ActionLink href={effectiveStore.hero_secondary_cta_url || '#contacto'}>
+                                {effectiveStore.hero_secondary_cta_label || t('home.hero_secondary_cta_fallback', 'Contáctanos')}
+                              </ActionLink>
+                            </div>
+
+                            <div className="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                              {homeHighlights.slice(0, 3).map((item, index) => (
+                                <article key={`highlight-${index}`} className="rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm backdrop-blur">
+                                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{item.eyebrow || t('home.highlight_eyebrow_fallback', 'Detalle')}</p>
+                                  <h2 className="mt-2 text-lg font-semibold text-slate-900">{item.title}</h2>
+                                  {item.description && (
+                                    <p className="mt-2 text-sm leading-6 text-slate-600">{item.description}</p>
+                                  )}
+                                </article>
+                              ))}
+                            </div>
+
+                            <div className="mt-6 flex flex-wrap gap-4 text-sm text-slate-600">
+                              <div className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 shadow-sm">
+                                <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                                {t('home.trust_badge', 'Información clara, contacto visible y acceso rápido a compra')}
+                              </div>
+                            </div>
+                          </div>
+
+                          <Hero banners={heroBanners} systemName={brandName} />
+                        </div>
                     </section>
 
                     {/* Productos destacados */}
@@ -190,11 +270,11 @@ export default function Home({ products = [], store = null, company = null }) {
                     </section>
 
                     {/* Ubicación y Contacto */}
-                    <LocationContact company={effectiveCompany} location={settings.location} store={effectiveStore} />
+                    <section id="contacto">
+                      <LocationContact company={effectiveCompany} location={settings.location} store={effectiveStore} />
+                    </section>
                     </div>
                 </div>
-
-
             </main>
     </GuestLayout>
   );

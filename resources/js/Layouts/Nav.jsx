@@ -3,6 +3,7 @@ import { Link, usePage, router } from '@inertiajs/react';
 import { useState, useEffect } from 'react'
 import { ShoppingCart as ShoppingCartIcon, Menu, X } from 'lucide-react'
 import ShoppingCartModal from '@/Components/shop/ShoppingCart'
+import ApplicationLogo from '@/Components/ApplicationLogo'
 import { useCart } from '@/Hooks/useCart'
 import { useDisplayCurrency } from '@/Hooks/useDisplayCurrency'
 import { useI18n } from '@/Hooks/useI18n'
@@ -15,6 +16,9 @@ export default function NavLayout() {
   const { displayCurrency, setDisplayCurrency, availableCurrencies } = useDisplayCurrency()
     const page = usePage()
     const { t } = useI18n()
+    const settings = page.props?.settings || {}
+    const general = settings.general || {}
+    const brandName = general.trade_name || general.company_name || t('nav.brand', 'Inventario')
     const isAuthenticated = !!page.props?.auth?.user;
     const userRoles = page.props?.auth?.roles || [];
     const isCliente = userRoles.includes('cliente');
@@ -28,10 +32,8 @@ export default function NavLayout() {
       <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-            <span className="text-primary-foreground font-bold">⚡</span>
-          </div>
-          <span className="font-bold text-lg text-primary">{t('nav.brand', 'Inventario')}</span>
+          <ApplicationLogo className="h-9 w-auto max-w-[140px] object-contain" />
+          <span className="font-bold text-lg text-primary">{brandName}</span>
         </Link>
 
         {/* Menu desktop */}

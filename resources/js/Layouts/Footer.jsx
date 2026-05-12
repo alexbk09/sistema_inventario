@@ -1,12 +1,14 @@
 import { Link, usePage } from '@inertiajs/react';
 import { Facebook, Instagram, Twitter } from 'lucide-react'
 import { useI18n } from '@/Hooks/useI18n';
+import ApplicationLogo from '@/Components/ApplicationLogo';
 export default function FooterLayout() {
     const currentYear = new Date().getFullYear()
       const { props } = usePage();
       const settings = props.settings || {};
       const general = settings.general || {};
       const store = settings.store || {};
+        const brandName = general.trade_name || general.company_name || 'Inventario';
   const { t } = useI18n();
     return (
    <footer className="bg-primary text-primary-foreground mt-16">
@@ -15,8 +17,8 @@ export default function FooterLayout() {
           {/* Empresa */}
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <span className="text-2xl">⚡</span>
-                <h3 className="font-bold text-lg">{general.trade_name || general.company_name || 'Inventario'}</h3>
+              <ApplicationLogo className="h-10 w-auto max-w-[140px] object-contain" />
+                <h3 className="font-bold text-lg">{brandName}</h3>
             </div>
             <p className="text-sm text-primary-foreground/80">
               {store.contact_text || t('footer.company_tagline', 'Tu tienda en línea de productos.')}
@@ -105,7 +107,7 @@ export default function FooterLayout() {
         {/* Divisor */}
         <div className="border-t border-primary-foreground/20 pt-8 flex flex-col md:flex-row items-center justify-between text-sm text-primary-foreground/70">
             <p>
-              &copy; {currentYear} {general.company_name || 'Inventario'}. {t(
+              &copy; {currentYear} {brandName}. {t(
                 'footer.rights',
                 'Todos los derechos reservados.'
               )}

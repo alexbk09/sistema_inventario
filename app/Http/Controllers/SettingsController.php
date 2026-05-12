@@ -5,9 +5,12 @@ namespace App\Http\Controllers;
 use App\Services\CurrencyService;
 use App\Support\CurrencySettings;
 use App\Support\Settings;
+use App\Support\TranslationKeySanitizer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use App\Models\Warehouse;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -49,11 +52,7 @@ class SettingsController extends Controller
 
         $currency = CurrencySettings::normalize(Settings::get('currency', CurrencySettings::defaults()));
 
-        $store = Settings::get('store', [
-            'home_title' => 'Tienda',
-            'home_subtitle' => null,
-            'contact_text' => null,
-        ]);
+        $store = $this->normalizeStoreSettings(Settings::get('store', $this->defaultStoreSettings()));
 
         $inventory = Settings::get('inventory', [
             'allow_negative_stock' => false,
@@ -157,6 +156,9 @@ class SettingsController extends Controller
             'branding.logo_url' => ['nullable', 'string', 'max:500'],
             'branding.logo_dark_url' => ['nullable', 'string', 'max:500'],
             'branding.favicon_url' => ['nullable', 'string', 'max:500'],
+            'branding.logo_file' => ['nullable', 'file', 'image', 'max:4096'],
+            'branding.logo_dark_file' => ['nullable', 'file', 'image', 'max:4096'],
+            'branding.favicon_file' => ['nullable', 'file', 'image', 'max:2048'],
             'branding.primary_color' => ['nullable', 'string', 'max:20'],
             'branding.secondary_color' => ['nullable', 'string', 'max:20'],
 
@@ -190,7 +192,23 @@ class SettingsController extends Controller
 
             'store.home_title' => ['required', 'string', 'max:255'],
             'store.home_subtitle' => ['nullable', 'string', 'max:255'],
+            'store.hero_badge' => ['nullable', 'string', 'max:120'],
+            'store.hero_description' => ['nullable', 'string', 'max:700'],
+            'store.hero_primary_cta_label' => ['nullable', 'string', 'max:100'],
+            'store.hero_primary_cta_url' => ['nullable', 'string', 'max:500'],
+            'store.hero_secondary_cta_label' => ['nullable', 'string', 'max:100'],
+            'store.hero_secondary_cta_url' => ['nullable', 'string', 'max:500'],
             'store.contact_text' => ['nullable', 'string', 'max:500'],
+            'store.hero_banners' => ['nullable', 'array'],
+            'store.hero_banners.*.title' => ['required', 'string', 'max:160'],
+            'store.hero_banners.*.description' => ['nullable', 'string', 'max:280'],
+            'store.hero_banners.*.image_url' => ['nullable', 'string', 'max:500'],
+            'store.hero_banner_files' => ['nullable', 'array'],
+            'store.hero_banner_files.*' => ['nullable', 'file', 'image', 'max:5120'],
+            'store.home_highlights' => ['nullable', 'array'],
+            'store.home_highlights.*.eyebrow' => ['nullable', 'string', 'max:80'],
+            'store.home_highlights.*.title' => ['required', 'string', 'max:120'],
+            'store.home_highlights.*.description' => ['nullable', 'string', 'max:220'],
 
             'inventory.allow_negative_stock' => ['required', 'boolean'],
             'inventory.default_min_stock' => ['required', 'integer', 'min:0'],
@@ -253,10 +271,16 @@ class SettingsController extends Controller
 
         \App\Support\Settings::set('general', $validated['general']);
         \App\Support\Settings::set('location', $validated['location']);
-        \App\Support\Settings::set('branding', $validated['branding']);
+        $branding = $validated['branding'];
+        $branding = $this->storeBrandingFiles($request, $branding);
+
+        $store = $this->normalizeStoreSettings($validated['store'] ?? []);
+        $store = $this->storeHomeBannerFiles($request, $store);
+
+        \App\Support\Settings::set('branding', $branding);
         \App\Support\Settings::set('billing', $validated['billing']);
         \App\Support\Settings::set('currency', CurrencySettings::normalize($validated['currency'] ?? []));
-        \App\Support\Settings::set('store', $validated['store']);
+        \App\Support\Settings::set('store', $store);
         \App\Support\Settings::set('inventory', $validated['inventory']);
         \App\Support\Settings::set('warehouses', $validated['warehouses']);
         \App\Support\Settings::set('security', $validated['security']);
@@ -273,5 +297,200 @@ class SettingsController extends Controller
         Settings::set('currency', $synced);
 
         return back()->with('success', __('app.admin.settings.notifications.currency_synced'));
+    }
+
+    private function defaultStoreSettings(): array
+    {
+        return [
+            'home_title' => __('app.admin.settings.commerce.store.defaults.home_title'),
+            'home_subtitle' => null,
+            'hero_badge' => __('app.admin.settings.commerce.store.defaults.hero_badge'),
+            'hero_description' => null,
+            'hero_primary_cta_label' => __('app.admin.settings.commerce.store.defaults.hero_primary_cta_label'),
+            'hero_primary_cta_url' => '/shop',
+            'hero_secondary_cta_label' => __('app.admin.settings.commerce.store.defaults.hero_secondary_cta_label'),
+            'hero_secondary_cta_url' => '#contacto',
+            'contact_text' => null,
+            'hero_banners' => [
+                [
+                    'title' => __('app.admin.settings.commerce.store.defaults.banner_one_title'),
+                    'description' => __('app.admin.settings.commerce.store.defaults.banner_one_description'),
+                    'image_url' => null,
+                ],
+                [
+                    'title' => __('app.admin.settings.commerce.store.defaults.banner_two_title'),
+                    'description' => __('app.admin.settings.commerce.store.defaults.banner_two_description'),
+                    'image_url' => null,
+                ],
+                [
+                    'title' => __('app.admin.settings.commerce.store.defaults.banner_three_title'),
+                    'description' => __('app.admin.settings.commerce.store.defaults.banner_three_description'),
+                    'image_url' => null,
+                ],
+            ],
+            'home_highlights' => [
+                [
+                    'eyebrow' => __('app.admin.settings.commerce.store.defaults.highlight_one_eyebrow'),
+                    'title' => __('app.admin.settings.commerce.store.defaults.highlight_one_title'),
+                    'description' => __('app.admin.settings.commerce.store.defaults.highlight_one_description'),
+                ],
+                [
+                    'eyebrow' => __('app.admin.settings.commerce.store.defaults.highlight_two_eyebrow'),
+                    'title' => __('app.admin.settings.commerce.store.defaults.highlight_two_title'),
+                    'description' => __('app.admin.settings.commerce.store.defaults.highlight_two_description'),
+                ],
+                [
+                    'eyebrow' => __('app.admin.settings.commerce.store.defaults.highlight_three_eyebrow'),
+                    'title' => __('app.admin.settings.commerce.store.defaults.highlight_three_title'),
+                    'description' => __('app.admin.settings.commerce.store.defaults.highlight_three_description'),
+                ],
+            ],
+        ];
+    }
+
+    private function normalizeStoreSettings(?array $store): array
+    {
+        $defaults = $this->defaultStoreSettings();
+        $normalized = array_replace_recursive($defaults, $store ?? []);
+
+        $normalized['hero_banners'] = collect($normalized['hero_banners'] ?? [])
+            ->take(5)
+            ->map(function ($banner, $index) use ($defaults) {
+                $fallback = $defaults['hero_banners'][$index] ?? ['title' => '', 'description' => '', 'image_url' => null];
+
+                return [
+                    'title' => $this->normalizeStoredTranslationValue($banner['title'] ?? $fallback['title'] ?? ''),
+                    'description' => $this->normalizeStoredTranslationValue($banner['description'] ?? $fallback['description'] ?? ''),
+                    'image_url' => trim((string) ($banner['image_url'] ?? $fallback['image_url'] ?? '')) ?: null,
+                ];
+            })
+            ->filter(fn ($banner) => $banner['title'] !== '')
+            ->values()
+            ->all();
+
+        if ($normalized['hero_banners'] === []) {
+            $normalized['hero_banners'] = $defaults['hero_banners'];
+        }
+
+        $normalized['home_highlights'] = collect($normalized['home_highlights'] ?? [])
+            ->take(6)
+            ->map(function ($item, $index) use ($defaults) {
+                $fallback = $defaults['home_highlights'][$index] ?? ['eyebrow' => null, 'title' => '', 'description' => null];
+
+                return [
+                    'eyebrow' => $this->normalizeStoredTranslationValue($item['eyebrow'] ?? $fallback['eyebrow'] ?? '', true),
+                    'title' => $this->normalizeStoredTranslationValue($item['title'] ?? $fallback['title'] ?? ''),
+                    'description' => $this->normalizeStoredTranslationValue($item['description'] ?? $fallback['description'] ?? '', true),
+                ];
+            })
+            ->filter(fn ($item) => $item['title'] !== '')
+            ->values()
+            ->all();
+
+        if ($normalized['home_highlights'] === []) {
+            $normalized['home_highlights'] = $defaults['home_highlights'];
+        }
+
+        foreach ([
+            'home_title',
+            'home_subtitle',
+            'hero_badge',
+            'hero_description',
+            'hero_primary_cta_label',
+            'hero_primary_cta_url',
+            'hero_secondary_cta_label',
+            'hero_secondary_cta_url',
+            'contact_text',
+        ] as $field) {
+            $normalized[$field] = $this->normalizeStoredTranslationValue($normalized[$field] ?? null, true);
+        }
+
+        return $normalized;
+    }
+
+    private function normalizeStoredTranslationValue(mixed $value, bool $allowNull = false): ?string
+    {
+        if (! is_string($value)) {
+            return $allowNull ? null : '';
+        }
+
+        $normalized = trim((string) TranslationKeySanitizer::sanitize($value));
+
+        if ($normalized === '') {
+            return $allowNull ? null : '';
+        }
+
+        if ($normalized === '') {
+            return $allowNull ? null : '';
+        }
+
+        return $normalized;
+    }
+
+    private function storeBrandingFiles(Request $request, array $branding): array
+    {
+        $currentBranding = Settings::get('branding', []);
+
+        foreach ([
+            'logo_file' => 'logo_url',
+            'logo_dark_file' => 'logo_dark_url',
+            'favicon_file' => 'favicon_url',
+        ] as $fileField => $urlField) {
+            $file = $request->file("branding.{$fileField}");
+
+            if (! $file instanceof UploadedFile) {
+                continue;
+            }
+
+            $this->deleteManagedAsset($currentBranding[$urlField] ?? null);
+            $path = $file->store('settings/branding', 'public');
+            $branding[$urlField] = Storage::disk('public')->url($path);
+        }
+
+        unset($branding['logo_file'], $branding['logo_dark_file'], $branding['favicon_file']);
+
+        return $branding;
+    }
+
+    private function storeHomeBannerFiles(Request $request, array $store): array
+    {
+        $files = $request->file('store.hero_banner_files', []);
+        $currentStore = Settings::get('store', []);
+        $currentBanners = $currentStore['hero_banners'] ?? [];
+
+        foreach ($store['hero_banners'] ?? [] as $index => $banner) {
+            $file = $files[$index] ?? null;
+
+            if (! $file instanceof UploadedFile) {
+                continue;
+            }
+
+            $this->deleteManagedAsset($currentBanners[$index]['image_url'] ?? null);
+            $path = $file->store('settings/home-banners', 'public');
+            $store['hero_banners'][$index]['image_url'] = Storage::disk('public')->url($path);
+        }
+
+        unset($store['hero_banner_files']);
+
+        return $store;
+    }
+
+    private function deleteManagedAsset(?string $url): void
+    {
+        if (! is_string($url) || $url === '') {
+            return;
+        }
+
+        $parsedPath = parse_url($url, PHP_URL_PATH);
+
+        if (! is_string($parsedPath) || ! str_contains($parsedPath, '/storage/settings/')) {
+            return;
+        }
+
+        $relativePath = ltrim(str_replace('/storage/', '', $parsedPath), '/');
+
+        if ($relativePath !== '' && Storage::disk('public')->exists($relativePath)) {
+            Storage::disk('public')->delete($relativePath);
+        }
     }
 }

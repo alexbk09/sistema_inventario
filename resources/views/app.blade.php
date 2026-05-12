@@ -1,10 +1,19 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
+        @php
+            $general = \App\Support\Settings::get('general', []);
+            $branding = \App\Support\Settings::get('branding', []);
+            $systemTitle = $general['trade_name'] ?? $general['company_name'] ?? config('app.name', 'Laravel');
+            $faviconUrl = $branding['favicon_url'] ?? null;
+        @endphp
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
-        <title inertia>{{ config('app.name', 'Laravel') }}</title>
+        <title inertia>{{ $systemTitle }}</title>
+        @if ($faviconUrl)
+            <link rel="icon" type="image/png" href="{{ $faviconUrl }}">
+        @endif
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">

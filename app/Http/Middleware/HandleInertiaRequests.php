@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Services\AdminNotificationService;
 use App\Support\CurrencySettings;
 use App\Support\Settings;
+use App\Support\TranslationKeySanitizer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Lang;
 use Inertia\Middleware;
@@ -100,7 +101,7 @@ class HandleInertiaRequests extends Middleware
                 'branding' => Settings::get('branding', null),
                 'billing' => Settings::get('billing', null),
                 'currency' => CurrencySettings::normalize(Settings::get('currency', CurrencySettings::defaults())),
-                'store' => Settings::get('store', null),
+                'store' => TranslationKeySanitizer::sanitize(Settings::get('store', null)),
                 'inventory' => Settings::get('inventory', null),
                 'warehouses' => Settings::get('warehouses', null),
                 'security' => Settings::get('security', null),
