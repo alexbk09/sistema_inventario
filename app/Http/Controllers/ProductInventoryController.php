@@ -3,21 +3,28 @@
 namespace App\Http\Controllers;
 
 use App\Models\{Product, MovementType, Provider, Warehouse};
+use App\Services\AdminMoneyService;
 use App\Services\InventoryService;
+use App\Support\Settings;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use InvalidArgumentException;
 
 class ProductInventoryController extends Controller
 {
-    public function index(Request $request, Product $product, InventoryService $inventory)
+    public function index(Request $request, Product $product, InventoryService $inventory, AdminMoneyService $adminMoneyService)
     {
         $product->load(['movements.warehouse']);
+        $currencySettings = Settings::get('currency', []);
+        $adminCurrencyContext = $adminMoneyService->getAdminCurrencyContext($currencySettings);
 
         // Recoger filtros desde la query
         $filters = $request->only(['warehouse_id', 'type', 'date_from', 'date_to']);
 
         $summary = $inventory->summaryForProduct($product);
+        $summary['entries_total_value_admin_totals'] = $adminMoneyService->buildAdminTotals((float) ($summary['entries_total_value_usd'] ?? 0), $currencySettings)['totals'];
+        $summary['exits_total_value_admin_totals'] = $adminMoneyService->buildAdminTotals((float) ($summary['exits_total_value_usd'] ?? 0), $currencySettings)['totals'];
+        $product->price_admin_totals = $adminMoneyService->buildAdminTotals((float) ($product->price_usd ?? 0), $currencySettings)['totals'];
 
         $movementsQuery = $product->movements()->with('warehouse');
 
@@ -36,6 +43,12 @@ class ProductInventoryController extends Controller
 
         $perPage = (int) $request->query('per_page', 20);
         $movements = $movementsQuery->latest()->paginate($perPage)->withQueryString();
+        $movements->getCollection()->transform(function ($movement) use ($adminMoneyService, $currencySettings) {
+            $movement->unit_price_admin_totals = $adminMoneyService->buildAdminTotals((float) ($movement->unit_price_usd ?? 0), $currencySettings)['totals'];
+            $movement->total_value_admin_totals = $adminMoneyService->buildAdminTotals((float) ($movement->total_value_usd ?? 0), $currencySettings)['totals'];
+
+            return $movement;
+        });
 
         $movementTypes = MovementType::orderBy('name')->get();
         $providers = Provider::orderBy('name')->get(['id','name']);
@@ -46,6 +59,7 @@ class ProductInventoryController extends Controller
             'movements' => $movements,
             'filters' => $filters,
             'summary' => $summary,
+            'adminCurrencyContext' => $adminCurrencyContext,
             'movementTypes' => $movementTypes,
             'providers' => $providers,
             'warehouses' => $warehouses,

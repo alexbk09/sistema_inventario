@@ -42,7 +42,7 @@ const currencyProviderOptions = [
     { value: 'dolarapi', label: 'DolarApi' },
     { value: 'frankfurter', label: 'Frankfurter' },
     { value: 'exchangeratehost', label: 'ExchangeRate.host' },
-    { value: 'manual', label: 'Manual' },
+    { value: 'manual', labelKey: 'admin.settings.commerce.tabs.manual.title', defaultLabel: 'Manual' },
 ];
 
 function SettingsSection({ eyebrow, title, description, children, contentClassName = 'p-6' }) {
@@ -186,7 +186,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
             bank_name: '',
             account_name: '',
             account_number: '',
-            account_type: 'Corriente',
+            account_type: '',
             identification: '',
             email: '',
             phone: '',
@@ -748,7 +748,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                         })}
                                     >
                                         {currencyProviderOptions.map((provider) => (
-                                            <option key={provider.value} value={provider.value}>{provider.label}</option>
+                                            <option key={provider.value} value={provider.value}>{provider.labelKey ? t(provider.labelKey, provider.defaultLabel) : provider.label}</option>
                                         ))}
                                     </select>
                                 </div>
@@ -855,7 +855,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                                         onChange={(e) => updateSupportedCurrency(index, 'rate_provider', e.target.value.toLowerCase())}
                                                     >
                                                         {currencyProviderOptions.map((provider) => (
-                                                            <option key={provider.value} value={provider.value}>{provider.label}</option>
+                                                            <option key={provider.value} value={provider.value}>{provider.labelKey ? t(provider.labelKey, provider.defaultLabel) : provider.label}</option>
                                                         ))}
                                                     </select>
                                                 </div>
@@ -1209,7 +1209,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                                         onChange={(e) => updatePaymentMethod('manual', 'enabled', e.target.checked)}
                                                     />
                                                     <label htmlFor="payments_manual_enabled" className="text-sm font-medium text-slate-700">
-                                                        Habilitar pago manual en checkout
+                                                        {t('admin.settings.commerce.manual.enable', 'Habilitar pago manual en checkout')}
                                                     </label>
                                                 </div>
                                                 <div>

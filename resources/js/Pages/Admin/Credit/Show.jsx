@@ -3,13 +3,20 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.jsx';
 import { useI18n } from '@/Hooks/useI18n';
 import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates';
 
-export default function Show({ account }) {
+export default function Show({ account, adminCurrencyContext }) {
   const { t } = useI18n();
-  const { displayCurrency, formatPriceFromUsd } = useConfiguredCurrencyRates();
-  const formatActiveAmount = (value) => formatPriceFromUsd(Number(value || 0), displayCurrency);
+  const { displayCurrency } = useConfiguredCurrencyRates();
+  const adminCurrencyCodes = Array.isArray(adminCurrencyContext?.codes) ? adminCurrencyContext.codes : [];
+  const formatMoney = (value) => new Intl.NumberFormat(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(value || 0));
+  const translateStatus = (status) => t(`admin.credits.statuses.${status}`, status ?? t('admin.credits.values.empty_dash', '—'));
+  const translateMovementType = (type) => t(`admin.credits.movement_types.${type}`, type ?? t('admin.credits.values.empty_dash', '—'));
   const { data, setData, post, processing, reset } = useForm({
     type: 'charge',
     amount_usd: '',
+    currency_code: displayCurrency,
     description: '',
     due_date: '',
   });
@@ -18,7 +25,7 @@ export default function Show({ account }) {
     e.preventDefault();
     post(route('admin.credits.movements.store', account.id), {
       preserveScroll: true,
-      onSuccess: () => reset(),
+      onSuccess: () => reset({ type: 'charge', amount_usd: '', currency_code: displayCurrency, description: '', due_date: '' }),
     });
   };
 
@@ -39,16 +46,20 @@ export default function Show({ account }) {
               <h2 className="text-lg font-bold text-foreground mb-2">{t('admin.credits.show.summary.title', 'Resumen')}</h2>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">{t('admin.credits.show.summary.status', 'Estado')}:</span>
-                <span className="font-semibold text-foreground">{account.status}</span>
+                <span className="font-semibold text-foreground">{translateStatus(account.status)}</span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{`${t('admin.credits.show.summary.credit_limit_usd', 'Límite')}: ${displayCurrency}`}</span>
-                <span className="font-semibold text-foreground">{formatActiveAmount(account.limit_usd ?? 0)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{`${t('admin.credits.show.summary.current_balance', 'Saldo actual')}: ${displayCurrency}`}</span>
-                <span className="font-semibold text-foreground">{formatActiveAmount(account.balance_usd ?? 0)}</span>
-              </div>
+              {adminCurrencyCodes.map((code) => (
+                <div key={`limit-${code}`} className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">{`${t('admin.credits.show.summary.credit_limit_usd', 'Límite')}: ${code}`}</span>
+                  <span className="font-semibold text-foreground">{formatMoney(account.credit_limit_admin_totals?.[code] ?? 0)}</span>
+                </div>
+              ))}
+              {adminCurrencyCodes.map((code) => (
+                <div key={`balance-${code}`} className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">{`${t('admin.credits.show.summary.current_balance', 'Saldo actual')}: ${code}`}</span>
+                  <span className="font-semibold text-foreground">{formatMoney(account.balance_admin_totals?.[code] ?? 0)}</span>
+                </div>
+              ))}
             </div>
 
             <div className="bg-card border border-border rounded-lg p-6 mt-6 space-y-3">
@@ -72,7 +83,10 @@ export default function Show({ account }) {
                     min="0"
                     step="0.01"
                     value={data.amount_usd}
-                    onChange={(e) => setData('amount_usd', e.target.value)}
+                    onChange={(e) => {
+                      setData('amount_usd', e.target.value);
+                      setData('currency_code', displayCurrency);
+                    }}
                     className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground"
                     required
                   />
@@ -116,7 +130,10 @@ export default function Show({ account }) {
                     <tr>
                       <th className="px-3 py-2 text-left">{t('admin.credits.show.movements.table.date', 'Fecha')}</th>
                       <th className="px-3 py-2 text-left">{t('admin.credits.show.movements.table.type', 'Tipo')}</th>
-                      <th className="px-3 py-2 text-right">{`${t('admin.credits.show.movements.table.amount_usd', 'Monto')} ${displayCurrency}`}</th>
+                      <th className="px-3 py-2 text-right">{t('admin.credits.show.movements.table.amount_usd', 'Monto origen')}</th>
+                      {adminCurrencyCodes.map((code) => (
+                        <th key={code} className="px-3 py-2 text-right">{`${t('admin.credits.show.movements.table.amount_usd', 'Monto')} ${code}`}</th>
+                      ))}
                       <th className="px-3 py-2 text-left">{t('admin.credits.show.movements.table.description', 'Descripción')}</th>
                       <th className="px-3 py-2 text-left">{t('admin.credits.show.movements.table.due', 'Vence')}</th>
                       <th className="px-3 py-2 text-left">{t('admin.credits.show.movements.table.paid', 'Pagado')}</th>
@@ -126,8 +143,11 @@ export default function Show({ account }) {
                     {account.movements.map((m) => (
                       <tr key={m.id} className="border-t border-border">
                         <td className="px-3 py-2 text-foreground">{m.created_at}</td>
-                        <td className="px-3 py-2 text-foreground">{m.type}</td>
-                        <td className="px-3 py-2 text-right text-foreground">{formatActiveAmount(m.amount_usd ?? 0)}</td>
+                        <td className="px-3 py-2 text-foreground">{translateMovementType(m.type)}</td>
+                        <td className="px-3 py-2 text-right text-foreground">{`${m.display_currency_code ?? 'USD'} ${formatMoney(m.display_original_amount ?? 0)}`}</td>
+                        {adminCurrencyCodes.map((code) => (
+                          <td key={`${m.id}-${code}`} className="px-3 py-2 text-right text-foreground">{formatMoney(m.admin_totals?.[code] ?? 0)}</td>
+                        ))}
                         <td className="px-3 py-2 text-foreground">{m.description}</td>
                         <td className="px-3 py-2 text-foreground">{m.due_date ?? t('admin.credits.values.empty_dash', '—')}</td>
                         <td className="px-3 py-2 text-foreground">{m.paid_at ? t('admin.credits.values.yes', 'Sí') : t('admin.credits.values.no', 'No')}</td>

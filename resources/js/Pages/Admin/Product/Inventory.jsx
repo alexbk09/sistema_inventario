@@ -6,11 +6,24 @@ import { useI18n } from '@/Hooks/useI18n';
 import { useLocaleFormat } from '@/Hooks/useLocaleFormat';
 import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates';
 
-export default function Inventory({ product, movements, summary, movementTypes, providers = [], warehouses = [], filters = {} }) {
+export default function Inventory({ product, movements, summary, movementTypes, providers = [], warehouses = [], filters = {}, adminCurrencyContext = {} }) {
   const { t } = useI18n();
-  const { formatDateTime, formatNumber } = useLocaleFormat();
+  const { formatDateTime, formatNumber, formatCurrency } = useLocaleFormat();
   const { displayCurrency, formatPriceFromUsd } = useConfiguredCurrencyRates();
   const formatActiveAmount = (value) => formatPriceFromUsd(Number(value || 0), displayCurrency);
+  const formatServerAmount = (code, value) => formatCurrency(Number(value || 0), code);
+  const formatMovementSource = (source) => {
+    if (!source) {
+      return t('admin.products.values.empty', '-');
+    }
+
+    const normalizedSource = String(source).toLowerCase();
+    const fallbackLabel = normalizedSource
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+
+    return t(`admin.products.inventory.history.sources.${normalizedSource}`, fallbackLabel);
+  };
   const [form, setForm] = useState({
     type: 'entry',
     quantity: 1,
@@ -74,21 +87,21 @@ export default function Inventory({ product, movements, summary, movementTypes, 
           <div className="p-4 rounded-lg border border-border bg-muted/40">
             <h2 className="font-semibold text-foreground mb-2">{t('admin.products.inventory.cards.product.title', 'Producto')}</h2>
             <p className="font-bold text-lg text-foreground">{product.name}</p>
-            <p className="text-sm text-muted-foreground">SKU: {product.sku}</p>
+            <p className="text-sm text-muted-foreground">{t('admin.products.inventory.cards.product.sku_label', 'SKU')}: {product.sku}</p>
             <p className="text-sm text-muted-foreground mt-1">{t('admin.products.inventory.cards.product.current_stock', 'Stock actual')}: <span className="font-semibold text-foreground">{product.stock}</span></p>
-            <p className="text-sm text-muted-foreground mt-1">{`${t('admin.products.inventory.cards.product.reference_price', 'Precio referencia')}: ${displayCurrency}`} <span className="font-semibold text-foreground">{formatActiveAmount(product.price_usd)}</span></p>
+            <p className="text-sm text-muted-foreground mt-1">{`${t('admin.products.inventory.cards.product.reference_price', 'Precio referencia')}: ${displayCurrency}`} <span className="font-semibold text-foreground">{product.price_admin_totals?.[displayCurrency] !== undefined ? formatServerAmount(displayCurrency, product.price_admin_totals[displayCurrency]) : formatActiveAmount(product.price_usd)}</span></p>
           </div>
 
           <div className="p-4 rounded-lg border border-border bg-emerald-50/60">
             <h2 className="font-semibold text-emerald-800 mb-2">{t('admin.products.inventory.cards.entries.title', 'Entradas acumuladas')}</h2>
             <p className="text-sm text-emerald-700">{t('admin.products.inventory.cards.entries.total_quantity', 'Cantidad total')}: <span className="font-bold">{summary.entries_quantity}</span></p>
-            <p className="text-sm text-emerald-700 mt-1">{`${t('admin.products.inventory.cards.entries.total_value_usd', 'Valor total')}: ${displayCurrency}`} <span className="font-bold">{formatActiveAmount(summary.entries_total_value_usd)}</span></p>
+            <p className="text-sm text-emerald-700 mt-1">{`${t('admin.products.inventory.cards.entries.total_value_usd', 'Valor total')}: ${displayCurrency}`} <span className="font-bold">{summary.entries_total_value_admin_totals?.[displayCurrency] !== undefined ? formatServerAmount(displayCurrency, summary.entries_total_value_admin_totals[displayCurrency]) : formatActiveAmount(summary.entries_total_value_usd)}</span></p>
           </div>
 
           <div className="p-4 rounded-lg border border-border bg-rose-50/60">
             <h2 className="font-semibold text-rose-800 mb-2">{t('admin.products.inventory.cards.exits.title', 'Salidas acumuladas')}</h2>
             <p className="text-sm text-rose-700">{t('admin.products.inventory.cards.exits.total_quantity', 'Cantidad total')}: <span className="font-bold">{summary.exits_quantity}</span></p>
-            <p className="text-sm text-rose-700 mt-1">{`${t('admin.products.inventory.cards.exits.total_value_usd', 'Valor total')}: ${displayCurrency}`} <span className="font-bold">{formatActiveAmount(summary.exits_total_value_usd)}</span></p>
+            <p className="text-sm text-rose-700 mt-1">{`${t('admin.products.inventory.cards.exits.total_value_usd', 'Valor total')}: ${displayCurrency}`} <span className="font-bold">{summary.exits_total_value_admin_totals?.[displayCurrency] !== undefined ? formatServerAmount(displayCurrency, summary.exits_total_value_admin_totals[displayCurrency]) : formatActiveAmount(summary.exits_total_value_usd)}</span></p>
           </div>
         </div>
 
@@ -217,11 +230,11 @@ export default function Inventory({ product, movements, summary, movementTypes, 
                             {isEntry ? t('admin.products.inventory.types.entry', 'Entrada') : t('admin.products.inventory.types.exit', 'Salida')}
                           </span>
                         </td>
-                        <td className="px-3 py-2 text-xs capitalize">{m.source}</td>
+                        <td className="px-3 py-2 text-xs">{formatMovementSource(m.source)}</td>
                         <td className="px-3 py-2 text-xs">{m.warehouse ? `${m.warehouse.name} (${m.warehouse.code})` : t('admin.products.values.empty', '-')}</td>
                         <td className="px-3 py-2 text-right">{m.quantity}</td>
-                        <td className="px-3 py-2 text-right">{formatActiveAmount(m.unit_price_usd)}</td>
-                        <td className="px-3 py-2 text-right">{formatActiveAmount(m.total_value_usd)}</td>
+                        <td className="px-3 py-2 text-right">{m.unit_price_admin_totals?.[displayCurrency] !== undefined ? formatServerAmount(displayCurrency, m.unit_price_admin_totals[displayCurrency]) : formatActiveAmount(m.unit_price_usd)}</td>
+                        <td className="px-3 py-2 text-right">{m.total_value_admin_totals?.[displayCurrency] !== undefined ? formatServerAmount(displayCurrency, m.total_value_admin_totals[displayCurrency]) : formatActiveAmount(m.total_value_usd)}</td>
                         <td className="px-3 py-2 text-xs">{m.reference || t('admin.products.values.empty', '-')}</td>
                         <td className="px-3 py-2 text-xs truncate max-w-[180px]" title={m.notes}>{m.notes || t('admin.products.values.empty', '-')}</td>
                       </tr>

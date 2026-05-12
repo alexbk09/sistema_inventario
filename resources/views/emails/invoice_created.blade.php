@@ -22,6 +22,18 @@
   $thousandsSeparator = $locale === 'en' ? ',' : '.';
   $decimalSeparator = $locale === 'en' ? '.' : ',';
   $formatMoney = static fn ($value) => number_format((float) $value, 2, $decimalSeparator, $thousandsSeparator);
+  $documentCurrency = (string) ($invoice->currency_code ?: ($invoice->monetary_totals_json['original_currency'] ?? 'USD'));
+  $documentOriginalAmount = is_numeric($invoice->monetary_totals_json['original_amount'] ?? null)
+    ? (float) $invoice->monetary_totals_json['original_amount']
+    : (float) ($invoice->total_usd ?? 0);
+  $documentTotals = is_array($invoice->monetary_totals_json['totals'] ?? null)
+    ? $invoice->monetary_totals_json['totals']
+    : [];
+  $secondaryDocumentTotals = array_filter(
+    $documentTotals,
+    static fn ($amount, $code) => $code !== $documentCurrency,
+    ARRAY_FILTER_USE_BOTH,
+  );
 @endphp
 
 <!DOCTYPE html>
@@ -68,10 +80,10 @@
 
                 <h2 style="font-size: 16px; margin: 0 0 8px 0; color: #111827;">{{ __('app.email_invoice.summary_title') }}</h2>
                 <p style="font-size: 14px; margin: 0 0 8px 0; color: #4b5563;">
-                  {{ __('app.email_invoice.total_label') }} <strong>{{ __('app.email_invoice.total_usd_value', ['amount' => $formatMoney($invoice->total_usd)]) }}</strong>
-                  @if($invoice->total_bs)
-                    &nbsp;·&nbsp; <strong>{{ __('app.email_invoice.total_bs_value', ['amount' => $formatMoney($invoice->total_bs)]) }}</strong>
-                  @endif
+                  {{ __('app.email_invoice.total_label') }} <strong>{{ $documentCurrency }} {{ $formatMoney($documentOriginalAmount) }}</strong>
+                  @foreach($secondaryDocumentTotals as $code => $amount)
+                    &nbsp;·&nbsp; <strong>{{ $code }} {{ $formatMoney($amount) }}</strong>
+                  @endforeach
                 </p>
 
                 @if($invoice->items && $invoice->items->count())
@@ -85,10 +97,29 @@
                     </thead>
                     <tbody>
                     @foreach($invoice->items as $item)
+                      @php
+                        $itemCurrency = (string) ($item->unit_currency_code ?: 'USD');
+                        $itemSubtotal = is_numeric($item->subtotal_original ?? null)
+                          ? (float) $item->subtotal_original
+                          : (float) ($item->subtotal_usd ?? 0);
+                        $itemTotals = is_array($item->monetary_breakdown_json['totals'] ?? null)
+                          ? $item->monetary_breakdown_json['totals']
+                          : [];
+                        $secondaryItemTotals = array_filter(
+                          $itemTotals,
+                          static fn ($amount, $code) => $code !== $itemCurrency,
+                          ARRAY_FILTER_USE_BOTH,
+                        );
+                      @endphp
                       <tr>
                         <td style="padding: 4px 0; border-bottom: 1px solid #f3f4f6;">{{ $item->product->name ?? __('app.email_invoice.product_fallback') }}</td>
                         <td align="center" style="padding: 4px 0; border-bottom: 1px solid #f3f4f6;">{{ $item->quantity }}</td>
-                        <td align="right" style="padding: 4px 0; border-bottom: 1px solid #f3f4f6;">{{ __('app.email_invoice.subtotal_usd_value', ['amount' => $formatMoney($item->subtotal_usd)]) }}</td>
+                        <td align="right" style="padding: 4px 0; border-bottom: 1px solid #f3f4f6;">
+                          <div>{{ $itemCurrency }} {{ $formatMoney($itemSubtotal) }}</div>
+                          @foreach($secondaryItemTotals as $code => $amount)
+                            <div style="color: #6b7280; font-size: 11px;">{{ $code }} {{ $formatMoney($amount) }}</div>
+                          @endforeach
+                        </td>
                       </tr>
                     @endforeach
                     </tbody>

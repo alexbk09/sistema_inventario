@@ -6,12 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\InventoryMovement;
 use App\Models\Product;
 use App\Models\Warehouse;
+use App\Services\AdminMoneyService;
+use App\Support\Settings;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class InventoryKardexController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, AdminMoneyService $adminMoneyService)
     {
         $filters = [
             'product_id' => $request->input('product_id'),
@@ -19,6 +21,9 @@ class InventoryKardexController extends Controller
             'date_from' => $request->input('date_from'),
             'date_to' => $request->input('date_to'),
         ];
+
+        $currencySettings = Settings::get('currency', []);
+        $adminCurrencyContext = $adminMoneyService->getAdminCurrencyContext($currencySettings);
 
         $query = InventoryMovement::query()
             ->with(['product:id,name,sku,barcode', 'warehouse:id,name,code', 'movementType:id,name,code'])
@@ -39,6 +44,16 @@ class InventoryKardexController extends Controller
 
         $movements = $query->paginate(100)->withQueryString();
 
+        $movements->getCollection()->transform(function (InventoryMovement $movement) use ($adminMoneyService, $currencySettings) {
+            $unitAmountUsd = (float) ($movement->unit_price_usd ?? $movement->cost_usd ?? 0);
+            $totalValueUsd = (float) ($movement->total_value_usd ?? (($movement->quantity ?? 0) * $unitAmountUsd));
+
+            $movement->unit_price_admin_totals = $adminMoneyService->buildAdminTotals($unitAmountUsd, $currencySettings)['totals'];
+            $movement->total_value_admin_totals = $adminMoneyService->buildAdminTotals($totalValueUsd, $currencySettings)['totals'];
+
+            return $movement;
+        });
+
         $product = null;
         if ($filters['product_id']) {
             $product = Product::select('id', 'name', 'sku', 'barcode', 'stock')->find($filters['product_id']);
@@ -53,6 +68,7 @@ class InventoryKardexController extends Controller
             'product' => $product,
             'products' => $products,
             'warehouses' => $warehouses,
+            'adminCurrencyContext' => $adminCurrencyContext,
         ]);
     }
 }

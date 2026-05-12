@@ -5,14 +5,20 @@ import { useI18n } from '@/Hooks/useI18n';
 import { useLocaleFormat } from '@/Hooks/useLocaleFormat';
 import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates';
 
-export default function Show({ customer, invoices }) {
+export default function Show({ customer, invoices, adminCurrencyContext = {}, customerMoney = {} }) {
   const { t } = useI18n();
-  const { formatDateTime, formatNumber } = useLocaleFormat();
+  const { formatCurrency, formatDateTime, formatNumber } = useLocaleFormat();
   const { displayCurrency, comparisonCurrency, formatPriceFromUsd, hasRateForCurrency } = useConfiguredCurrencyRates();
   const secondaryCurrency = comparisonCurrency && comparisonCurrency !== displayCurrency && hasRateForCurrency(comparisonCurrency)
     ? comparisonCurrency
     : null;
   const formatActiveAmount = (value, currency = displayCurrency) => formatPriceFromUsd(Number(value || 0), currency);
+  const visibleCurrencyCodes = Array.isArray(adminCurrencyContext?.codes) && adminCurrencyContext.codes.length > 0
+    ? adminCurrencyContext.codes
+    : [displayCurrency, ...(secondaryCurrency ? [secondaryCurrency] : [])].filter(Boolean);
+  const currencyColumns = [...new Set(visibleCurrencyCodes)];
+  const formatServerAmount = (code, value) => formatCurrency(Number(value || 0), code);
+  const translateInvoiceStatus = (status) => t(`admin.invoices.statuses.${status}`, status ?? t('admin.common.table.values.empty_dash', '—'));
   return (
     <AuthenticatedLayout>
       <Head title={`${t('admin.customers.show.page_title_prefix', 'Cliente')}: ${customer.name}`} />
@@ -57,7 +63,11 @@ export default function Show({ customer, invoices }) {
               <div className="bg-card border border-border rounded-lg p-4 flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">{`${t('admin.customers.show.total_spent_usd', 'Total gastado')} (${displayCurrency})`}</p>
-                  <p className="text-2xl font-bold text-foreground">{formatActiveAmount(customer.lifetime_spent_usd || 0)}</p>
+                  <p className="text-2xl font-bold text-foreground">
+                    {customerMoney?.lifetime_spent?.totals?.[displayCurrency] !== undefined
+                      ? formatServerAmount(displayCurrency, customerMoney.lifetime_spent.totals[displayCurrency])
+                      : formatActiveAmount(customer.lifetime_spent_usd || 0)}
+                  </p>
                 </div>
                 <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
                   <ShoppingBag className="w-6 h-6" />
@@ -85,8 +95,9 @@ export default function Show({ customer, invoices }) {
                         <th className="px-4 py-2 text-left font-medium text-foreground">{t('admin.customers.show.table.date', 'Fecha')}</th>
                         <th className="px-4 py-2 text-left font-medium text-foreground">{t('admin.customers.show.table.number', 'Número')}</th>
                         <th className="px-4 py-2 text-left font-medium text-foreground">{t('admin.customers.show.table.status', 'Estado')}</th>
-                        <th className="px-4 py-2 text-left font-medium text-foreground">{`${t('admin.customers.show.table.total_usd', 'Total')} ${displayCurrency}`}</th>
-                        <th className="px-4 py-2 text-left font-medium text-foreground">{secondaryCurrency ? `${t('admin.customers.show.table.total_bs', 'Total')} ${secondaryCurrency}` : t('admin.customers.show.table.total_bs', 'Referencia')}</th>
+                        {currencyColumns.map((code) => (
+                          <th key={code} className="px-4 py-2 text-left font-medium text-foreground">{`${t('admin.customers.show.table.total_usd', 'Total')} ${code}`}</th>
+                        ))}
                         <th className="px-4 py-2 text-left font-medium text-foreground">{t('admin.customers.show.table.points', 'Puntos')}</th>
                       </tr>
                     </thead>
@@ -97,9 +108,14 @@ export default function Show({ customer, invoices }) {
                             {inv.created_at ? formatDateTime(inv.created_at) : ''}
                           </td>
                           <td className="px-4 py-2 text-foreground">{inv.number}</td>
-                          <td className="px-4 py-2 text-muted-foreground">{inv.status_name || inv.status}</td>
-                          <td className="px-4 py-2 text-foreground">{formatActiveAmount(inv.total_usd || 0)}</td>
-                          <td className="px-4 py-2 text-foreground">{secondaryCurrency ? formatActiveAmount(inv.total_usd || 0, secondaryCurrency) : '—'}</td>
+                          <td className="px-4 py-2 text-muted-foreground">{inv.status_name || translateInvoiceStatus(inv.status)}</td>
+                          {currencyColumns.map((code) => (
+                            <td key={`${inv.id}-${code}`} className="px-4 py-2 text-foreground">
+                              {inv.document_totals?.[code] !== undefined
+                                ? formatServerAmount(code, inv.document_totals[code])
+                                : formatActiveAmount(inv.total_usd || 0, code)}
+                            </td>
+                          ))}
                           <td className="px-4 py-2 text-foreground">{inv.points_earned}</td>
                         </tr>
                       ))}

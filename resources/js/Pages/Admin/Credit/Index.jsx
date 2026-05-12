@@ -4,13 +4,18 @@ import AdminTable from '@/Components/admin/provider/AdminTableProviders.jsx';
 import { useI18n } from '@/Hooks/useI18n';
 import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates';
 
-export default function Index({ accounts, customers = [] }) {
+export default function Index({ accounts, customers = [], adminCurrencyContext }) {
   const { t } = useI18n();
-  const { displayCurrency, formatPriceFromUsd } = useConfiguredCurrencyRates();
-  const formatActiveAmount = (value) => formatPriceFromUsd(Number(value || 0), displayCurrency);
+  const { displayCurrency } = useConfiguredCurrencyRates();
   const { data } = accounts;
   const page = accounts.current_page ?? accounts?.meta?.current_page ?? 1;
   const totalPages = accounts.last_page ?? accounts?.meta?.last_page ?? 1;
+  const adminCurrencyCodes = Array.isArray(adminCurrencyContext?.codes) ? adminCurrencyContext.codes : [];
+
+  const formatMoney = (value) => new Intl.NumberFormat(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(value || 0));
 
   const handlePageChange = (nextPage) => {
     if (nextPage < 1 || nextPage > totalPages) return;
@@ -24,13 +29,24 @@ export default function Index({ accounts, customers = [] }) {
   const columns = [
     { key: 'customer', label: t('admin.credits.index.table.customer', 'Cliente'), width: '30%', render: (_v, row) => row.customer?.name ?? t('admin.credits.values.not_available', 'N/A') },
     { key: 'status', label: t('admin.credits.index.table.status', 'Estado'), width: '15%' },
-    { key: 'credit_limit_usd', label: `${t('admin.credits.index.table.credit_limit_usd', 'Límite')} ${displayCurrency}`, width: '20%', render: (v) => formatActiveAmount(v) },
-    { key: 'balance_usd', label: `${t('admin.credits.index.table.balance_usd', 'Saldo')} ${displayCurrency}`, width: '20%', render: (v) => formatActiveAmount(v) },
+    ...adminCurrencyCodes.map((code) => ({
+      key: `credit_limit_admin_totals.${code}`,
+      label: `${t('admin.credits.index.table.credit_limit_usd', 'Límite')} ${code}`,
+      width: '18%',
+      render: (_v, row) => formatMoney(row.credit_limit_admin_totals?.[code] ?? 0),
+    })),
+    ...adminCurrencyCodes.map((code) => ({
+      key: `balance_admin_totals.${code}`,
+      label: `${t('admin.credits.index.table.balance_usd', 'Saldo')} ${code}`,
+      width: '18%',
+      render: (_v, row) => formatMoney(row.balance_admin_totals?.[code] ?? 0),
+    })),
   ];
 
   const { data: form, setData, post, processing, reset } = useForm({
     customer_id: customers?.[0]?.id ?? '',
     credit_limit_usd: '',
+    currency_code: displayCurrency,
     status: 'active',
   });
 
@@ -38,7 +54,7 @@ export default function Index({ accounts, customers = [] }) {
     e.preventDefault();
     post(route('admin.credits.store'), {
       preserveScroll: true,
-      onSuccess: () => reset({ customer_id: customers?.[0]?.id ?? '', credit_limit_usd: '', status: 'active' }),
+      onSuccess: () => reset({ customer_id: customers?.[0]?.id ?? '', credit_limit_usd: '', currency_code: displayCurrency, status: 'active' }),
     });
   };
 
@@ -89,7 +105,10 @@ export default function Index({ accounts, customers = [] }) {
                   min="0"
                   step="0.01"
                   value={form.credit_limit_usd}
-                  onChange={(e) => setData('credit_limit_usd', e.target.value)}
+                  onChange={(e) => {
+                    setData('credit_limit_usd', e.target.value);
+                    setData('currency_code', displayCurrency);
+                  }}
                   className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground"
                   placeholder={t('admin.credits.index.form.optional', 'Opcional')}
                 />

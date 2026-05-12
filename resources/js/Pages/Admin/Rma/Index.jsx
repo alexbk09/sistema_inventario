@@ -8,11 +8,19 @@ import { useI18n } from '@/Hooks/useI18n';
 import { useLocaleFormat } from '@/Hooks/useLocaleFormat';
 import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates';
 
-export default function Index({ rmas, filters }) {
+export default function Index({ rmas, filters, adminCurrencyContext = {} }) {
   const { t } = useI18n();
-  const { formatNumber } = useLocaleFormat();
-  const { displayCurrency, formatPriceFromUsd } = useConfiguredCurrencyRates();
-  const formatActiveAmount = (value) => formatPriceFromUsd(Number(value || 0), displayCurrency);
+  const { formatCurrency } = useLocaleFormat();
+  const { displayCurrency, comparisonCurrency, formatPriceFromUsd, hasRateForCurrency } = useConfiguredCurrencyRates();
+  const secondaryCurrency = comparisonCurrency && comparisonCurrency !== displayCurrency && hasRateForCurrency(comparisonCurrency)
+    ? comparisonCurrency
+    : null;
+  const visibleCurrencyCodes = Array.isArray(adminCurrencyContext?.codes) && adminCurrencyContext.codes.length > 0
+    ? adminCurrencyContext.codes
+    : [displayCurrency, ...(secondaryCurrency ? [secondaryCurrency] : [])].filter(Boolean);
+  const currencyColumns = [...new Set(visibleCurrencyCodes)];
+  const formatActiveAmount = (value, currency = displayCurrency) => formatPriceFromUsd(Number(value || 0), currency);
+  const formatServerAmount = (code, value) => formatCurrency(Number(value || 0), code);
   const { data } = rmas;
   const page = rmas.current_page ?? rmas?.meta?.current_page ?? 1;
   const totalPages = rmas.last_page ?? rmas?.meta?.last_page ?? 1;
@@ -82,12 +90,14 @@ export default function Index({ rmas, filters }) {
       width: '15%',
       render: (value) => statusLabels[value] ?? value,
     },
-    {
-      key: 'total_usd',
-      label: `${t('admin.rmas.index.table.total_usd', 'Total')} ${displayCurrency}`,
+    ...currencyColumns.map((code) => ({
+      key: `total_${code}`,
+      label: `${t('admin.rmas.index.table.total_usd', 'Total')} ${code}`,
       width: '20%',
-      render: (v) => formatActiveAmount(v),
-    },
+      render: (_v, row) => row.document_totals?.[code] !== undefined
+        ? formatServerAmount(code, row.document_totals[code])
+        : formatActiveAmount(row.total_usd, code),
+    })),
   ];
 
   return (

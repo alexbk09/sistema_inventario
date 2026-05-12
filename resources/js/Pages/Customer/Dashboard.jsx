@@ -4,11 +4,22 @@ import { useI18n } from '@/Hooks/useI18n.ts';
 import { useLocaleFormat } from '@/Hooks/useLocaleFormat.ts';
 import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates';
 
-export default function CustomerDashboard({ summary, invoices, topProducts, profile }) {
+export default function CustomerDashboard({ summary, invoices, topProducts, profile, currencyContext }) {
     const { t } = useI18n();
     const { formatDate, formatNumber } = useLocaleFormat();
     const { displayCurrency, formatPriceFromUsd } = useConfiguredCurrencyRates();
+    const enabledCurrencyCodes = Array.isArray(currencyContext?.codes) ? currencyContext.codes : [];
     const formatActiveAmount = (value) => formatPriceFromUsd(Number(value || 0), displayCurrency);
+    const formatServerAmount = (currencyCode, value) => new Intl.NumberFormat(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(Number(value || 0));
+
+    const getDocumentAmount = (totals, baseAmount) => (
+        displayCurrency && totals && totals[displayCurrency] !== undefined
+            ? `${displayCurrency} ${formatServerAmount(displayCurrency, totals[displayCurrency])}`
+            : formatActiveAmount(baseAmount ?? 0)
+    );
 
     return (
         <AuthenticatedLayout>
@@ -18,7 +29,7 @@ export default function CustomerDashboard({ summary, invoices, topProducts, prof
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                     <div className="bg-card p-4 rounded-lg shadow">
                         <div className="text-muted-foreground text-sm">{t('customer_dashboard.metrics.total_spent', 'Total gastado')}</div>
-                        <div className="text-2xl font-bold">{formatActiveAmount(summary.totalSpent ?? 0)}</div>
+                        <div className="text-2xl font-bold">{getDocumentAmount(summary.documentTotals, summary.totalSpent)}</div>
                     </div>
                     <div className="bg-card p-4 rounded-lg shadow">
                         <div className="text-muted-foreground text-sm">{t('customer_dashboard.metrics.purchases', 'Compras')}</div>
@@ -45,7 +56,7 @@ export default function CustomerDashboard({ summary, invoices, topProducts, prof
                                 {invoices.length > 0 ? invoices.map((inv) => (
                                     <tr key={inv.id} className="border-t">
                                         <td className="px-4 py-2">{inv.number}</td>
-                                        <td className="px-4 py-2">{formatActiveAmount(inv.total_usd ?? 0)}</td>
+                                        <td className="px-4 py-2">{getDocumentAmount(inv.document_totals, inv.total_usd)}</td>
                                         <td className="px-4 py-2">{formatDate(inv.created_at)}</td>
                                         <td className="px-4 py-2">{t(`admin.invoices.statuses.${inv.status}`, inv.status)}</td>
                                     </tr>

@@ -6,14 +6,16 @@ import { useI18n } from '@/Hooks/useI18n';
 import { useLocaleFormat } from '@/Hooks/useLocaleFormat';
 import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates';
 
-export default function Create({ customers = [], products = [], rateBs }) {
+export default function Create({ customers = [], products = [], rateBs, adminCurrencyContext = {} }) {
   const { t } = useI18n();
-  const { formatNumber } = useLocaleFormat();
+  const { formatNumber, formatCurrency } = useLocaleFormat();
   const { displayCurrency, comparisonCurrency, formatPriceFromUsd, hasRateForCurrency } = useConfiguredCurrencyRates();
   const secondaryCurrency = comparisonCurrency && comparisonCurrency !== displayCurrency && hasRateForCurrency(comparisonCurrency)
     ? comparisonCurrency
     : null;
   const formatActiveAmount = (value, currency = displayCurrency) => formatPriceFromUsd(Number(value || 0), currency);
+  const formatServerAmount = (code, value) => formatCurrency(Number(value || 0), code);
+  const getProductDisplayPrice = (product, currency = displayCurrency) => product?.price_admin_totals?.[currency];
   const { data, setData, post, processing } = useForm({
     customer_id: '',
     expires_at: '',
@@ -36,11 +38,22 @@ export default function Create({ customers = [], products = [], rateBs }) {
       const priceUsd = Number(product?.price_usd ?? 0);
       const subtotalUsd = priceUsd * quantity;
       const subtotalBs = subtotalUsd * Number(rateBs ?? 0);
-      return { ...item, product, quantity, priceUsd, subtotalUsd, subtotalBs };
+      return {
+        ...item,
+        product,
+        quantity,
+        priceUsd,
+        priceDisplay: getProductDisplayPrice(product),
+        subtotalUsd,
+        subtotalDisplay: getProductDisplayPrice(product) !== undefined ? getProductDisplayPrice(product) * quantity : null,
+        subtotalBs,
+      };
     });
   }, [data.items, products, rateBs]);
 
   const totalUsd = useMemo(() => itemsWithDetails.reduce((sum, item) => sum + (item.subtotalUsd || 0), 0), [itemsWithDetails]);
+  const totalDisplay = useMemo(() => itemsWithDetails.reduce((sum, item) => sum + Number(item.subtotalDisplay ?? 0), 0), [itemsWithDetails]);
+  const hasDisplayTotal = itemsWithDetails.length > 0 && itemsWithDetails.every((item) => item.subtotalDisplay !== null);
   const totalBs = totalUsd * Number(rateBs ?? 0);
 
   const handleAddProduct = (product) => {
@@ -98,7 +111,7 @@ export default function Create({ customers = [], products = [], rateBs }) {
           description={t('admin.layaways.create.hero_description', 'El formulario se divide en datos del acuerdo y detalle de productos reservados, mientras el resumen lateral mantiene visible el compromiso económico del apartado.')}
           stats={[
             { label: t('admin.layaways.create.stats.items', 'Ítems'), value: itemsWithDetails.length },
-            { label: `${t('admin.layaways.create.stats.total_usd', 'Total')} ${displayCurrency}`, value: formatActiveAmount(totalUsd) },
+            { label: `${t('admin.layaways.create.stats.total_usd', 'Total')} ${displayCurrency}`, value: hasDisplayTotal ? formatServerAmount(displayCurrency, totalDisplay) : formatActiveAmount(totalUsd) },
             { label: t('admin.layaways.create.stats.rate', 'Tasa'), value: formatNumber(rateBs ?? 0, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) },
           ]}
           sections={sections}
@@ -124,18 +137,18 @@ export default function Create({ customers = [], products = [], rateBs }) {
                       <p className="truncate font-medium text-slate-900">{item.product?.name ?? t('admin.layaways.values.product_fallback', 'Producto')}</p>
                       <p className="text-xs text-slate-500">x{item.quantity}</p>
                     </div>
-                    <p className="font-semibold text-slate-900">{formatActiveAmount(item.subtotalUsd)}</p>
+                    <p className="font-semibold text-slate-900">{item.subtotalDisplay !== null ? formatServerAmount(displayCurrency, item.subtotalDisplay) : formatActiveAmount(item.subtotalUsd)}</p>
                   </div>
                 ))}
               </div>
               <div className="mt-4 space-y-3 text-sm text-slate-600">
                 <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
                   <span>{`${t('admin.layaways.create.summary.total_usd', 'Total')} ${displayCurrency}`}</span>
-                  <strong className="text-slate-900">{formatActiveAmount(totalUsd)}</strong>
+                  <strong className="text-slate-900">{hasDisplayTotal ? formatServerAmount(displayCurrency, totalDisplay) : formatActiveAmount(totalUsd)}</strong>
                 </div>
                 <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
                   <span>{secondaryCurrency ? `${t('admin.layaways.create.summary.total_bs', 'Referencia')} ${secondaryCurrency}` : t('admin.layaways.create.summary.total_bs', 'Referencia')}</span>
-                  <strong className="text-slate-900">{secondaryCurrency ? formatActiveAmount(totalUsd, secondaryCurrency) : '—'}</strong>
+                  <strong className="text-slate-900">{secondaryCurrency ? formatActiveAmount(totalUsd, secondaryCurrency) : t('admin.common.table.values.empty_dash', '—')}</strong>
                 </div>
               </div>
               <p className="mt-4 text-xs leading-6 text-slate-500">{t('admin.layaways.create.summary.note', 'El apartado se creará en estado activo. Luego podrá completarse, cancelarse o marcarse como vencido desde su detalle.')}</p>
@@ -202,7 +215,7 @@ export default function Create({ customers = [], products = [], rateBs }) {
                         <li key={product.id} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50">
                           <div className="flex flex-col">
                             <span className="text-sm font-medium text-slate-900">{product.name}</span>
-                            <span className="text-xs text-slate-500">{`${t('admin.layaways.create.items.price', 'Precio')}: ${formatActiveAmount(product.price_usd ?? 0)}`}</span>
+                            <span className="text-xs text-slate-500">{`${t('admin.layaways.create.items.price', 'Precio')}: ${getProductDisplayPrice(product) !== undefined ? formatServerAmount(displayCurrency, getProductDisplayPrice(product)) : formatActiveAmount(product.price_usd ?? 0)}`}</span>
                           </div>
                           <button type="button" onClick={() => handleAddProduct(product)} className="rounded-2xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-800">{t('admin.layaways.create.items.add', 'Agregar')}</button>
                         </li>
@@ -235,8 +248,8 @@ export default function Create({ customers = [], products = [], rateBs }) {
                                 <td className="px-4 py-3 text-center">
                                   <input type="number" min={1} value={item.quantity} onChange={(event) => handleQuantityChange(index, event.target.value)} className="w-20 rounded-xl border border-slate-300 bg-white px-2 py-2 text-center text-xs text-slate-900" />
                                 </td>
-                                <td className="px-4 py-3 text-right text-slate-900">{formatActiveAmount(item.priceUsd)}</td>
-                                <td className="px-4 py-3 text-right font-semibold text-slate-900">{formatActiveAmount(item.subtotalUsd)}</td>
+                                <td className="px-4 py-3 text-right text-slate-900">{item.priceDisplay !== undefined ? formatServerAmount(displayCurrency, item.priceDisplay) : formatActiveAmount(item.priceUsd)}</td>
+                                <td className="px-4 py-3 text-right font-semibold text-slate-900">{item.subtotalDisplay !== null ? formatServerAmount(displayCurrency, item.subtotalDisplay) : formatActiveAmount(item.subtotalUsd)}</td>
                                 <td className="px-4 py-3 text-center">
                                   <button type="button" onClick={() => handleRemoveItem(index)} className="text-xs font-semibold text-rose-600 hover:text-rose-700">{t('admin.layaways.create.items.remove', 'Quitar')}</button>
                                 </td>

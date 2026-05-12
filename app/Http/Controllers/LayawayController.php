@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\{Layaway, LayawayItem, Customer, Product};
+use App\Services\AdminMoneyService;
 use App\Services\AdminNotificationService;
 use App\Services\CurrencyService;
+use App\Support\Settings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
@@ -12,13 +14,14 @@ use Inertia\Inertia;
 
 class LayawayController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, AdminMoneyService $adminMoneyService)
     {
         if (!$request->user() || !$request->user()->can('view credits')) {
             return redirect()->route('dashboard')->with('error', __('app.admin.layaways.permissions.view_denied'));
         }
 
         $status = (string) $request->input('status', '');
+        $currencySettings = Settings::get('currency', []);
 
         $layaways = Layaway::with('customer')
             ->when($status !== '', function ($q) use ($status) {
@@ -28,30 +31,50 @@ class LayawayController extends Controller
             ->paginate(20)
             ->withQueryString();
 
+        $adminCurrencyContext = $adminMoneyService->getAdminCurrencyContext($currencySettings);
+
+        $layaways->setCollection(
+            $layaways->getCollection()->map(function (Layaway $layaway) use ($adminMoneyService, $currencySettings) {
+                $layaway->document_totals = $this->resolveLayawayDocumentTotals($layaway, $adminMoneyService, $currencySettings);
+                $layaway->paid_admin_totals = $adminMoneyService->buildAdminTotals((float) ($layaway->paid_usd ?? 0), $currencySettings)['totals'];
+
+                return $layaway;
+            })
+        );
+
         return Inertia::render('Admin/Layaway/Index', [
             'layaways' => $layaways,
             'filters' => [
                 'status' => $status,
             ],
+            'adminCurrencyContext' => $adminCurrencyContext,
         ]);
     }
 
-    public function create(Request $request)
+    public function create(Request $request, AdminMoneyService $adminMoneyService)
     {
         if (!$request->user() || !$request->user()->can('manage credits')) {
             return redirect()->route('dashboard')->with('error', __('app.admin.layaways.permissions.create_denied'));
         }
 
+        $currencySettings = Settings::get('currency', []);
+        $adminCurrencyContext = $adminMoneyService->getAdminCurrencyContext($currencySettings);
         $customers = Customer::orderBy('name')->get(['id','name']);
-        $products = Product::orderBy('name')->get(['id','name','price_usd','stock']);
+        $products = Product::orderBy('name')->get(['id','name','price_usd','stock'])
+            ->map(function (Product $product) use ($adminMoneyService, $currencySettings) {
+                $product->price_admin_totals = $adminMoneyService->buildAdminTotals((float) ($product->price_usd ?? 0), $currencySettings)['totals'];
+
+                return $product;
+            });
 
         return Inertia::render('Admin/Layaway/Create', [
             'customers' => $customers,
             'products' => $products,
+            'adminCurrencyContext' => $adminCurrencyContext,
         ]);
     }
 
-    public function store(Request $request, CurrencyService $currency, AdminNotificationService $notificationService)
+    public function store(Request $request, CurrencyService $currency, AdminNotificationService $notificationService, AdminMoneyService $adminMoneyService)
     {
         if (!$request->user() || !$request->user()->can('manage credits')) {
             return redirect()->route('dashboard')->with('error', __('app.admin.layaways.permissions.create_denied'));
@@ -66,7 +89,15 @@ class LayawayController extends Controller
             'items.*.quantity' => ['required','integer','min:1'],
         ]);
 
-        return DB::transaction(function () use ($data, $currency, $notificationService) {
+        return DB::transaction(function () use ($data, $currency, $notificationService, $adminMoneyService) {
+            $currencySettings = \App\Support\Settings::get('currency', []);
+            $enabledCurrencyContext = $adminMoneyService->getEnabledCurrencyContext($currencySettings);
+            $documentSnapshot = $adminMoneyService->buildSnapshot(
+                $enabledCurrencyContext['rates'] ?? [],
+                $enabledCurrencyContext['base_currency'] ?? 'USD',
+                now()->toIso8601String(),
+            );
+
             $layaway = new Layaway();
             $layaway->number = 'LAY-'.Str::upper(Str::random(8));
             $layaway->customer_id = $data['customer_id'] ?? null;
@@ -76,6 +107,10 @@ class LayawayController extends Controller
             $layaway->total_usd = 0;
             $layaway->total_bs = 0;
             $layaway->paid_usd = 0;
+            $layaway->currency_code = 'USD';
+            $layaway->base_currency_code = $documentSnapshot['base_currency'] ?? 'USD';
+            $layaway->exchange_rate_snapshot = 1;
+            $layaway->exchange_rate_source = 'manual';
             $layaway->save();
 
             $totalUsd = 0.0;
@@ -94,6 +129,11 @@ class LayawayController extends Controller
                     'unit_price_usd' => $unitPrice,
                     'subtotal_usd' => $subtotalUsd,
                     'subtotal_bs' => $subtotalBs,
+                    'unit_currency_code' => 'USD',
+                    'unit_price_original' => $unitPrice,
+                    'subtotal_original' => $subtotalUsd,
+                    'exchange_rate_snapshot' => 1,
+                    'monetary_breakdown_json' => $adminMoneyService->buildDocumentTotals($subtotalUsd, $currencySettings, $documentSnapshot),
                 ]);
 
                 $totalUsd += $subtotalUsd;
@@ -102,9 +142,23 @@ class LayawayController extends Controller
             $layaway->update([
                 'total_usd' => $totalUsd,
                 'total_bs' => $currency->usdToBs($totalUsd),
+                'currency_code' => 'USD',
+                'base_currency_code' => $documentSnapshot['base_currency'] ?? 'USD',
+                'exchange_rate_snapshot' => 1,
+                'exchange_rate_source' => 'manual',
+                'monetary_totals_json' => [
+                    'original_currency' => 'USD',
+                    'original_amount' => round($totalUsd, 2),
+                    ...$adminMoneyService->buildDocumentTotals($totalUsd, $currencySettings, $documentSnapshot),
+                ],
             ]);
 
-            $notificationMessage = 'Total: $'.number_format((float) $layaway->total_usd, 2);
+            $notificationMessage = $notificationService->formatDocumentAmount(
+                'Total',
+                $layaway->currency_code,
+                $layaway->total_usd,
+                is_array($layaway->monetary_totals_json) ? $layaway->monetary_totals_json : null,
+            );
             if ($layaway->expires_at) {
                 $notificationMessage .= ' / Vence: '.$layaway->expires_at->format('d/m/Y H:i');
             }
@@ -129,16 +183,43 @@ class LayawayController extends Controller
         });
     }
 
-    public function show(Request $request, Layaway $layaway)
+    public function show(Request $request, Layaway $layaway, AdminMoneyService $adminMoneyService)
     {
         if (!$request->user() || !$request->user()->can('view credits')) {
             return redirect()->route('dashboard')->with('error', __('app.admin.layaways.permissions.view_denied'));
         }
 
         $layaway->load(['customer','items.product']);
+        $currencySettings = Settings::get('currency', []);
+        $adminCurrencyContext = $adminMoneyService->getAdminCurrencyContext($currencySettings);
+
+        $layaway->document_totals = $this->resolveLayawayDocumentTotals($layaway, $adminMoneyService, $currencySettings);
+        $layaway->paid_admin_totals = $adminMoneyService->buildAdminTotals((float) ($layaway->paid_usd ?? 0), $currencySettings)['totals'];
+        $layaway->items->transform(function (LayawayItem $item) use ($adminMoneyService, $currencySettings, $layaway) {
+            $item->unit_price_admin_totals = $adminMoneyService->buildAdminTotals((float) ($item->unit_price_usd ?? 0), $currencySettings)['totals'];
+
+            if (is_array($item->monetary_breakdown_json['totals'] ?? null)) {
+                $item->document_totals = $item->monetary_breakdown_json['totals'];
+
+                return $item;
+            }
+
+            $snapshot = is_array($layaway->monetary_totals_json['rates'] ?? null)
+                ? [
+                    'base_currency' => (string) ($layaway->base_currency_code ?: 'USD'),
+                    'captured_at' => $layaway->monetary_totals_json['captured_at'] ?? null,
+                    'rates' => $layaway->monetary_totals_json['rates'],
+                ]
+                : null;
+
+            $item->document_totals = $adminMoneyService->buildDocumentTotals((float) ($item->subtotal_usd ?? 0), $currencySettings, $snapshot)['totals'];
+
+            return $item;
+        });
 
         return Inertia::render('Admin/Layaway/Show', [
             'layaway' => $layaway,
+            'adminCurrencyContext' => $adminCurrencyContext,
         ]);
     }
 
@@ -176,5 +257,22 @@ class LayawayController extends Controller
         }
 
         return redirect()->route('admin.layaways.show', $layaway->id)->with('success', __('app.admin.layaways.notifications.updated'));
+    }
+
+    protected function resolveLayawayDocumentTotals(Layaway $layaway, AdminMoneyService $adminMoneyService, array $currencySettings): array
+    {
+        if (is_array($layaway->monetary_totals_json['totals'] ?? null)) {
+            return $layaway->monetary_totals_json['totals'];
+        }
+
+        $snapshot = is_array($layaway->monetary_totals_json['rates'] ?? null)
+            ? [
+                'base_currency' => (string) ($layaway->base_currency_code ?: 'USD'),
+                'captured_at' => $layaway->monetary_totals_json['captured_at'] ?? null,
+                'rates' => $layaway->monetary_totals_json['rates'],
+            ]
+            : null;
+
+        return $adminMoneyService->buildDocumentTotals((float) ($layaway->total_usd ?? 0), $currencySettings, $snapshot)['totals'];
     }
 }

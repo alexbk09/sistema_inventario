@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Mail\InvoiceCreated;
 use App\Models\{Coupon, CreditMovement, Customer, Invoice, InvoiceContact, InvoiceItem, InvoicePayment, InvoiceStatus, MovementType, PaymentGatewayTransaction, Product};
-use App\Services\{CurrencyService, InventoryService};
+use App\Services\{AdminMoneyService, AdminNotificationService, CurrencyService, InventoryService};
 use App\Services\PayPalService;
 use App\Services\StripeService;
 use App\Support\CurrencySettings;
@@ -49,7 +49,7 @@ class CheckoutController extends Controller
         ]);
     }
 
-    public function store(Request $request, CurrencyService $currency, InventoryService $inventory)
+    public function store(Request $request, CurrencyService $currency, InventoryService $inventory, AdminNotificationService $notificationService, AdminMoneyService $adminMoneyService)
     {
         $payload = $request->validate([
             'fullName' => ['required','string','max:255'],
@@ -187,6 +187,14 @@ class CheckoutController extends Controller
                 $customer->save();
             }
 
+            $currencySettings = $this->currencySettings();
+            $enabledCurrencyContext = $adminMoneyService->getEnabledCurrencyContext($currencySettings);
+            $documentSnapshot = $adminMoneyService->buildSnapshot(
+                $enabledCurrencyContext['rates'] ?? [],
+                $enabledCurrencyContext['base_currency'] ?? 'USD',
+                now()->toIso8601String(),
+            );
+
             // Crear factura base
             $invoice = new Invoice();
             $invoice->number = 'INV-'.Str::upper(Str::random(8));
@@ -200,6 +208,12 @@ class CheckoutController extends Controller
 
             $invoice->total_usd = 0;
             $invoice->total_bs = 0;
+            $invoice->currency_code = $checkoutCurrency;
+            $invoice->base_currency_code = $documentSnapshot['base_currency'] ?? 'USD';
+            $invoice->exchange_rate_snapshot = $checkoutCurrency === ($documentSnapshot['base_currency'] ?? 'USD')
+                ? 1
+                : (float) ($documentSnapshot['rates'][$checkoutCurrency] ?? null);
+            $invoice->exchange_rate_source = $adminMoneyService->resolveCurrencyRateSource($checkoutCurrency, $currencySettings) ?? 'manual';
             $invoice->save();
 
             // Items
@@ -217,6 +231,8 @@ class CheckoutController extends Controller
                 $subtotalBs = $rate !== null
                     ? round($subtotalUsd * $rate, 2)
                     : $currency->usdToBs($subtotalUsd);
+                $unitPriceOriginal = $adminMoneyService->convertUsingSnapshot($priceUsd, $checkoutCurrency, $documentSnapshot);
+                $subtotalOriginal = $adminMoneyService->convertUsingSnapshot($subtotalUsd, $checkoutCurrency, $documentSnapshot);
 
                 InvoiceItem::create([
                     'invoice_id' => $invoice->id,
@@ -225,6 +241,13 @@ class CheckoutController extends Controller
                     'price_usd' => $priceUsd,
                     'subtotal_usd' => $subtotalUsd,
                     'subtotal_bs' => $subtotalBs,
+                    'unit_currency_code' => $checkoutCurrency,
+                    'unit_price_original' => $unitPriceOriginal,
+                    'subtotal_original' => $subtotalOriginal,
+                    'exchange_rate_snapshot' => $checkoutCurrency === ($documentSnapshot['base_currency'] ?? 'USD')
+                        ? 1
+                        : (float) ($documentSnapshot['rates'][$checkoutCurrency] ?? null),
+                    'monetary_breakdown_json' => $adminMoneyService->buildDocumentTotals($subtotalUsd, $currencySettings, $documentSnapshot),
                 ]);
 
                 $itemsTotalUsd += $subtotalUsd;
@@ -291,6 +314,15 @@ class CheckoutController extends Controller
             $invoice->update([
                 'total_usd' => $totalUsd,
                 'total_bs' => $totalBs,
+                'currency_code' => $checkoutCurrency,
+                'base_currency_code' => $documentSnapshot['base_currency'] ?? 'USD',
+                'exchange_rate_snapshot' => $chargedRate,
+                'exchange_rate_source' => $adminMoneyService->resolveCurrencyRateSource($checkoutCurrency, $currencySettings) ?? 'manual',
+                'monetary_totals_json' => [
+                    'original_currency' => $checkoutCurrency,
+                    'original_amount' => round($chargedAmount, 2),
+                    ...$adminMoneyService->buildDocumentTotals($totalUsd, $currencySettings, $documentSnapshot),
+                ],
             ]);
 
             // Datos de contacto asociados
@@ -314,6 +346,11 @@ class CheckoutController extends Controller
                 'method' => $payload['paymentMethod'],
                 'amount_usd' => $totalUsd,
                 'amount_bs' => $totalBs,
+                'payment_currency_code' => $checkoutCurrency,
+                'amount_original' => round($chargedAmount, 2),
+                'amount_base' => $totalUsd,
+                'exchange_rate_snapshot' => $chargedRate,
+                'exchange_rate_source' => $adminMoneyService->resolveCurrencyRateSource($checkoutCurrency, $currencySettings) ?? 'manual',
                 'reference' => $payload['reference'] ?: ($payload['paypalCaptureId'] ?? $payload['paypalOrderId'] ?? null),
                 'bank' => $payload['bank'] ?: ($payload['paymentMethod'] === 'paypal' ? 'PayPal' : ($payload['paymentMethod'] === 'stripe' ? 'Stripe' : null)),
                 'notes' => $payload['paymentMethod'] === 'paypal'
@@ -330,6 +367,40 @@ class CheckoutController extends Controller
                 ])->save();
 
                 $this->markInvoiceAsPaid($invoice, $inventory);
+            } elseif ($payload['paymentMethod'] === 'manual') {
+                $customerName = $invoice->customer?->name ?: $contact->full_name;
+                $reference = $contact->reference;
+                $message = 'Factura pendiente por pago manual / '.$notificationService->formatDocumentAmount(
+                    'Total',
+                    $invoice->currency_code,
+                    $invoice->total_usd,
+                    is_array($invoice->monetary_totals_json) ? $invoice->monetary_totals_json : null,
+                );
+
+                if ($customerName) {
+                    $message .= ' / Cliente: '.$customerName;
+                }
+
+                if ($reference && $reference !== 'N/A') {
+                    $message .= ' / Ref: '.$reference;
+                }
+
+                $notificationService->notifyStaff(
+                    'manual_checkout_payment_pending',
+                    'Validar pago manual: '.$invoice->number,
+                    $message,
+                    [
+                        'severity' => 'warning',
+                        'action_url' => route('admin.invoices.index'),
+                        'action_label' => 'Revisar facturas',
+                        'dedupe_key' => 'manual_checkout_payment_pending:invoice:'.$invoice->id,
+                        'data' => [
+                            'invoice_id' => $invoice->id,
+                            'invoice_number' => $invoice->number,
+                            'payment_method' => 'manual',
+                        ],
+                    ]
+                );
             }
 
             // Notificación por correo (cliente + correo de la empresa si está configurado)
@@ -803,6 +874,12 @@ class CheckoutController extends Controller
             'invoice_id' => $invoice->id,
             'type' => 'payment',
             'amount_usd' => $invoice->total_usd,
+            'amount_original' => (float) ($invoice->monetary_totals_json['original_amount'] ?? $invoice->total_usd),
+            'currency_code' => (string) ($invoice->currency_code ?: 'USD'),
+            'base_currency_code' => (string) ($invoice->base_currency_code ?: 'USD'),
+            'exchange_rate_snapshot' => (float) ($invoice->exchange_rate_snapshot ?? 1),
+            'exchange_rate_source' => $invoice->exchange_rate_source,
+            'monetary_totals_json' => is_array($invoice->monetary_totals_json) ? $invoice->monetary_totals_json : null,
             'description' => 'Abono automático por factura '.$invoice->number,
             'paid_at' => now(),
         ]);

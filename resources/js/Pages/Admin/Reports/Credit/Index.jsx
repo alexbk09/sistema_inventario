@@ -5,13 +5,15 @@ import AdminPagination from '@/Components/admin/AdminPagination.jsx';
 import AdminIndexShell from '@/Components/admin/AdminIndexShell.jsx';
 import { useI18n } from '@/Hooks/useI18n';
 import { useLocaleFormat } from '@/Hooks/useLocaleFormat';
-import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates';
 
-export default function CreditReportIndex({ accounts, filters = {}, metrics, customers = [], statuses = [] }) {
+export default function CreditReportIndex({ accounts, filters = {}, metrics, customers = [], statuses = [], adminCurrencyContext }) {
   const { t } = useI18n();
   const { formatNumber } = useLocaleFormat();
-  const { displayCurrency, formatPriceFromUsd } = useConfiguredCurrencyRates();
-  const formatActiveAmount = (value) => formatPriceFromUsd(Number(value || 0), displayCurrency);
+  const adminCurrencyCodes = Array.isArray(adminCurrencyContext?.codes) ? adminCurrencyContext.codes : [];
+  const formatMoney = (value) => new Intl.NumberFormat(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(value || 0));
   const [localFilters, setLocalFilters] = useState({
     customer_id: filters.customer_id || '',
     status: filters.status || '',
@@ -49,7 +51,7 @@ export default function CreditReportIndex({ accounts, filters = {}, metrics, cus
         stats={[
           { label: t('admin.reports.credit.index.stats.accounts', 'Cuentas'), value: metrics.total_accounts },
           { label: t('admin.reports.credit.index.stats.page_accounts', 'Cuentas página'), value: metrics.page_accounts },
-          { label: `${t('admin.reports.credit.index.stats.balance_usd', 'Saldo')} ${displayCurrency}`, value: formatActiveAmount(metrics.total_balance_usd || 0) },
+          ...adminCurrencyCodes.map((code) => ({ label: `${t('admin.reports.credit.index.stats.balance_usd', 'Saldo')} ${code}`, value: formatMoney(metrics.total_balance_admin_totals?.[code] ?? 0) })),
           { label: t('admin.reports.credit.index.stats.overdue', 'Atrasos'), value: metrics.overdue_accounts },
         ]}
         contextTitle={t('admin.reports.credit.index.context_title', 'Crédito por cliente')}
@@ -151,28 +153,37 @@ export default function CreditReportIndex({ accounts, filters = {}, metrics, cus
                 <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.credit.index.table.customer', 'Cliente')}</th>
                 <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.credit.index.table.email', 'Email')}</th>
                 <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.credit.index.table.status', 'Estado')}</th>
-                <th className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.credit.index.table.limit_usd', 'Límite')} ${displayCurrency}`}</th>
-                <th className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.credit.index.table.balance_usd', 'Saldo')} ${displayCurrency}`}</th>
-                <th className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.credit.index.table.available_usd', 'Disponible')} ${displayCurrency}`}</th>
+                {adminCurrencyCodes.map((code) => (
+                  <th key={`limit-${code}`} className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.credit.index.table.limit_usd', 'Límite')} ${code}`}</th>
+                ))}
+                {adminCurrencyCodes.map((code) => (
+                  <th key={`balance-${code}`} className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.credit.index.table.balance_usd', 'Saldo')} ${code}`}</th>
+                ))}
+                {adminCurrencyCodes.map((code) => (
+                  <th key={`available-${code}`} className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.credit.index.table.available_usd', 'Disponible')} ${code}`}</th>
+                ))}
                 <th className="px-3 py-2 text-right font-semibold">{t('admin.reports.credit.index.table.overdue_charges', 'Cargos vencidos')}</th>
                 <th className="px-3 py-2 text-right font-semibold">{t('admin.reports.credit.index.table.actions', 'Acciones')}</th>
               </tr>
             </thead>
             <tbody>
               {accounts.data.map((acc) => {
-                const limit = Number(acc.credit_limit_usd ?? 0);
-                const balance = Number(acc.balance_usd ?? 0);
-                const available = limit > 0 ? limit - balance : 0;
                 const overdueCount = Number(acc.overdue_charges_count ?? 0);
 
                 return (
                   <tr key={acc.id} className="border-b border-border hover:bg-muted/40">
                     <td className="px-3 py-2 text-xs">{acc.customer?.name ?? t('admin.reports.credit.states.not_available', 'N/A')}</td>
-                    <td className="px-3 py-2 text-xs">{acc.customer?.email ?? '—'}</td>
+                    <td className="px-3 py-2 text-xs">{acc.customer?.email ?? t('admin.reports.credit.values.empty_dash', '—')}</td>
                     <td className="px-3 py-2 text-xs capitalize">{translateAccountStatus(acc.status)}</td>
-                    <td className="px-3 py-2 text-xs text-right">{formatActiveAmount(limit)}</td>
-                    <td className="px-3 py-2 text-xs text-right">{formatActiveAmount(balance)}</td>
-                    <td className="px-3 py-2 text-xs text-right">{formatActiveAmount(available)}</td>
+                    {adminCurrencyCodes.map((code) => (
+                      <td key={`limit-${acc.id}-${code}`} className="px-3 py-2 text-xs text-right">{formatMoney(acc.credit_limit_admin_totals?.[code] ?? 0)}</td>
+                    ))}
+                    {adminCurrencyCodes.map((code) => (
+                      <td key={`balance-${acc.id}-${code}`} className="px-3 py-2 text-xs text-right">{formatMoney(acc.balance_admin_totals?.[code] ?? 0)}</td>
+                    ))}
+                    {adminCurrencyCodes.map((code) => (
+                      <td key={`available-${acc.id}-${code}`} className="px-3 py-2 text-xs text-right">{formatMoney(acc.available_admin_totals?.[code] ?? 0)}</td>
+                    ))}
                     <td className="px-3 py-2 text-xs text-right">{formatNumber(overdueCount, { maximumFractionDigits: 0 })}</td>
                     <td className="px-3 py-2 text-xs text-right">
                       <Link
@@ -187,7 +198,7 @@ export default function CreditReportIndex({ accounts, filters = {}, metrics, cus
               })}
               {accounts.data.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-3 py-6 text-center text-sm text-muted-foreground">
+                  <td colSpan={6 + (adminCurrencyCodes.length * 3)} className="px-3 py-6 text-center text-sm text-muted-foreground">
                     {t('admin.reports.credit.index.empty', 'No hay cuentas de crédito para los filtros seleccionados.')}
                   </td>
                 </tr>

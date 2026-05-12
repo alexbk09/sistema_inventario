@@ -185,12 +185,12 @@ export default function InventoryRotation({ products, filters = {}, metrics, war
                 return (
                   <tr key={p.id} className="border-b border-border hover:bg-muted/40">
                     <td className="px-3 py-2 text-xs">{p.name}</td>
-                    <td className="px-3 py-2 text-xs">{p.sku || p.barcode || '—'}</td>
+                    <td className="px-3 py-2 text-xs">{p.sku || p.barcode || t('admin.reports.inventory.rotation.values.empty_dash', '—')}</td>
                     <td className="px-3 py-2 text-xs text-right">{formatNumber(stock, { maximumFractionDigits: 0 })}</td>
                     <td className="px-3 py-2 text-xs text-right">{formatNumber(unitsSold, { maximumFractionDigits: 0 })}</td>
                     <td className="px-3 py-2 text-xs text-right">{formatNumber(avgDaily, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     <td className="px-3 py-2 text-xs text-right">
-                      {daysInv !== null ? formatNumber(daysInv, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : (stock > 0 ? t('admin.reports.inventory.rotation.states.no_sales', 'Sin ventas') : '—')}
+                      {daysInv !== null ? formatNumber(daysInv, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : (stock > 0 ? t('admin.reports.inventory.rotation.states.no_sales', 'Sin ventas') : t('admin.reports.inventory.rotation.values.empty_dash', '—'))}
                     </td>
                     <td className="px-3 py-2 text-xs">
                       {p.last_sale_at ? formatDateTime(p.last_sale_at) : t('admin.reports.inventory.rotation.states.no_sales_in_period', 'Sin ventas en período')}

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\{Invoice, InvoiceItem, Product, Customer, MovementType, InvoiceStatus, Warehouse, InvoiceAdjustment, CreditAccount, CreditMovement, Layaway};
-use App\Services\{AdminNotificationService, CurrencyService, InventoryService};
+use App\Services\{AdminMoneyService, AdminNotificationService, CurrencyService, InventoryService};
 use App\Support\{Settings, Audit};
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -11,7 +11,7 @@ use Inertia\Inertia;
 
 class InvoiceController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, AdminMoneyService $adminMoneyService)
     {
         $search = trim((string) $request->input('search', ''));
         $invoices = Invoice::query()
@@ -42,24 +42,61 @@ class InvoiceController extends Controller
             ])
             ->paginate(12)
             ->withQueryString();
+
+        $adminCurrencyContext = $adminMoneyService->getAdminCurrencyContext();
+        $currencySettings = Settings::get('currency', []);
+
+        $invoices->setCollection(
+            $invoices->getCollection()->map(function (Invoice $invoice) use ($adminMoneyService, $currencySettings) {
+                $invoice->document_totals = $this->resolveInvoiceDocumentTotals($invoice, $adminMoneyService, $currencySettings);
+
+                return $invoice;
+            })
+        );
+
         return Inertia::render('Admin/Invoice/Index', [
             'invoices' => $invoices,
             'filters' => ['search' => $search],
+            'adminCurrencyContext' => $adminCurrencyContext,
         ]);
     }
 
-    public function create()
+    public function create(AdminMoneyService $adminMoneyService)
     {
+        $currencySettings = Settings::get('currency', []);
+        $adminCurrencyContext = $adminMoneyService->getAdminCurrencyContext($currencySettings);
+        $products = Product::select('id','name','price_usd','stock')->get()
+            ->map(function (Product $product) use ($adminMoneyService, $currencySettings) {
+                $product->price_admin_totals = $adminMoneyService->buildAdminTotals((float) ($product->price_usd ?? 0), $currencySettings)['totals'];
+
+                return $product;
+            });
+
         return Inertia::render('Admin/Invoice/Create', [
-            'products' => Product::select('id','name','price_usd','stock')->get(),
+            'products' => $products,
             'customers' => Customer::select('id','name')->get(),
             'warehouses' => Warehouse::select('id','name','code')->orderBy('name')->get(),
-            'layaways' => Layaway::where('status', 'active')->with('customer:id,name')->orderByDesc('id')->get(['id','number','customer_id','total_usd']),
+            'layaways' => Layaway::where('status', 'active')
+                ->with('customer:id,name')
+                ->orderByDesc('id')
+                ->get(['id','number','customer_id','total_usd','currency_code','base_currency_code','monetary_totals_json'])
+                ->map(function (Layaway $layaway) use ($adminMoneyService, $currencySettings) {
+                    return [
+                        'id' => $layaway->id,
+                        'number' => $layaway->number,
+                        'customer_id' => $layaway->customer_id,
+                        'customer' => $layaway->customer,
+                        'total_usd' => (float) ($layaway->total_usd ?? 0),
+                        'document_totals' => $this->resolveLayawayDocumentTotals($layaway, $adminMoneyService, $currencySettings),
+                    ];
+                })
+                ->values(),
             'users' => \App\Models\User::select('id','name')->orderBy('name')->get(),
+            'adminCurrencyContext' => $adminCurrencyContext,
         ]);
     }
 
-    public function store(Request $request, CurrencyService $currency, AdminNotificationService $notificationService)
+    public function store(Request $request, CurrencyService $currency, AdminNotificationService $notificationService, AdminMoneyService $adminMoneyService)
     {
         $data = $request->validate([
             'customer_id' => ['nullable','exists:customers,id'],
@@ -77,12 +114,14 @@ class InvoiceController extends Controller
             'adjustments' => ['sometimes','array'],
             'adjustments.*.type' => ['required_with:adjustments','in:credit,debit'],
             'adjustments.*.amount_usd' => ['required_with:adjustments','numeric','min:0.01'],
+            'adjustments.*.currency_code' => ['nullable','string','max:10'],
             'adjustments.*.description' => ['nullable','string','max:255'],
             'credit_sale' => ['sometimes','boolean'],
             'credit_due_date' => ['nullable','date'],
             'payments' => ['sometimes','array'],
             'payments.*.method' => ['required_with:payments','string','max:50'],
             'payments.*.amount_usd' => ['required_with:payments','numeric','min:0'],
+            'payments.*.currency_code' => ['nullable','string','max:10'],
             'payments.*.amount_bs' => ['nullable','numeric','min:0'],
             'payments.*.reference' => ['nullable','string','max:255'],
             'payments.*.bank' => ['nullable','string','max:255'],
@@ -146,8 +185,20 @@ class InvoiceController extends Controller
             $invoice->invoice_status_id = $pendingStatus->id;
         }
 
+        $currencySettings = Settings::get('currency', []);
+        $enabledCurrencyContext = $adminMoneyService->getEnabledCurrencyContext($currencySettings);
+        $documentSnapshot = $adminMoneyService->buildSnapshot(
+            $enabledCurrencyContext['rates'] ?? [],
+            $enabledCurrencyContext['base_currency'] ?? 'USD',
+            now()->toIso8601String(),
+        );
+
         $invoice->total_usd = 0;
         $invoice->total_bs = 0;
+        $invoice->currency_code = 'USD';
+        $invoice->base_currency_code = $documentSnapshot['base_currency'] ?? 'USD';
+        $invoice->exchange_rate_snapshot = 1;
+        $invoice->exchange_rate_source = 'manual';
         $invoice->save();
 
         $taxPercent = (float) Settings::get('billing', ['default_tax_percent' => 0])['default_tax_percent'] ?? 0;
@@ -172,6 +223,11 @@ class InvoiceController extends Controller
                 'price_usd' => $product->price_usd,
                 'subtotal_usd' => $subtotalUsd,
                 'subtotal_bs' => $subtotalBs,
+                'unit_currency_code' => 'USD',
+                'unit_price_original' => (float) $product->price_usd,
+                'subtotal_original' => $subtotalUsd,
+                'exchange_rate_snapshot' => 1,
+                'monetary_breakdown_json' => $adminMoneyService->buildDocumentTotals($subtotalUsd, $currencySettings, $documentSnapshot),
             ]);
             $totalUsd += $subtotalUsd;
         }
@@ -182,6 +238,15 @@ class InvoiceController extends Controller
         $invoice->update([
             'total_usd' => $grandTotalUsd,
             'total_bs' => $currency->usdToBs($grandTotalUsd),
+            'currency_code' => 'USD',
+            'base_currency_code' => $documentSnapshot['base_currency'] ?? 'USD',
+            'exchange_rate_snapshot' => 1,
+            'exchange_rate_source' => 'manual',
+            'monetary_totals_json' => [
+                'original_currency' => 'USD',
+                'original_amount' => round($grandTotalUsd, 2),
+                ...$adminMoneyService->buildDocumentTotals($grandTotalUsd, $currencySettings, $documentSnapshot),
+            ],
         ]);
 
         // Si es venta a crédito, crear/actualizar cuenta de crédito y movimiento de cargo
@@ -196,6 +261,12 @@ class InvoiceController extends Controller
                 'invoice_id' => $invoice->id,
                 'type' => 'charge',
                 'amount_usd' => $grandTotalUsd,
+                'amount_original' => (float) ($invoice->monetary_totals_json['original_amount'] ?? $grandTotalUsd),
+                'currency_code' => (string) ($invoice->currency_code ?: 'USD'),
+                'base_currency_code' => (string) ($invoice->base_currency_code ?: 'USD'),
+                'exchange_rate_snapshot' => (float) ($invoice->exchange_rate_snapshot ?? 1),
+                'exchange_rate_source' => $invoice->exchange_rate_source,
+                'monetary_totals_json' => is_array($invoice->monetary_totals_json) ? $invoice->monetary_totals_json : null,
                 'description' => 'Venta a crédito factura '.$invoice->number,
                 'due_date' => $data['credit_due_date'] ?? null,
             ]);
@@ -219,26 +290,25 @@ class InvoiceController extends Controller
 
         if (!empty($data['adjustments'])) {
             foreach ($data['adjustments'] as $adj) {
-                InvoiceAdjustment::create([
-                    'invoice_id' => $invoice->id,
-                    'type' => $adj['type'],
-                    'amount_usd' => $adj['amount_usd'],
-                    'description' => $adj['description'] ?? null,
-                    'created_by' => $request->user()?->id,
-                ]);
+                InvoiceAdjustment::create($this->buildInvoiceAdjustmentPayload(
+                    $invoice,
+                    $adj,
+                    $documentSnapshot,
+                    $currencySettings,
+                    $adminMoneyService,
+                    $request->user()?->id,
+                ));
             }
         }
 
         if (!empty($data['payments'])) {
             foreach ($data['payments'] as $pay) {
-                $invoice->payments()->create([
-                    'method' => $pay['method'],
-                    'amount_usd' => $pay['amount_usd'],
-                    'amount_bs' => $pay['amount_bs'] ?? 0,
-                    'reference' => $pay['reference'] ?? null,
-                    'bank' => $pay['bank'] ?? null,
-                    'notes' => $pay['notes'] ?? null,
-                ]);
+                $invoice->payments()->create($this->buildInvoicePaymentPayload(
+                    $pay,
+                    $documentSnapshot,
+                    $currencySettings,
+                    $adminMoneyService,
+                ));
             }
         }
 
@@ -248,7 +318,12 @@ class InvoiceController extends Controller
             'customer_id' => $invoice->customer_id,
         ]);
 
-        $notificationMessage = 'Monto: $'.number_format((float) $invoice->total_usd, 2);
+        $notificationMessage = $notificationService->formatDocumentAmount(
+            'Monto',
+            $invoice->currency_code,
+            $invoice->total_usd,
+            is_array($invoice->monetary_totals_json) ? $invoice->monetary_totals_json : null,
+        );
         if ($invoice->customer_id && $invoice->customer) {
             $notificationMessage .= ' / Cliente: '.$invoice->customer->name;
         }
@@ -272,7 +347,7 @@ class InvoiceController extends Controller
         return redirect()->route('admin.invoices.index');
     }
 
-    public function update(Request $request, Invoice $invoice, CurrencyService $currency, InventoryService $inventory, AdminNotificationService $notificationService)
+    public function update(Request $request, Invoice $invoice, CurrencyService $currency, InventoryService $inventory, AdminNotificationService $notificationService, AdminMoneyService $adminMoneyService)
     {
         if ($invoice->status !== 'pending') {
             abort(403, 'Solo se pueden editar facturas en estado pendiente.');
@@ -289,6 +364,7 @@ class InvoiceController extends Controller
             'payments' => ['sometimes','array'],
             'payments.*.method' => ['required_with:payments','string','max:50'],
             'payments.*.amount_usd' => ['required_with:payments','numeric','min:0'],
+            'payments.*.currency_code' => ['nullable','string','max:10'],
             'payments.*.amount_bs' => ['nullable','numeric','min:0'],
             'payments.*.reference' => ['nullable','string','max:255'],
             'payments.*.bank' => ['nullable','string','max:255'],
@@ -296,6 +372,7 @@ class InvoiceController extends Controller
             'adjustments' => ['sometimes','array'],
             'adjustments.*.type' => ['required_with:adjustments','in:credit,debit'],
             'adjustments.*.amount_usd' => ['required_with:adjustments','numeric','min:0.01'],
+            'adjustments.*.currency_code' => ['nullable','string','max:10'],
             'adjustments.*.description' => ['nullable','string','max:255'],
         ]);
 
@@ -307,6 +384,19 @@ class InvoiceController extends Controller
 
         $taxPercent = (float) ($billing['default_tax_percent'] ?? 0);
         $taxRate = max(0.0, min(100.0, $taxPercent)) / 100.0;
+        $currencySettings = Settings::get('currency', []);
+        $documentCurrency = (string) ($invoice->currency_code ?: 'USD');
+        $documentSnapshot = is_array($invoice->monetary_totals_json['rates'] ?? null)
+            ? [
+                'base_currency' => (string) ($invoice->base_currency_code ?: 'USD'),
+                'captured_at' => $invoice->monetary_totals_json['captured_at'] ?? null,
+                'rates' => $invoice->monetary_totals_json['rates'],
+            ]
+            : $adminMoneyService->buildSnapshot(
+                $adminMoneyService->getEnabledCurrencyContext($currencySettings)['rates'] ?? [],
+                $invoice->base_currency_code ?: 'USD',
+                now()->toIso8601String(),
+            );
 
         $itemsTotalUsd = 0.0;
 
@@ -323,6 +413,13 @@ class InvoiceController extends Controller
                 'quantity' => $qty,
                 'subtotal_usd' => $subtotalUsd,
                 'subtotal_bs' => $subtotalBs,
+                'unit_currency_code' => $documentCurrency,
+                'unit_price_original' => $adminMoneyService->convertUsingSnapshot((float) $item->price_usd, $documentCurrency, $documentSnapshot),
+                'subtotal_original' => $adminMoneyService->convertUsingSnapshot($subtotalUsd, $documentCurrency, $documentSnapshot),
+                'exchange_rate_snapshot' => $documentCurrency === ($documentSnapshot['base_currency'] ?? 'USD')
+                    ? 1
+                    : (float) ($documentSnapshot['rates'][$documentCurrency] ?? null),
+                'monetary_breakdown_json' => $adminMoneyService->buildDocumentTotals($subtotalUsd, $currencySettings, $documentSnapshot),
             ]);
 
             $itemsTotalUsd += $subtotalUsd;
@@ -334,6 +431,19 @@ class InvoiceController extends Controller
 
         $invoice->total_usd = $totalUsd;
         $invoice->total_bs = $currency->usdToBs($totalUsd);
+        $invoice->base_currency_code = $documentSnapshot['base_currency'] ?? ($invoice->base_currency_code ?: 'USD');
+        $invoice->currency_code = $documentCurrency;
+        $invoice->exchange_rate_snapshot = $documentCurrency === ($documentSnapshot['base_currency'] ?? 'USD')
+            ? 1
+            : (float) ($documentSnapshot['rates'][$documentCurrency] ?? null);
+        $invoice->exchange_rate_source = $documentCurrency === 'USD'
+            ? 'manual'
+            : ($adminMoneyService->resolveCurrencyRateSource($documentCurrency, $currencySettings) ?? $invoice->exchange_rate_source);
+        $invoice->monetary_totals_json = [
+            'original_currency' => $documentCurrency,
+            'original_amount' => $adminMoneyService->convertUsingSnapshot($totalUsd, $documentCurrency, $documentSnapshot),
+            ...$adminMoneyService->buildDocumentTotals($totalUsd, $currencySettings, $documentSnapshot),
+        ];
         $invoice->status = $data['status'];
         $invoice->internal_notes = $data['internal_notes'] ?? null;
         $invoice->public_notes = $data['public_notes'] ?? null;
@@ -355,26 +465,26 @@ class InvoiceController extends Controller
         if (isset($data['payments'])) {
             $invoice->payments()->delete();
             foreach ($data['payments'] as $pay) {
-                $invoice->payments()->create([
-                    'method' => $pay['method'],
-                    'amount_usd' => $pay['amount_usd'],
-                    'amount_bs' => $pay['amount_bs'] ?? 0,
-                    'reference' => $pay['reference'] ?? null,
-                    'bank' => $pay['bank'] ?? null,
-                    'notes' => $pay['notes'] ?? null,
-                ]);
+                $invoice->payments()->create($this->buildInvoicePaymentPayload(
+                    $pay,
+                    $documentSnapshot,
+                    $currencySettings,
+                    $adminMoneyService,
+                ));
             }
         }
 
         if (isset($data['adjustments'])) {
             $invoice->adjustments()->delete();
             foreach ($data['adjustments'] as $adj) {
-                $invoice->adjustments()->create([
-                    'type' => $adj['type'],
-                    'amount_usd' => $adj['amount_usd'],
-                    'description' => $adj['description'] ?? null,
-                    'created_by' => $request->user()?->id,
-                ]);
+                $invoice->adjustments()->create($this->buildInvoiceAdjustmentPayload(
+                    $invoice,
+                    $adj,
+                    $documentSnapshot,
+                    $currencySettings,
+                    $adminMoneyService,
+                    $request->user()?->id,
+                ));
             }
         }
 
@@ -419,6 +529,12 @@ class InvoiceController extends Controller
                             'invoice_id' => $invoice->id,
                             'type' => 'payment',
                             'amount_usd' => $invoice->total_usd,
+                            'amount_original' => (float) ($invoice->monetary_totals_json['original_amount'] ?? $invoice->total_usd),
+                            'currency_code' => (string) ($invoice->currency_code ?: 'USD'),
+                            'base_currency_code' => (string) ($invoice->base_currency_code ?: 'USD'),
+                            'exchange_rate_snapshot' => (float) ($invoice->exchange_rate_snapshot ?? 1),
+                            'exchange_rate_source' => $invoice->exchange_rate_source,
+                            'monetary_totals_json' => is_array($invoice->monetary_totals_json) ? $invoice->monetary_totals_json : null,
                             'description' => 'Abono automático por factura '.$invoice->number,
                             'paid_at' => now(),
                         ]);
@@ -455,5 +571,106 @@ class InvoiceController extends Controller
         }
 
         return redirect()->route('admin.invoices.index');
+    }
+
+    protected function buildInvoicePaymentPayload(
+        array $payment,
+        array $documentSnapshot,
+        array $currencySettings,
+        AdminMoneyService $adminMoneyService,
+    ): array {
+        $currencyCode = strtoupper((string) ($payment['currency_code'] ?? 'USD'));
+        $originalAmount = round((float) ($payment['amount_usd'] ?? 0), 2);
+        $baseAmount = $adminMoneyService->convertToBase($originalAmount, $currencyCode, $currencySettings, $documentSnapshot);
+        $vesAmount = isset($documentSnapshot['rates']['VES'])
+            ? $adminMoneyService->convertUsingSnapshot($baseAmount, 'VES', $documentSnapshot)
+            : round((float) ($payment['amount_bs'] ?? 0), 2);
+
+        return [
+            'method' => $payment['method'],
+            'amount_usd' => $baseAmount,
+            'amount_bs' => $vesAmount,
+            'payment_currency_code' => $currencyCode,
+            'amount_original' => $originalAmount,
+            'amount_base' => $baseAmount,
+            'exchange_rate_snapshot' => $currencyCode === ($documentSnapshot['base_currency'] ?? 'USD')
+                ? 1
+                : (float) ($documentSnapshot['rates'][$currencyCode] ?? 0),
+            'exchange_rate_source' => $currencyCode === 'USD'
+                ? 'manual'
+                : ($adminMoneyService->resolveCurrencyRateSource($currencyCode, $currencySettings) ?? 'manual'),
+            'reference' => $payment['reference'] ?? null,
+            'bank' => $payment['bank'] ?? null,
+            'notes' => $payment['notes'] ?? null,
+        ];
+    }
+
+    protected function buildInvoiceAdjustmentPayload(
+        Invoice $invoice,
+        array $adjustment,
+        array $documentSnapshot,
+        array $currencySettings,
+        AdminMoneyService $adminMoneyService,
+        mixed $createdBy,
+    ): array {
+        $currencyCode = strtoupper((string) ($adjustment['currency_code'] ?? 'USD'));
+        $originalAmount = round((float) ($adjustment['amount_usd'] ?? 0), 2);
+        $baseAmount = $adminMoneyService->convertToBase($originalAmount, $currencyCode, $currencySettings, $documentSnapshot);
+
+        return [
+            'invoice_id' => $invoice->id,
+            'type' => $adjustment['type'],
+            'amount_usd' => $baseAmount,
+            'amount_original' => $originalAmount,
+            'currency_code' => $currencyCode,
+            'base_currency_code' => $documentSnapshot['base_currency'] ?? 'USD',
+            'exchange_rate_snapshot' => $currencyCode === ($documentSnapshot['base_currency'] ?? 'USD')
+                ? 1
+                : (float) ($documentSnapshot['rates'][$currencyCode] ?? 0),
+            'exchange_rate_source' => $currencyCode === 'USD'
+                ? 'manual'
+                : ($adminMoneyService->resolveCurrencyRateSource($currencyCode, $currencySettings) ?? 'manual'),
+            'monetary_totals_json' => [
+                'original_currency' => $currencyCode,
+                'original_amount' => $originalAmount,
+                ...$adminMoneyService->buildDocumentTotals($baseAmount, $currencySettings, $documentSnapshot),
+            ],
+            'description' => $adjustment['description'] ?? null,
+            'created_by' => $createdBy,
+        ];
+    }
+
+    protected function resolveLayawayDocumentTotals(Layaway $layaway, AdminMoneyService $adminMoneyService, array $currencySettings): array
+    {
+        if (is_array($layaway->monetary_totals_json['totals'] ?? null)) {
+            return $layaway->monetary_totals_json['totals'];
+        }
+
+        $snapshot = is_array($layaway->monetary_totals_json['rates'] ?? null)
+            ? [
+                'base_currency' => (string) ($layaway->base_currency_code ?: 'USD'),
+                'captured_at' => $layaway->monetary_totals_json['captured_at'] ?? null,
+                'rates' => $layaway->monetary_totals_json['rates'],
+            ]
+            : null;
+
+        return $adminMoneyService->buildDocumentTotals((float) ($layaway->total_usd ?? 0), $currencySettings, $snapshot)['totals'];
+    }
+
+    protected function resolveInvoiceDocumentTotals(Invoice $invoice, AdminMoneyService $adminMoneyService, array $currencySettings): array
+    {
+        if (is_array($invoice->monetary_totals_json['totals'] ?? null)) {
+            return $invoice->monetary_totals_json['totals'];
+        }
+
+        $snapshot = is_array($invoice->monetary_totals_json['rates'] ?? null)
+            ? [
+                'base_currency' => (string) ($invoice->base_currency_code ?: 'USD'),
+                'captured_at' => $invoice->monetary_totals_json['captured_at'] ?? null,
+                'rates' => $invoice->monetary_totals_json['rates'],
+            ]
+            : null;
+
+        return $adminMoneyService->buildDocumentTotals((float) ($invoice->total_usd ?? 0), $currencySettings, $snapshot)['totals'];
     }
 }

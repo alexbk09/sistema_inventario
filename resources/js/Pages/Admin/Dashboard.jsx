@@ -23,6 +23,8 @@ export default function Dashboard({
   filters = {},
   charts = {},
   metrics = {},
+  adminCurrencyContext = {},
+  dashboardMoney = {},
   legacyMetrics = {},
   counts = {},
   lowStockProducts = [],
@@ -37,13 +39,19 @@ export default function Dashboard({
   const { formatCurrency, formatDate, formatNumber } = useLocaleFormat();
   const { displayCurrency, convertFromUsd, formatPriceFromUsd } = useConfiguredCurrencyRates();
   const salesChart = charts.sales || { labels: [], current: [], previous: [] };
+  const visibleCurrencyCodes = Array.isArray(adminCurrencyContext?.codes) && adminCurrencyContext.codes.length > 0
+    ? adminCurrencyContext.codes
+    : [displayCurrency];
+  const summaryCurrencyCodes = visibleCurrencyCodes.slice(0, 2);
 
   const salesData = useMemo(() => ({
     labels: salesChart.labels,
     datasets: [
       {
         label: t('admin.dashboard.charts.sales.current_period', 'Últimos 30 días'),
-        data: salesChart.current.map((value) => convertFromUsd(value, displayCurrency)),
+        data: Array.isArray(salesChart.currentByCurrency?.[displayCurrency])
+          ? salesChart.currentByCurrency[displayCurrency]
+          : salesChart.current.map((value) => convertFromUsd(value, displayCurrency)),
         borderColor: 'rgba(59,130,246,1)',
         backgroundColor: 'rgba(59,130,246,0.15)',
         tension: 0.3,
@@ -51,7 +59,9 @@ export default function Dashboard({
       },
       {
         label: t('admin.dashboard.charts.sales.previous_period', 'Período anterior'),
-        data: salesChart.previous.map((value) => convertFromUsd(value, displayCurrency)),
+        data: Array.isArray(salesChart.previousByCurrency?.[displayCurrency])
+          ? salesChart.previousByCurrency[displayCurrency]
+          : salesChart.previous.map((value) => convertFromUsd(value, displayCurrency)),
         borderColor: 'rgba(148,163,184,1)',
         backgroundColor: 'rgba(148,163,184,0.1)',
         tension: 0.3,
@@ -99,7 +109,7 @@ export default function Dashboard({
     datasets: [
       {
         label: `${t('admin.dashboard.charts.top_customers.dataset', 'Ventas')} ${displayCurrency}`,
-        data: topCustomers.map((c) => convertFromUsd(c.total_sales_usd ?? 0, displayCurrency)),
+        data: topCustomers.map((c) => c.admin_totals?.[displayCurrency] ?? convertFromUsd(c.total_sales_usd ?? 0, displayCurrency)),
         backgroundColor: 'rgba(249,115,22,0.8)',
       },
     ],
@@ -116,7 +126,16 @@ export default function Dashboard({
   const creditShare = metrics.credit_share ?? 0;
   const cashShare = metrics.cash_share ?? 0;
   const formatPercent = (value) => `${formatNumber(value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
-  const formatActiveAmount = (value) => formatPriceFromUsd(Number(value || 0), displayCurrency);
+  const formatActiveAmount = (value, currency = displayCurrency) => formatPriceFromUsd(Number(value || 0), currency);
+  const formatServerAmount = (code, value) => formatCurrency(Number(value || 0), code);
+  const getMoneyValue = (bucket, code, fallback) => {
+    const serverValue = dashboardMoney?.[bucket]?.totals?.[code];
+    if (serverValue !== undefined) {
+      return formatServerAmount(code, serverValue);
+    }
+
+    return formatActiveAmount(fallback, code);
+  };
 
   return (
     <AuthenticatedLayout>
@@ -154,26 +173,28 @@ export default function Dashboard({
             <div className="text-xs uppercase text-muted-foreground mb-1">{t('admin.dashboard.metrics.analytics.total_invoices', 'Facturas (30 días)')}</div>
             <div className="text-2xl font-semibold">{formatNumber(metrics.total_invoices ?? 0)}</div>
           </div>
-          <div className="rounded-lg border border-border bg-white p-4">
-            <div className="text-xs uppercase text-muted-foreground mb-1">{`${t('admin.dashboard.metrics.analytics.total_sales_usd', 'Ventas (30 días)')} ${displayCurrency}`}</div>
-            <div className="text-2xl font-semibold">{formatActiveAmount(metrics.total_usd || 0)}</div>
-          </div>
+          {summaryCurrencyCodes.map((code) => (
+            <div key={`sales-${code}`} className="rounded-lg border border-border bg-white p-4">
+              <div className="text-xs uppercase text-muted-foreground mb-1">{`${t('admin.dashboard.metrics.analytics.total_sales_usd', 'Ventas (30 días)')} ${code}`}</div>
+              <div className="text-2xl font-semibold">{getMoneyValue('total_sales', code, metrics.total_usd || 0)}</div>
+            </div>
+          ))}
           <div className="rounded-lg border border-border bg-white p-4">
             <div className="text-xs uppercase text-muted-foreground mb-1">{`${t('admin.dashboard.metrics.analytics.avg_ticket_usd', 'Ticket promedio')} ${displayCurrency}`}</div>
-            <div className="text-2xl font-semibold">{formatActiveAmount(metrics.avg_ticket_usd || 0)}</div>
+            <div className="text-2xl font-semibold">{getMoneyValue('avg_ticket', displayCurrency, metrics.avg_ticket_usd || 0)}</div>
           </div>
           <div className="rounded-lg border border-border bg-white p-4">
             <div className="text-xs uppercase text-muted-foreground mb-1">{`${t('admin.dashboard.metrics.analytics.margin_usd', 'Margen estimado')} ${displayCurrency}`}</div>
-            <div className="text-2xl font-semibold">{formatActiveAmount(metrics.margin_usd || 0)}</div>
+            <div className="text-2xl font-semibold">{getMoneyValue('margin', displayCurrency, metrics.margin_usd || 0)}</div>
           </div>
           <div className="rounded-lg border border-border bg-white p-4">
             <div className="text-xs uppercase text-muted-foreground mb-1">{t('admin.dashboard.metrics.analytics.credit_sales', 'Ventas a crédito')}</div>
-            <div className="text-2xl font-semibold">{formatActiveAmount(metrics.credit_sales_usd || 0)}</div>
+            <div className="text-2xl font-semibold">{getMoneyValue('credit_sales', displayCurrency, metrics.credit_sales_usd || 0)}</div>
             <p className="text-[11px] text-muted-foreground mt-1">{t('admin.dashboard.metrics.analytics.share_of_total', ':percent del total', { percent: formatPercent(creditShare) })}</p>
           </div>
           <div className="rounded-lg border border-border bg-white p-4">
             <div className="text-xs uppercase text-muted-foreground mb-1">{t('admin.dashboard.metrics.analytics.cash_sales', 'Ventas de contado')}</div>
-            <div className="text-2xl font-semibold">{formatActiveAmount(metrics.cash_sales_usd || 0)}</div>
+            <div className="text-2xl font-semibold">{getMoneyValue('cash_sales', displayCurrency, metrics.cash_sales_usd || 0)}</div>
             <p className="text-[11px] text-muted-foreground mt-1">{t('admin.dashboard.metrics.analytics.share_of_total', ':percent del total', { percent: formatPercent(cashShare) })}</p>
           </div>
         </div>
@@ -182,17 +203,17 @@ export default function Dashboard({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="rounded-lg border border-border bg-white p-4">
             <div className="text-xs uppercase text-muted-foreground mb-1">{t('admin.dashboard.metrics.classic.day_rate', 'Tasa del día')}</div>
-            <div className="text-2xl font-semibold">{rate ? formatNumber(rate, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--'}</div>
+            <div className="text-2xl font-semibold">{rate ? formatNumber(rate, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : t('admin.dashboard.metrics.classic.values.empty_dash', '—')}</div>
             <p className="text-[11px] text-muted-foreground mt-1">{t('admin.dashboard.metrics.classic.day_rate_help', 'Promedio oficial de conversión monetaria.')}</p>
           </div>
           <div className="rounded-lg border border-border bg-white p-4">
             <div className="text-xs uppercase text-muted-foreground mb-1">{`${t('admin.dashboard.metrics.classic.today_sales_usd', 'Ventas HOY')} (${displayCurrency})`}</div>
-            <div className="text-2xl font-semibold">{formatActiveAmount(legacyMetrics.today_sales_usd || 0)}</div>
+            <div className="text-2xl font-semibold">{getMoneyValue('today_sales', displayCurrency, legacyMetrics.today_sales_usd || 0)}</div>
             <p className="text-[11px] text-muted-foreground mt-1">{t('admin.dashboard.metrics.classic.paid_invoices_count', ':count facturas pagadas', { count: formatNumber(legacyMetrics.today_sales_count || 0) })}</p>
           </div>
           <div className="rounded-lg border border-border bg-white p-4">
             <div className="text-xs uppercase text-muted-foreground mb-1">{`${t('admin.dashboard.metrics.classic.month_sales_usd', 'Ventas MES')} (${displayCurrency})`}</div>
-            <div className="text-2xl font-semibold">{formatActiveAmount(legacyMetrics.month_sales_usd || 0)}</div>
+            <div className="text-2xl font-semibold">{getMoneyValue('month_sales', displayCurrency, legacyMetrics.month_sales_usd || 0)}</div>
             <p className="text-[11px] text-muted-foreground mt-1">{t('admin.dashboard.metrics.classic.paid_invoices_count', ':count facturas pagadas', { count: formatNumber(legacyMetrics.month_sales_count || 0) })}</p>
           </div>
           <div className="rounded-lg border border-border bg-white p-4">
@@ -411,7 +432,7 @@ export default function Dashboard({
                         <td className="py-1 pr-2 text-xs text-muted-foreground">{p.sku}</td>
                         <td className="py-1 pr-2">{p.name}</td>
                         <td className="py-1 pr-2 text-right font-medium">{formatNumber(p.stock)}</td>
-                        <td className="py-1 pr-2 text-right text-xs text-muted-foreground">{p.min_stock ?? '-'}</td>
+                        <td className="py-1 pr-2 text-right text-xs text-muted-foreground">{p.min_stock ?? t('admin.dashboard.alerts.low_stock.values.empty_dash', '—')}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -440,7 +461,7 @@ export default function Dashboard({
                       <tr key={l.id} className="border-b border-border/60 last:border-0">
                         <td className="py-1 pr-2 text-xs text-muted-foreground">{l.number}</td>
                         <td className="py-1 pr-2">{l.customer?.name || t('admin.dashboard.alerts.expired_layaways.customer_fallback', 'Sin cliente')}</td>
-                        <td className="py-1 pr-2 text-right font-medium">{formatActiveAmount(l.total_usd || 0)}</td>
+                        <td className="py-1 pr-2 text-right font-medium">{l.document_totals?.[displayCurrency] !== undefined ? formatServerAmount(displayCurrency, l.document_totals[displayCurrency]) : formatActiveAmount(l.total_usd || 0)}</td>
                         <td className="py-1 pr-2 text-xs text-muted-foreground">{formatDate(l.expires_at)}</td>
                       </tr>
                     ))}

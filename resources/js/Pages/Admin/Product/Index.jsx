@@ -12,11 +12,12 @@ import { useI18n } from '@/Hooks/useI18n';
 import { useLocaleFormat } from '@/Hooks/useLocaleFormat';
 import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates';
 
-export default function Index({ products, filters, summary, warehouses = [] }) {
+export default function Index({ products, filters, summary, warehouses = [], adminCurrencyContext = {} }) {
   const { t } = useI18n();
   const { formatNumber, formatCurrency } = useLocaleFormat();
   const { displayCurrency, formatPriceFromUsd } = useConfiguredCurrencyRates();
   const formatActiveAmount = (value) => formatPriceFromUsd(Number(value || 0), displayCurrency);
+  const formatServerAmount = (code, value) => formatCurrency(Number(value || 0), code);
   const { data } = products;
   const page = products.current_page ?? products?.meta?.current_page ?? 1;
   const totalPages = products.last_page ?? products?.meta?.last_page ?? 1;
@@ -116,7 +117,14 @@ export default function Index({ products, filters, summary, warehouses = [] }) {
   const columns = [
     { key: 'name', label: t('admin.products.index.table.name', 'Nombre'), width: '25%' },
     { key: 'sku', label: t('admin.products.index.table.sku', 'SKU'), width: '15%' },
-    { key: 'price_usd', label: displayCurrency, width: '15%', render: (v) => formatActiveAmount(v) },
+    {
+      key: 'price_usd',
+      label: displayCurrency,
+      width: '15%',
+      render: (v, row) => row?.price_admin_totals?.[displayCurrency] !== undefined
+        ? formatServerAmount(displayCurrency, row.price_admin_totals[displayCurrency])
+        : formatActiveAmount(v),
+    },
     { key: 'stock', label: t('admin.products.index.table.stock', 'Stock'), width: '15%', render: (v, row) => {
       const value = Number(v) || 0;
       const effectiveMin = Number(row.effective_min_stock ?? 0);
@@ -166,7 +174,12 @@ export default function Index({ products, filters, summary, warehouses = [] }) {
         description={t('admin.products.index.hero_description', 'La pantalla prioriza métricas, acciones y filtros sin romper el foco sobre la tabla principal ni sobre las tareas de inventario del día a día.')}
         stats={[
           { label: t('admin.products.index.stats.products', 'Productos'), value: Number(summary?.total_products || data.length || 0) },
-          { label: `${t('admin.products.index.stats.inventory_usd', 'Inventario')} ${displayCurrency}`, value: formatActiveAmount(summary?.total_products_value_usd || 0) },
+          {
+            label: `${t('admin.products.index.stats.inventory_usd', 'Inventario')} ${displayCurrency}`,
+            value: summary?.total_products_value_admin_totals?.[displayCurrency] !== undefined
+              ? formatServerAmount(displayCurrency, summary.total_products_value_admin_totals[displayCurrency])
+              : formatActiveAmount(summary?.total_products_value_usd || 0),
+          },
           { label: t('admin.products.index.stats.exits_30d', 'Salidas 30d'), value: Number(summary?.last_30_days_exits || 0) },
         ]}
         contextTitle={t('admin.products.index.context_title', 'Productos')}

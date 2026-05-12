@@ -19,6 +19,22 @@ class RmaItem extends Model
         'subtotal_usd',
         'subtotal_bs',
         'reason',
+        'unit_currency_code',
+        'unit_price_original',
+        'subtotal_original',
+        'exchange_rate_snapshot',
+        'monetary_breakdown_json',
+    ];
+
+    protected $casts = [
+        'quantity' => 'int',
+        'unit_price_usd' => 'float',
+        'subtotal_usd' => 'float',
+        'subtotal_bs' => 'float',
+        'unit_price_original' => 'float',
+        'subtotal_original' => 'float',
+        'exchange_rate_snapshot' => 'float',
+        'monetary_breakdown_json' => 'array',
     ];
 
     public function rma(): BelongsTo

@@ -14,12 +14,21 @@ class InvoiceAdjustment extends Model
         'invoice_id',
         'type',
         'amount_usd',
+        'amount_original',
+        'currency_code',
+        'base_currency_code',
+        'exchange_rate_snapshot',
+        'exchange_rate_source',
+        'monetary_totals_json',
         'description',
         'created_by',
     ];
 
     protected $casts = [
         'amount_usd' => 'float',
+        'amount_original' => 'float',
+        'exchange_rate_snapshot' => 'float',
+        'monetary_totals_json' => 'array',
     ];
 
     public function invoice(): BelongsTo

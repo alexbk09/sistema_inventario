@@ -3,6 +3,7 @@
 namespace App\Exports;
 
 use App\Models\Product;
+use App\Services\AdminMoneyService;
 use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\WithHeadings;
@@ -11,10 +12,14 @@ use Maatwebsite\Excel\Concerns\WithMapping;
 class InventoryReportExport implements FromQuery, WithHeadings, WithMapping
 {
     protected array $filters;
+    protected array $currencyContext;
+    protected AdminMoneyService $adminMoneyService;
 
-    public function __construct(array $filters = [])
+    public function __construct(array $filters = [], ?array $currencyContext = null)
     {
         $this->filters = $filters;
+        $this->adminMoneyService = app(AdminMoneyService::class);
+        $this->currencyContext = $currencyContext ?? $this->adminMoneyService->getAdminCurrencyContext();
     }
 
     public function query()
@@ -46,16 +51,23 @@ class InventoryReportExport implements FromQuery, WithHeadings, WithMapping
 
     public function headings(): array
     {
-        return [
+        $headings = [
             __('app.report_exports.inventory.columns.product'),
             __('app.report_exports.inventory.columns.sku'),
             __('app.report_exports.inventory.columns.categories'),
             __('app.report_exports.inventory.columns.stock'),
-            __('app.report_exports.inventory.columns.avg_cost_usd'),
-            __('app.report_exports.inventory.columns.price_usd'),
-            __('app.report_exports.inventory.columns.value_cost_usd'),
-            __('app.report_exports.inventory.columns.value_price_usd'),
         ];
+
+        $defaultDisplayCurrency = (string) ($this->currencyContext['default_display_currency'] ?? 'USD');
+        $headings[] = __('app.report_exports.inventory.columns.avg_cost_usd').' '.$defaultDisplayCurrency;
+        $headings[] = __('app.report_exports.inventory.columns.price_usd').' '.$defaultDisplayCurrency;
+
+        foreach ($this->currencyContext['codes'] ?? [] as $code) {
+            $headings[] = __('app.report_exports.inventory.columns.value_cost_usd').' '.$code;
+            $headings[] = __('app.report_exports.inventory.columns.value_price_usd').' '.$code;
+        }
+
+        return $headings;
     }
 
     public function map($product): array
@@ -63,16 +75,26 @@ class InventoryReportExport implements FromQuery, WithHeadings, WithMapping
         $categoriesNames = $product->categories->pluck('name')->implode(', ');
         $valueCost = (int) ($product->stock ?? 0) * (float) ($product->average_cost_usd ?? 0);
         $valuePrice = (int) ($product->stock ?? 0) * (float) ($product->price_usd ?? 0);
+        $defaultDisplayCurrency = (string) ($this->currencyContext['default_display_currency'] ?? 'USD');
+        $averageCostTotals = $this->adminMoneyService->buildAdminTotals((float) ($product->average_cost_usd ?? 0), null)['totals'];
+        $priceTotals = $this->adminMoneyService->buildAdminTotals((float) ($product->price_usd ?? 0), null)['totals'];
+        $valueCostTotals = $this->adminMoneyService->buildAdminTotals($valueCost, null)['totals'];
+        $valuePriceTotals = $this->adminMoneyService->buildAdminTotals($valuePrice, null)['totals'];
 
-        return [
+        $row = [
             $product->name,
             $product->sku,
             $categoriesNames,
             (int) $product->stock,
-            number_format((float) ($product->average_cost_usd ?? 0), 2, '.', ''),
-            number_format((float) ($product->price_usd ?? 0), 2, '.', ''),
-            number_format($valueCost, 2, '.', ''),
-            number_format($valuePrice, 2, '.', ''),
+            number_format((float) ($averageCostTotals[$defaultDisplayCurrency] ?? 0), 2, '.', ''),
+            number_format((float) ($priceTotals[$defaultDisplayCurrency] ?? 0), 2, '.', ''),
         ];
+
+        foreach ($this->currencyContext['codes'] ?? [] as $code) {
+            $row[] = number_format((float) ($valueCostTotals[$code] ?? 0), 2, '.', '');
+            $row[] = number_format((float) ($valuePriceTotals[$code] ?? 0), 2, '.', '');
+        }
+
+        return $row;
     }
 }

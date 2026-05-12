@@ -5,14 +5,19 @@ import { useI18n } from '@/Hooks/useI18n';
 import { useLocaleFormat } from '@/Hooks/useLocaleFormat';
 import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates';
 
-export default function Show({ rma }) {
+export default function Show({ rma, adminCurrencyContext = {} }) {
   const { t } = useI18n();
-  const { formatNumber } = useLocaleFormat();
+  const { formatCurrency } = useLocaleFormat();
   const { displayCurrency, comparisonCurrency, formatPriceFromUsd, hasRateForCurrency } = useConfiguredCurrencyRates();
   const secondaryCurrency = comparisonCurrency && comparisonCurrency !== displayCurrency && hasRateForCurrency(comparisonCurrency)
     ? comparisonCurrency
     : null;
+  const visibleCurrencyCodes = Array.isArray(adminCurrencyContext?.codes) && adminCurrencyContext.codes.length > 0
+    ? adminCurrencyContext.codes
+    : [displayCurrency, ...(secondaryCurrency ? [secondaryCurrency] : [])].filter(Boolean);
+  const currencyColumns = [...new Set(visibleCurrencyCodes)];
   const formatActiveAmount = (value, currency = displayCurrency) => formatPriceFromUsd(Number(value || 0), currency);
+  const formatServerAmount = (code, value) => formatCurrency(Number(value || 0), code);
   const [status, setStatus] = useState(rma.status);
   const [resolutionType, setResolutionType] = useState(rma.resolution_type || 'credit_note');
   const [saving, setSaving] = useState(false);
@@ -29,6 +34,7 @@ export default function Show({ rma }) {
     replace: t('admin.rmas.resolutions.replace', 'Reemplazo'),
     refund: t('admin.rmas.resolutions.refund', 'Reembolso'),
   };
+  const translateInvoiceStatus = (invoiceStatus) => t(`admin.invoices.statuses.${invoiceStatus}`, invoiceStatus ?? t('admin.common.table.values.empty_dash', '—'));
 
   const handleUpdate = (e) => {
     e.preventDefault();
@@ -107,7 +113,7 @@ export default function Show({ rma }) {
                 <div>
                   <p className="text-xs font-semibold text-muted-foreground mb-1">{t('admin.rmas.show.related_invoice', 'FACTURA RELACIONADA')}</p>
                   {rma.invoice ? (
-                    <p className="text-sm text-foreground">{rma.invoice.number} · {t('admin.rmas.show.invoice_status', 'Estado')}: {rma.invoice.status}</p>
+                    <p className="text-sm text-foreground">{rma.invoice.number} · {t('admin.rmas.show.invoice_status', 'Estado')}: {translateInvoiceStatus(rma.invoice.status)}</p>
                   ) : (
                     <p className="text-sm text-muted-foreground">{t('admin.rmas.show.without_invoice', 'Sin factura asociada')}</p>
                   )}
@@ -140,7 +146,9 @@ export default function Show({ rma }) {
                       <th className="px-3 py-2 text-left">{t('admin.rmas.show.table.product', 'Producto')}</th>
                       <th className="px-3 py-2 text-center w-20">{t('admin.rmas.show.table.quantity', 'Cantidad')}</th>
                       <th className="px-3 py-2 text-right w-24">{`${t('admin.rmas.show.table.price', 'Precio')} ${displayCurrency}`}</th>
-                      <th className="px-3 py-2 text-right w-28">{`${t('admin.rmas.show.table.subtotal', 'Subtotal')} ${displayCurrency}`}</th>
+                      {currencyColumns.map((code) => (
+                        <th key={code} className="px-3 py-2 text-right w-28">{`${t('admin.rmas.show.table.subtotal', 'Subtotal')} ${code}`}</th>
+                      ))}
                       <th className="px-3 py-2">{t('admin.rmas.show.table.reason', 'Motivo')}</th>
                     </tr>
                   </thead>
@@ -154,13 +162,19 @@ export default function Show({ rma }) {
                           {item.quantity}
                         </td>
                         <td className="px-3 py-2 text-right text-foreground whitespace-nowrap">
-                          {formatActiveAmount(item.unit_price_usd ?? 0)}
+                          {item.unit_price_admin_totals?.[displayCurrency] !== undefined
+                            ? formatServerAmount(displayCurrency, item.unit_price_admin_totals[displayCurrency])
+                            : formatActiveAmount(item.unit_price_usd ?? 0)}
                         </td>
-                        <td className="px-3 py-2 text-right font-semibold text-foreground whitespace-nowrap">
-                          {formatActiveAmount(item.subtotal_usd ?? 0)}
-                        </td>
+                        {currencyColumns.map((code) => (
+                          <td key={`${item.id}-${code}`} className="px-3 py-2 text-right font-semibold text-foreground whitespace-nowrap">
+                            {item.document_totals?.[code] !== undefined
+                              ? formatServerAmount(code, item.document_totals[code])
+                              : formatActiveAmount(item.subtotal_usd ?? 0, code)}
+                          </td>
+                        ))}
                         <td className="px-3 py-2 text-sm text-muted-foreground whitespace-pre-line">
-                          {item.reason || '—'}
+                          {item.reason || t('admin.common.table.values.empty_dash', '—')}
                         </td>
                       </tr>
                     ))}
@@ -174,14 +188,16 @@ export default function Show({ rma }) {
           <div>
             <div className="bg-card border border-border rounded-lg p-6 space-y-3">
               <h2 className="text-lg font-bold text-foreground mb-2">{t('admin.rmas.show.money_summary', 'Resumen monetario')}</h2>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{`${t('admin.rmas.show.total_usd', 'Total')}: ${displayCurrency}`}</span>
-                <span className="font-semibold text-foreground">{formatActiveAmount(rma.total_usd ?? 0)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{secondaryCurrency ? `${t('admin.rmas.show.total_bs', 'Referencia')}: ${secondaryCurrency}` : t('admin.rmas.show.total_bs', 'Referencia')}</span>
-                <span className="font-semibold text-foreground">{secondaryCurrency ? formatActiveAmount(rma.total_usd ?? 0, secondaryCurrency) : '—'}</span>
-              </div>
+              {currencyColumns.map((code) => (
+                <div key={code} className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">{`${t('admin.rmas.show.total_usd', 'Total')}: ${code}`}</span>
+                  <span className="font-semibold text-foreground">
+                    {rma.document_totals?.[code] !== undefined
+                      ? formatServerAmount(code, rma.document_totals[code])
+                      : formatActiveAmount(rma.total_usd ?? 0, code)}
+                  </span>
+                </div>
+              ))}
               <div className="mt-2">
                 <p className="text-xs text-muted-foreground">
                   {t('admin.rmas.show.current_resolution', 'Resolución actual')}: {resolutionLabels[rma.resolution_type] ?? t('admin.rmas.show.undefined', 'Sin definir')}

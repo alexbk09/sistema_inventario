@@ -14,16 +14,16 @@ class InventoryService
     public function registerEntry(Product $product, int $quantity, float $unitPriceUsd = 0, int $movementTypeId = null, ?string $reference = null, ?string $notes = null, ?int $providerId = null, ?int $warehouseId = null): InventoryMovement
     {
         if ($quantity <= 0) {
-            throw new InvalidArgumentException('La cantidad debe ser mayor a 0.');
+            throw new InvalidArgumentException(__('app.admin.products.inventory.errors.quantity_positive'));
         }
         $userId = Auth::id();
         if (! $userId) {
-            throw new InvalidArgumentException('Debe haber un usuario autenticado para registrar un movimiento de inventario.');
+            throw new InvalidArgumentException(__('app.admin.products.inventory.errors.auth_required'));
         }
 
         $cleanNotes = is_null($notes) ? '' : trim($notes);
         if ($cleanNotes === '') {
-            throw new InvalidArgumentException('Debes indicar un motivo para el movimiento de inventario.');
+            throw new InvalidArgumentException(__('app.admin.products.inventory.errors.reason_required'));
         }
 
         return DB::transaction(function () use ($product, $quantity, $unitPriceUsd, $movementTypeId, $reference, $cleanNotes, $providerId, $warehouseId, $userId) {
@@ -84,17 +84,17 @@ class InventoryService
     public function registerExit(Product $product, int $quantity, float $unitPriceUsd = 0, int $movementTypeId = null, ?string $reference = null, ?string $notes = null, ?int $warehouseId = null): InventoryMovement
     {
         if ($quantity <= 0) {
-            throw new InvalidArgumentException('La cantidad debe ser mayor a 0.');
+            throw new InvalidArgumentException(__('app.admin.products.inventory.errors.quantity_positive'));
         }
 
         $userId = Auth::id();
         if (! $userId) {
-            throw new InvalidArgumentException('Debe haber un usuario autenticado para registrar un movimiento de inventario.');
+            throw new InvalidArgumentException(__('app.admin.products.inventory.errors.auth_required'));
         }
 
         $cleanNotes = is_null($notes) ? '' : trim($notes);
         if ($cleanNotes === '') {
-            throw new InvalidArgumentException('Debes indicar un motivo para el movimiento de inventario.');
+            throw new InvalidArgumentException(__('app.admin.products.inventory.errors.reason_required'));
         }
 
         $inventorySettings = Settings::get('inventory', [
@@ -105,7 +105,7 @@ class InventoryService
 
         return DB::transaction(function () use ($product, $quantity, $unitPriceUsd, $movementTypeId, $reference, $cleanNotes, $warehouseId, $allowNegativeStock, $userId) {
             if (! $allowNegativeStock && $product->stock < $quantity) {
-                throw new InvalidArgumentException('No hay stock suficiente para esta salida.');
+                throw new InvalidArgumentException(__('app.admin.products.inventory.errors.insufficient_stock'));
             }
 
             $totalValue = $quantity * $unitPriceUsd;

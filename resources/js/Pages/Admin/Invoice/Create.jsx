@@ -6,14 +6,35 @@ import { useI18n } from '@/Hooks/useI18n';
 import { useLocaleFormat } from '@/Hooks/useLocaleFormat';
 import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates';
 
-export default function Create({ products, customers, warehouses = [], layaways = [], users = [] }) {
+export default function Create({ products, customers, warehouses = [], layaways = [], users = [], adminCurrencyContext = {} }) {
   const { t } = useI18n();
-  const { formatNumber } = useLocaleFormat();
-  const { displayCurrency, comparisonCurrency, formatPriceFromUsd, hasRateForCurrency } = useConfiguredCurrencyRates();
+  const { formatNumber, formatCurrency } = useLocaleFormat();
+  const { displayCurrency, comparisonCurrency, formatPriceFromUsd, hasRateForCurrency, availableCurrencies, baseCurrency, ratesByCode } = useConfiguredCurrencyRates();
   const secondaryCurrency = comparisonCurrency && comparisonCurrency !== displayCurrency && hasRateForCurrency(comparisonCurrency)
     ? comparisonCurrency
     : null;
   const formatActiveAmount = (value, currency = displayCurrency) => formatPriceFromUsd(Number(value || 0), currency);
+  const formatServerAmount = (code, value) => formatCurrency(Number(value || 0), code);
+  const getProductDisplayPrice = (product, currency = displayCurrency) => product?.price_admin_totals?.[currency];
+  const formatProductPrimaryAmount = (product, fallbackUsd) => getProductDisplayPrice(product) !== undefined
+    ? formatServerAmount(displayCurrency, getProductDisplayPrice(product))
+    : formatActiveAmount(fallbackUsd);
+  const getLayawayAmount = (layaway) => layaway?.document_totals?.[displayCurrency] !== undefined
+    ? formatServerAmount(displayCurrency, layaway.document_totals[displayCurrency])
+    : formatActiveAmount(layaway?.total_usd ?? 0);
+  const toBaseAmount = (value, currency = displayCurrency) => {
+    const numericValue = Number(value || 0);
+    if (currency === baseCurrency) {
+      return numericValue;
+    }
+
+    const rate = Number(ratesByCode?.[currency] ?? 0);
+    if (!rate) {
+      return numericValue;
+    }
+
+    return numericValue / rate;
+  };
   const { data, setData, post, processing } = useForm({
     customer_id: '',
     document_type: 'invoice',
@@ -68,16 +89,20 @@ export default function Create({ products, customers, warehouses = [], layaways 
         ...item,
         product,
         price,
+        priceDisplay: getProductDisplayPrice(product),
         quantity,
         subtotal: price * quantity,
+        subtotalDisplay: getProductDisplayPrice(product) !== undefined ? getProductDisplayPrice(product) * quantity : null,
         bs_subtotal: Number(item.bs_subtotal ?? 0),
       };
     });
   }, [data.items, products]);
 
   const subtotalUsd = itemsWithDetails.reduce((sum, item) => sum + item.subtotal, 0);
+  const subtotalDisplay = itemsWithDetails.reduce((sum, item) => sum + Number(item.subtotalDisplay ?? 0), 0);
+  const hasDisplaySubtotal = itemsWithDetails.length > 0 && itemsWithDetails.every((item) => item.subtotalDisplay !== null);
   const subtotalBs = itemsWithDetails.reduce((sum, item) => sum + (Number(item.bs_subtotal) || 0), 0);
-  const paymentsTotalUsd = (data.payments || []).reduce((sum, payment) => sum + (Number(payment.amount_usd) || 0), 0);
+  const paymentsTotalUsd = (data.payments || []).reduce((sum, payment) => sum + toBaseAmount(payment.amount_usd, payment.currency_code || displayCurrency), 0);
 
   const layawaysForCustomer = useMemo(() => {
     if (!data.customer_id) return layaways;
@@ -207,18 +232,18 @@ export default function Create({ products, customers, warehouses = [], layaways 
                 <p className="truncate font-medium text-slate-900">{item.product?.name ?? t('admin.invoices.create.summary.product_fallback', 'Producto')}</p>
                 <p className="text-xs text-slate-500">x{item.quantity}</p>
               </div>
-              <p className="font-semibold text-slate-900">{formatActiveAmount(item.subtotal)}</p>
+              <p className="font-semibold text-slate-900">{item.subtotalDisplay !== null ? formatServerAmount(displayCurrency, item.subtotalDisplay) : formatActiveAmount(item.subtotal)}</p>
             </div>
           ))}
         </div>
         <div className="mt-4 space-y-3 text-sm text-slate-600">
           <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
             <span>{`${t('admin.invoices.create.summary.subtotal_usd', 'Subtotal')} ${displayCurrency}`}</span>
-            <strong className="text-slate-900">{formatActiveAmount(subtotalUsd)}</strong>
+            <strong className="text-slate-900">{hasDisplaySubtotal ? formatServerAmount(displayCurrency, subtotalDisplay) : formatActiveAmount(subtotalUsd)}</strong>
           </div>
           <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
             <span>{secondaryCurrency ? `${t('admin.invoices.create.summary.subtotal_bs', 'Referencia')} ${secondaryCurrency}` : t('admin.invoices.create.summary.subtotal_bs', 'Referencia')}</span>
-            <strong className="text-slate-900">{secondaryCurrency ? formatActiveAmount(subtotalUsd, secondaryCurrency) : '—'}</strong>
+            <strong className="text-slate-900">{secondaryCurrency ? formatActiveAmount(subtotalUsd, secondaryCurrency) : t('admin.common.table.values.empty_dash', '—')}</strong>
           </div>
           <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
             <span>{`${t('admin.invoices.create.summary.payments_loaded', 'Pagos cargados')} ${displayCurrency}`}</span>
@@ -248,11 +273,24 @@ export default function Create({ products, customers, warehouses = [], layaways 
                 <option value="zelle">{paymentMethodLabels.zelle}</option>
                 <option value="otro">{paymentMethodLabels.otro}</option>
               </select>
+              <select
+                className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-slate-700"
+                value={payment.currency_code || displayCurrency}
+                onChange={(event) => {
+                  const nextPayments = [...data.payments];
+                  nextPayments[index] = { ...nextPayments[index], currency_code: event.target.value };
+                  setData('payments', nextPayments);
+                }}
+              >
+                {availableCurrencies.map((currency) => (
+                  <option key={currency} value={currency}>{currency}</option>
+                ))}
+              </select>
               <input
                 type="number"
                 min="0"
                 step="0.01"
-                placeholder={`${t('admin.invoices.create.quick_payments.amount_usd', 'Monto')} ${displayCurrency}`}
+                placeholder={`${t('admin.invoices.create.quick_payments.amount_usd', 'Monto')} ${payment.currency_code || displayCurrency}`}
                 className="flex-1 rounded-xl border border-slate-200 bg-white px-2 py-2 text-slate-700"
                 value={payment.amount_usd}
                 onChange={(event) => {
@@ -273,7 +311,7 @@ export default function Create({ products, customers, warehouses = [], layaways 
         </div>
         <button
           type="button"
-          onClick={() => setData('payments', [...(data.payments || []), { method: 'efectivo', amount_usd: '' }])}
+          onClick={() => setData('payments', [...(data.payments || []), { method: 'efectivo', amount_usd: '', currency_code: displayCurrency }])}
           className="mt-4 w-full rounded-2xl border border-dashed border-slate-300 px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
         >
           {t('admin.invoices.create.quick_payments.add_payment', 'Añadir pago')}
@@ -294,7 +332,7 @@ export default function Create({ products, customers, warehouses = [], layaways 
           backLabel={t('admin.invoices.create.back_to_list', 'Volver al listado')}
           stats={[
             { label: t('admin.invoices.create.stats.products', 'Productos'), value: itemsWithDetails.length },
-            { label: `${t('admin.invoices.create.stats.total_usd', 'Total')} ${displayCurrency}`, value: formatActiveAmount(subtotalUsd) },
+            { label: `${t('admin.invoices.create.stats.total_usd', 'Total')} ${displayCurrency}`, value: hasDisplaySubtotal ? formatServerAmount(displayCurrency, subtotalDisplay) : formatActiveAmount(subtotalUsd) },
             { label: t('admin.invoices.create.stats.payments', 'Pagos'), value: data.payments?.length ?? 0 },
           ]}
           sections={sections}
@@ -423,7 +461,7 @@ export default function Create({ products, customers, warehouses = [], layaways 
                       <option value="">{t('admin.invoices.create.form.no_layaway', 'Sin apartado')}</option>
                       {layawaysForCustomer.map((layaway) => (
                         <option key={layaway.id} value={layaway.id}>
-                            {layaway.number} – {layaway.customer?.name ?? t('admin.invoices.create.form.no_customer', 'Sin cliente')} – {formatActiveAmount(layaway.total_usd ?? 0)}
+                            {layaway.number} – {layaway.customer?.name ?? t('admin.invoices.create.form.no_customer', 'Sin cliente')} – {getLayawayAmount(layaway)}
                         </option>
                       ))}
                     </select>
@@ -489,7 +527,7 @@ export default function Create({ products, customers, warehouses = [], layaways 
                           <div className="flex flex-col">
                             <span className="text-sm font-medium text-slate-900">{product.name}</span>
                             <span className="text-xs text-slate-500">
-                              {formatActiveAmount(product.price_usd ?? 0)}
+                              {formatProductPrimaryAmount(product, product.price_usd ?? 0)}
                               {typeof product.stock !== 'undefined' ? ` · ${t('admin.invoices.create.items.stock', 'Stock')}: ${product.stock}` : ''}
                             </span>
                           </div>
@@ -537,10 +575,10 @@ export default function Create({ products, customers, warehouses = [], layaways 
                                     className="w-20 rounded-xl border border-slate-300 bg-white px-2 py-2 text-center text-xs text-slate-900"
                                   />
                                 </td>
-                                <td className="px-4 py-3 text-right text-slate-900">{formatActiveAmount(item.price)}</td>
-                                <td className="px-4 py-3 text-right font-semibold text-slate-900">{formatActiveAmount(item.subtotal)}</td>
+                                <td className="px-4 py-3 text-right text-slate-900">{item.priceDisplay !== undefined ? formatServerAmount(displayCurrency, item.priceDisplay) : formatActiveAmount(item.price)}</td>
+                                <td className="px-4 py-3 text-right font-semibold text-slate-900">{item.subtotalDisplay !== null ? formatServerAmount(displayCurrency, item.subtotalDisplay) : formatActiveAmount(item.subtotal)}</td>
                                 <td className="px-4 py-3 text-right font-semibold text-slate-900">
-                                  {secondaryCurrency ? formatActiveAmount(item.subtotal, secondaryCurrency) : '—'}
+                                  {secondaryCurrency ? formatActiveAmount(item.subtotal, secondaryCurrency) : t('admin.common.table.values.empty_dash', '—')}
                                 </td>
                                 <td className="px-4 py-3 text-center">
                                   <button

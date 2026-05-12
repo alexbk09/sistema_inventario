@@ -5,13 +5,15 @@ import AdminPagination from '@/Components/admin/AdminPagination.jsx';
 import AdminIndexShell from '@/Components/admin/AdminIndexShell.jsx';
 import { useI18n } from '@/Hooks/useI18n';
 import { useLocaleFormat } from '@/Hooks/useLocaleFormat';
-import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates';
 
-export default function CreditMovementsReport({ movements, filters = {}, metrics, customers = [], accounts = [], types = [], statuses = [] }) {
+export default function CreditMovementsReport({ movements, filters = {}, metrics, customers = [], accounts = [], types = [], statuses = [], adminCurrencyContext }) {
   const { t } = useI18n();
-  const { formatDateTime, formatNumber } = useLocaleFormat();
-  const { displayCurrency, formatPriceFromUsd } = useConfiguredCurrencyRates();
-  const formatActiveAmount = (value) => formatPriceFromUsd(Number(value || 0), displayCurrency);
+  const { formatDateTime } = useLocaleFormat();
+  const adminCurrencyCodes = Array.isArray(adminCurrencyContext?.codes) ? adminCurrencyContext.codes : [];
+  const formatMoney = (value) => new Intl.NumberFormat(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(value || 0));
   const [localFilters, setLocalFilters] = useState({
     customer_id: filters.customer_id || '',
     account_id: filters.account_id || '',
@@ -26,6 +28,7 @@ export default function CreditMovementsReport({ movements, filters = {}, metrics
   const activeFilters = Object.values(filters || {}).filter((value) => value !== null && value !== undefined && value !== '').length;
   const translateMovementType = (value) => t(`admin.reports.credit.movement_types.${value}`, value);
   const translateMovementStatus = (value) => t(`admin.reports.credit.movement_statuses.${value}`, value);
+  const translateDocumentType = (value) => t(`admin.invoices.document_types.${value}`, value ?? t('admin.reports.credit.values.empty_dash', '—'));
 
   const submitFilters = () => {
     router.get(route('admin.reports.credits.movements'), {
@@ -51,8 +54,8 @@ export default function CreditMovementsReport({ movements, filters = {}, metrics
         stats={[
           { label: t('admin.reports.credit.movements.stats.movements', 'Movimientos'), value: metrics.total_movements },
           { label: t('admin.reports.credit.movements.stats.page_movements', 'Movimientos página'), value: metrics.page_movements },
-          { label: `${t('admin.reports.credit.movements.stats.charges_usd', 'Cargos')} ${displayCurrency}`, value: formatActiveAmount(metrics.total_charges_usd || 0) },
-          { label: `${t('admin.reports.credit.movements.stats.payments_usd', 'Pagos')} ${displayCurrency}`, value: formatActiveAmount(metrics.total_payments_usd || 0) },
+          ...adminCurrencyCodes.map((code) => ({ label: `${t('admin.reports.credit.movements.stats.charges_usd', 'Cargos')} ${code}`, value: formatMoney(metrics.total_charges_admin_totals?.[code] ?? 0) })),
+          ...adminCurrencyCodes.map((code) => ({ label: `${t('admin.reports.credit.movements.stats.payments_usd', 'Pagos')} ${code}`, value: formatMoney(metrics.total_payments_admin_totals?.[code] ?? 0) })),
         ]}
         contextTitle={t('admin.reports.credit.movements.context_title', 'Movimientos y pagos')}
         contextDescription={t('admin.reports.credit.movements.context_description', 'Úsalo para seguir cargos, pagos y facturas asociadas dentro del historial completo de crédito.')}
@@ -189,14 +192,16 @@ export default function CreditMovementsReport({ movements, filters = {}, metrics
                 <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.credit.movements.table.customer', 'Cliente')}</th>
                 <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.credit.movements.table.account', 'Cuenta')}</th>
                 <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.credit.movements.table.type', 'Tipo')}</th>
-                <th className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.credit.movements.table.amount_usd', 'Monto')} ${displayCurrency}`}</th>
+                <th className="px-3 py-2 text-right font-semibold">{t('admin.reports.credit.movements.table.amount_usd', 'Monto origen')}</th>
+                {adminCurrencyCodes.map((code) => (
+                  <th key={code} className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.credit.movements.table.amount_usd', 'Monto')} ${code}`}</th>
+                ))}
                 <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.credit.movements.table.invoice', 'Factura asociada')}</th>
                 <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.credit.movements.table.status', 'Estado')}</th>
               </tr>
             </thead>
             <tbody>
               {movements.data.map((mov) => {
-                const amount = Number(mov.amount_usd ?? 0);
                 const typeLabel = translateMovementType(mov.type === 'charge' ? 'charge' : 'payment');
                 const statusLabel = translateMovementStatus(mov.paid_at ? 'paid' : 'pending');
                 return (
@@ -205,13 +210,16 @@ export default function CreditMovementsReport({ movements, filters = {}, metrics
                     <td className="px-3 py-2 text-xs">{mov.account?.customer?.name ?? t('admin.reports.credit.states.not_available', 'N/A')}</td>
                     <td className="px-3 py-2 text-xs">#{mov.credit_account_id}</td>
                     <td className="px-3 py-2 text-xs">{typeLabel}</td>
-                    <td className="px-3 py-2 text-xs text-right">{formatActiveAmount(amount)}</td>
+                    <td className="px-3 py-2 text-xs text-right">{`${mov.display_currency_code ?? 'USD'} ${formatMoney(mov.display_original_amount ?? 0)}`}</td>
+                    {adminCurrencyCodes.map((code) => (
+                      <td key={`${mov.id}-${code}`} className="px-3 py-2 text-xs text-right">{formatMoney(mov.admin_totals?.[code] ?? 0)}</td>
+                    ))}
                     <td className="px-3 py-2 text-xs">
                       {mov.invoice ? (
                         <>
-                          {mov.invoice.number} ({mov.invoice.document_type})
+                          {mov.invoice.number} ({translateDocumentType(mov.invoice.document_type)})
                         </>
-                      ) : '—'}
+                      ) : t('admin.reports.credit.values.empty_dash', '—')}
                     </td>
                     <td className="px-3 py-2 text-xs">{statusLabel}</td>
                   </tr>
@@ -219,7 +227,7 @@ export default function CreditMovementsReport({ movements, filters = {}, metrics
               })}
               {movements.data.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-3 py-6 text-center text-sm text-muted-foreground">
+                  <td colSpan={6 + adminCurrencyCodes.length} className="px-3 py-6 text-center text-sm text-muted-foreground">
                     {t('admin.reports.credit.movements.empty', 'No hay movimientos para los filtros seleccionados.')}
                   </td>
                 </tr>

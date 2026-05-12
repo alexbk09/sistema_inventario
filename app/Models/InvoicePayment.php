@@ -15,6 +15,11 @@ class InvoicePayment extends Model
         'method',
         'amount_usd',
         'amount_bs',
+        'payment_currency_code',
+        'amount_original',
+        'amount_base',
+        'exchange_rate_snapshot',
+        'exchange_rate_source',
         'reference',
         'bank',
         'notes',
@@ -23,6 +28,9 @@ class InvoicePayment extends Model
     protected $casts = [
         'amount_usd' => 'float',
         'amount_bs' => 'float',
+        'amount_original' => 'float',
+        'amount_base' => 'float',
+        'exchange_rate_snapshot' => 'float',
     ];
 
     public function invoice(): BelongsTo

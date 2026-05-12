@@ -100,19 +100,8 @@ return [
                 'name' => 'Nome',
                 'email' => 'Email',
             ],
-            'verification' => [
-                'unverified' => 'Seu endereço de email ainda não foi verificado.',
-                'resend' => 'Clique aqui para reenviar o email de verificação.',
-                'sent' => 'Um novo link de verificação foi enviado para o seu email.',
-            ],
-        ],
-        'password' => [
-            'title' => 'Atualizar senha',
-            'description' => 'Use uma senha longa e segura para proteger sua conta.',
-            'fields' => [
-                'current_password' => 'Senha atual',
-                'new_password' => 'Nova senha',
-                'confirm_password' => 'Confirmar senha',
+            'notifications' => [
+                'updated' => 'Perfil atualizado com sucesso.',
             ],
         ],
         'customer' => [
@@ -180,7 +169,6 @@ return [
                     'invoices' => [
                         'title' => 'Faturas',
                         'description' => 'Códigos com padrão de comprovante disparam uma busca direta em vendas.',
-                    ],
                     'products' => [
                         'title' => 'Produtos',
                         'description' => 'Os demais códigos são interpretados como SKU ou identificador de produto para consulta rápida.',
@@ -324,10 +312,31 @@ return [
             'actions_filters' => 'Ações e filtros',
             'actions_description' => 'Mantenha busca, filtros e ações principais acessíveis sem perder espaço útil para a tabela.',
         ],
+        'common' => [
+            'close' => 'Fechar',
+            'table' => [
+                'actions' => 'Ações',
+                'loading' => 'Carregando...',
+                'empty' => 'Não há registros',
+                'view' => 'Ver',
+                'edit' => 'Editar',
+                'delete' => 'Excluir',
+                'values' => [
+                    'empty_dash' => '—',
+                ],
+            ],
+        ],
+            'filters' => [
+                'search_placeholder' => 'Buscar...',
+                'new' => 'Novo',
+            ],
         'notifications' => [
             'title' => 'Notificações',
+            'generic_type' => 'Notificação',
             'alerts_count' => '{count} alerta|{count} alertas',
             'no_alerts' => 'Sem alertas',
+            'view_history' => 'Ver histórico',
+            'unread_count' => '{count} não lida|{count} não lidas',
             'low_stock' => 'Estoque baixo',
             'products_count' => '{count} produto|{count} produtos',
             'expired_layaways' => 'Reservas vencidas',
@@ -335,7 +344,136 @@ return [
             'view_detail' => 'Ver detalhes',
             'manage_layaways' => 'Gerenciar reservas',
             'customer_fallback' => 'Cliente',
-            'empty' => 'Não há alertas no momento.',
+            'empty' => 'Não há notificações pendentes no momento.',
+            'page_title' => 'Histórico de notificações',
+            'history_title' => 'Histórico de notificações operacionais',
+            'history_description' => 'Consulte alertas pendentes e lidos, filtre por severidade ou tipo e volte ao detalhe de cada incidência sem depender do dropdown do sino.',
+            'stats' => [
+                'total' => 'Total',
+                'unread' => 'Não lidas',
+                'critical' => 'Críticas',
+                'warnings' => 'Avisos',
+            ],
+            'context_title' => 'Centro de alertas',
+            'context_description' => 'Use esta visualização para processar sua fila pessoal de alertas, revisar prioridades e manter o histórico limpo com ações pontuais de leitura e exclusão.',
+            'context_items' => [
+                'active_filters' => 'Filtros ativos',
+                'page' => 'Página',
+                'scope' => 'Escopo',
+                'personal' => 'Somente minhas notificações',
+            ],
+            'action_error' => 'Não foi possível concluir a ação.',
+            'loading_mark_read' => 'Marcando notificação como lida...',
+            'loading_delete_selected' => 'Excluindo notificações selecionadas...',
+            'loading_delete_single' => 'Excluindo notificação...',
+            'loading_mark_selected' => 'Marcando notificações selecionadas...',
+            'loading_save_preferences' => 'Salvando preferências de notificações...',
+            'loading_toggle_bell' => 'Atualizando silêncio no sino...',
+            'loading_toggle_history' => 'Atualizando visibilidade no histórico...',
+            'loading_mark_all' => 'Marcando todas as notificações...',
+            'preferences_updated' => 'Preferências de notificações atualizadas.',
+            'selected_marked_read' => 'Notificações selecionadas marcadas como lidas.',
+            'selected_deleted' => 'Notificações selecionadas excluídas.',
+            'mark_all_read' => 'Marcar todas',
+            'selected_count' => ':count selecionadas',
+            'mark_selected_read' => 'Marcar selecionadas',
+            'delete_selected' => 'Excluir selecionadas',
+            'generated' => [
+                'low_stock' => [
+                    'title' => 'Produto com estoque baixo: :product',
+                    'current_stock' => 'Estoque atual: :stock',
+                    'min_stock' => 'Mínimo: :min_stock',
+                    'sku' => 'SKU: :sku',
+                    'action' => 'Revisar inventário',
+                ],
+            ],
+            'filters' => [
+                'search' => 'Buscar',
+                'search_placeholder' => 'Título ou mensagem',
+                'status' => 'Estado',
+                'severity' => 'Severidade',
+                'type' => 'Tipo',
+                'all_severities' => 'Todas',
+                'all_types' => 'Todos',
+                'statuses' => [
+                    'all' => 'Todos',
+                    'unread' => 'Não lidas',
+                    'read' => 'Lida',
+                ],
+            ],
+            'groups' => [
+                'danger' => 'Críticas',
+                'warning' => 'Atenção',
+                'success' => 'Acompanhamento',
+                'info' => 'Informativas',
+            ],
+            'quick_filters' => [
+                'visible' => 'Visíveis no histórico',
+                'bell_muted' => 'Ocultas no sino',
+                'history_muted' => 'Ocultas no histórico',
+            ],
+            'visibility_notice' => [
+                'visible_title' => 'Histórico visível ativo',
+                'visible_description' => 'Você está vendo apenas as notificações que continuam visíveis no seu histórico pessoal.',
+                'bell_muted_title' => 'Ocultas no sino',
+                'bell_muted_description' => 'Esta visualização mostra tipos silenciados no sino. Você pode reativá-los ou mantê-los fora do dropdown sem excluir o histórico.',
+                'history_muted_title' => 'Ocultas no histórico',
+                'history_muted_description' => 'Você está revisando notificações que seu histórico normalmente oculta por preferência. Daqui você pode reativá-las rapidamente.',
+                'count' => 'Correspondências atuais: :count',
+            ],
+            'clear_filters' => 'Limpar filtros',
+            'apply_filters' => 'Aplicar filtros',
+            'preferences_title' => 'Preferências pessoais',
+            'preferences_description' => 'Configure separadamente quais tipos ocultar no sino e quais remover do histórico sem perder a persistência do alerta.',
+            'muted_bell_count' => 'Sino: :count',
+            'muted_history_count' => 'Histórico: :count',
+            'preference_target' => 'Ajustando este tipo',
+            'preference_bell' => 'Ocultar no sino',
+            'preference_history' => 'Ocultar no histórico',
+            'unmute_all' => 'Reativar ambos os canais',
+            'save_preferences' => 'Salvar preferências',
+            'table' => [
+                'select_all' => 'Selecionar todas',
+                'date' => 'Data',
+                'severity' => 'Severidade',
+                'type' => 'Tipo',
+                'title' => 'Título',
+                'message' => 'Mensagem',
+                'status' => 'Estado',
+                'actions' => 'Ações',
+                'select_row' => 'Selecionar notificação',
+            ],
+            'mute_bell' => 'Ocultar no sino',
+            'unmute_bell' => 'Mostrar no sino',
+            'mute_history' => 'Ocultar no histórico',
+            'unmute_history' => 'Mostrar no histórico',
+            'mark_read' => 'Marcar como lida',
+            'open' => 'Abrir',
+            'delete' => 'Excluir',
+            'empty_history' => 'Não há notificações para os filtros selecionados.',
+            'confirm_delete_title' => 'Confirmar exclusão',
+            'confirm_delete_bulk' => 'Excluir as notificações selecionadas? Esta ação não pode ser desfeita.',
+            'confirm_delete_single' => 'Excluir esta notificação? Esta ação não pode ser desfeita.',
+            'cancel' => 'Cancelar',
+            'preferences_link' => 'Preferências',
+            'types' => [
+                'low_stock' => 'Estoque baixo',
+                'expired_layaway' => 'Reserva vencida',
+                'manual_checkout_payment_pending' => 'Pagamento manual pendente',
+                'overdue_credit_charge' => 'Cobrança de crédito vencida',
+                'stale_pending_invoice' => 'Fatura pendente estagnada',
+                'stale_rma' => 'RMA estagnado',
+                'invoice_created' => 'Fatura criada',
+                'invoice_status_changed' => 'Status da fatura atualizado',
+                'layaway_created' => 'Reserva criada',
+                'layaway_status_changed' => 'Status da reserva atualizado',
+                'rma_created' => 'RMA criado',
+                'rma_status_changed' => 'Status do RMA atualizado',
+                'transfer_created' => 'Transferência criada',
+                'transfer_status_changed' => 'Status da transferência atualizado',
+                'credit_account_created' => 'Conta de crédito criada',
+                'credit_movement_created' => 'Movimento de crédito criado',
+            ],
         ],
         'dashboard' => [
             'page_title' => 'Dashboard',
@@ -363,6 +501,9 @@ return [
                     'paid_invoices_count' => ':count faturas pagas',
                     'low_stock_products' => 'Produtos com estoque baixo',
                     'low_stock_help' => 'Inclui produtos zerados ou negativos.',
+                    'values' => [
+                        'empty_dash' => '—',
+                    ],
                 ],
             ],
             'summary' => [
@@ -431,6 +572,9 @@ return [
                         'product' => 'Produto',
                         'stock' => 'Estoque',
                         'min_stock' => 'Mín.',
+                    ],
+                    'values' => [
+                        'empty_dash' => '—',
                     ],
                     'empty' => 'Não há produtos com estoque baixo na configuração atual.',
                 ],
@@ -528,6 +672,9 @@ return [
                     'page_title' => 'Relatório de inventário',
                     'hero_title' => 'Consulte a valorização do inventário com melhor hierarquia visual',
                     'hero_description' => 'A vista integra métricas de estoque, navegação entre sub-relatórios, exportações e filtros sem cair em um layout plano de tabela.',
+                    'values' => [
+                        'empty_dash' => '—',
+                    ],
                     'stats' => [
                         'units' => 'Unidades',
                         'cost_usd' => 'Custo USD',
@@ -580,6 +727,9 @@ return [
                     'filters' => [
                         'search_product' => 'Buscar produto',
                     ],
+                    'values' => [
+                        'empty_dash' => '—',
+                    ],
                     'table' => [
                         'branch' => 'Filial',
                         'product' => 'Produto',
@@ -622,6 +772,9 @@ return [
                         'sku' => 'SKU',
                         'barcode' => 'Código',
                         'current_stock' => 'Estoque atual',
+                    ],
+                    'values' => [
+                        'empty_dash' => '—',
                     ],
                     'table' => [
                         'date' => 'Data',
@@ -672,6 +825,9 @@ return [
                         'no_sales' => 'Sem vendas',
                         'no_sales_in_period' => 'Sem vendas no período',
                     ],
+                    'values' => [
+                        'empty_dash' => '—',
+                    ],
                     'empty' => 'Não há produtos para os filtros selecionados.',
                 ],
             ],
@@ -704,6 +860,9 @@ return [
                 'movement_statuses' => [
                     'pending' => 'Pendente',
                     'paid' => 'Pago',
+                ],
+                'values' => [
+                    'empty_dash' => '—',
                 ],
                 'states' => [
                     'not_available' => 'N/D',
@@ -843,6 +1002,9 @@ return [
                 'page_title' => 'Relatório de vendas',
                 'hero_title' => 'Analise vendas com um painel mais claro para consulta e exportação',
                 'hero_description' => 'A vista reúne métricas, navegação entre relatórios, filtros comerciais e exportações sem obrigar o usuário a percorrer uma tela plana.',
+                'values' => [
+                    'empty_dash' => '—',
+                ],
                 'stats' => [
                     'invoices' => 'Faturas',
                     'total_usd' => 'Total USD',
@@ -1757,6 +1919,7 @@ return [
                         'contact_name' => 'Nome do responsável',
                         'contact_placeholder' => 'Ex.: Carlos Martínez',
                         'phone' => 'Telefone',
+                        'phone_placeholder' => '+58 212-1234567',
                         'email' => 'Email',
                         'email_placeholder' => 'contato@empresa.com',
                         'address' => 'Endereço',
@@ -1955,6 +2118,7 @@ return [
                 'bulk_import' => [
                     'title' => 'Importação em massa de produtos',
                     'description' => 'Envie um arquivo Excel (.xlsx/.xls/.csv) com colunas:',
+                    'columns' => 'name, sku, price_usd, stock, description, image_url',
                     'description_suffix' => 'Se incluir image_url, a imagem será baixada e definida como principal quando possível.',
                     'file' => 'Arquivo',
                     'branch_optional' => 'Filial (opcional)',
@@ -1975,6 +2139,12 @@ return [
                     'notifications' => [
                         'movement_registered' => 'Movimento de inventário registrado com sucesso.',
                     ],
+                    'errors' => [
+                        'quantity_positive' => 'A quantidade deve ser maior que 0.',
+                        'auth_required' => 'É necessário um usuário autenticado para registrar um movimento de inventário.',
+                        'reason_required' => 'Você deve informar um motivo para o movimento de inventário.',
+                        'insufficient_stock' => 'Não há estoque suficiente para esta saída.',
+                    ],
                     'types' => [
                         'entry' => 'Entrada',
                         'exit' => 'Saída',
@@ -1982,6 +2152,7 @@ return [
                     'cards' => [
                         'product' => [
                             'title' => 'Produto',
+                            'sku_label' => 'SKU',
                             'current_stock' => 'Estoque atual',
                             'reference_price' => 'Preço de referência',
                         ],
@@ -2017,6 +2188,12 @@ return [
                         'apply_filters' => 'Aplicar filtros',
                         'clear' => 'Limpar',
                         'empty' => 'Não há movimentos registrados para este produto.',
+                        'sources' => [
+                            'purchase' => 'Compra',
+                            'sale' => 'Venda',
+                            'adjustment' => 'Ajuste',
+                            'return' => 'Devolução',
+                        ],
                         'table' => [
                             'date' => 'Data',
                             'type' => 'Tipo',
@@ -2270,6 +2447,48 @@ return [
                     'product' => 'QR produto',
                     'whatsapp' => 'QR contato WhatsApp',
                 ],
+            ],
+            'qr_scanner' => [
+                'page_title' => 'Scanner QR',
+                'hero_title' => 'Escaneie e direcione códigos com uma interface mais clara para operação rápida',
+                'hero_description' => 'A tela concentra o leitor, o acesso ao lote de QR e a lógica de roteamento para faturas ou produtos dentro do mesmo sistema visual do backoffice.',
+                'stats' => [
+                    'scanner' => 'Scanner',
+                    'invoice_destination' => 'Destino fatura',
+                    'product_destination' => 'Destino produto',
+                ],
+                'context_title' => 'Scanner QR',
+                'context_description' => 'Use esta tela para resolver leituras rápidas no balcão e saltar direto para o módulo correto conforme o conteúdo do código.',
+                'context_items' => [
+                    'last_scan' => 'Última leitura',
+                    'batch_qr' => 'QR em lote',
+                    'heuristic' => 'Heurística',
+                ],
+                'actions' => [
+                    'batch' => 'Ver QRs em lote',
+                ],
+                'cards' => [
+                    'scan' => [
+                        'title' => 'Leitura',
+                        'description' => 'Escaneie um código e direcione a navegação sem sair do painel administrativo.',
+                    ],
+                    'invoices' => [
+                        'title' => 'Faturas',
+                        'description' => 'Códigos com padrão de comprovante disparam uma busca direta nas vendas.',
+                    ],
+                    'products' => [
+                        'title' => 'Produtos',
+                        'description' => 'Os demais códigos são interpretados como SKU ou identificador de produto para consulta rápida.',
+                    ],
+                ],
+                'values' => [
+                    'available' => 'Disponível',
+                    'pending' => 'Pendente',
+                    'automatic' => 'Automático',
+                    'no_scans' => 'Sem leituras',
+                    'invoice_or_product' => 'Fatura ou produto',
+                ],
+                'reader_pending' => 'O leitor QR será instalado mais adiante.',
             ],
             'warehouses' => [
                 'permissions' => [
@@ -2619,6 +2838,7 @@ return [
                     ],
                     'tabs' => [
                         'manual' => [
+                            'label' => 'Transferência bancária',
                             'title' => 'Manual',
                             'eyebrow' => 'Transferências',
                             'description' => 'Contas bancárias e referências manuais.',
@@ -2666,6 +2886,11 @@ return [
                         ],
                     ],
                     'manual' => [
+                        'enable' => 'Habilitar pagamento manual no checkout',
+                        'defaults' => [
+                            'description' => 'Pagamento por transferência ou depósito com referência manual.',
+                            'instructions' => 'Realize sua transferência e compartilhe os dados do pagamento durante o checkout.',
+                        ],
                         'experience' => [
                             'eyebrow' => 'Experiência',
                             'title' => 'Transferências claras para o cliente',
@@ -2705,6 +2930,10 @@ return [
                         ],
                     ],
                     'paypal' => [
+                        'defaults' => [
+                            'description' => 'Habilite o PayPal quando suas credenciais estiverem prontas.',
+                            'instructions' => 'Configure Client ID e Secret para ativá-lo.',
+                        ],
                         'enable' => 'Habilitar PayPal no checkout',
                         'environment' => 'Ambiente',
                         'client_id' => 'Client ID',
@@ -2720,6 +2949,10 @@ return [
                         ],
                     ],
                     'stripe' => [
+                        'defaults' => [
+                            'description' => 'Aceite pagamentos com cartão via Stripe.',
+                            'instructions' => 'Configure Publishable Key e Secret Key para ativar a cobrança com cartão.',
+                        ],
                         'enable' => 'Habilitar Stripe no checkout',
                         'environment' => 'Ambiente',
                         'publishable_key' => 'Publishable Key',
@@ -3106,5 +3339,6 @@ return [
         'social_instagram' => 'Instagram',
         'social_twitter' => 'Twitter',
         'rights' => 'Todos os direitos reservados.',
+    ],
     ],
 ];

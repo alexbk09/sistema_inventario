@@ -6,11 +6,22 @@ import { useI18n } from '@/Hooks/useI18n';
 import { useLocaleFormat } from '@/Hooks/useLocaleFormat';
 import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates';
 
-export default function Create({ invoices = [], customers = [], products = [] }) {
+export default function Create({ invoices = [], customers = [], products = [], adminCurrencyContext = {} }) {
   const { t } = useI18n();
-  const { formatNumber } = useLocaleFormat();
-  const { displayCurrency, formatPriceFromUsd } = useConfiguredCurrencyRates();
+  const { formatNumber, formatCurrency } = useLocaleFormat();
+  const { displayCurrency, comparisonCurrency, formatPriceFromUsd, hasRateForCurrency } = useConfiguredCurrencyRates();
+  const secondaryCurrency = comparisonCurrency && comparisonCurrency !== displayCurrency && hasRateForCurrency(comparisonCurrency)
+    ? comparisonCurrency
+    : null;
+  const visibleCurrencyCodes = Array.isArray(adminCurrencyContext?.codes) && adminCurrencyContext.codes.length > 0
+    ? adminCurrencyContext.codes
+    : [displayCurrency, ...(secondaryCurrency ? [secondaryCurrency] : [])].filter(Boolean);
   const formatActiveAmount = (value) => formatPriceFromUsd(Number(value || 0), displayCurrency);
+  const formatServerAmount = (code, value) => formatCurrency(Number(value || 0), code);
+  const getProductDisplayPrice = (product, currency = displayCurrency) => product?.price_admin_totals?.[currency];
+  const getInvoiceAmount = (invoice) => invoice?.document_totals?.[displayCurrency] !== undefined
+    ? formatServerAmount(displayCurrency, invoice.document_totals[displayCurrency])
+    : formatActiveAmount(invoice?.total_usd ?? 0);
   const { data, setData, post, processing } = useForm({
     invoice_id: '',
     customer_id: '',
@@ -38,11 +49,21 @@ export default function Create({ invoices = [], customers = [], products = [] })
       const product = products.find((candidate) => String(candidate.id) === String(item.product_id));
       const price = Number(product?.price_usd ?? 0);
       const quantity = Number(item.quantity ?? 1);
-      return { ...item, product, price, quantity, subtotal: price * quantity };
+      return {
+        ...item,
+        product,
+        price,
+        priceDisplay: getProductDisplayPrice(product),
+        quantity,
+        subtotal: price * quantity,
+        subtotalDisplay: getProductDisplayPrice(product) !== undefined ? getProductDisplayPrice(product) * quantity : null,
+      };
     });
   }, [data.items, products]);
 
   const subtotalUsd = itemsWithDetails.reduce((sum, item) => sum + item.subtotal, 0);
+  const subtotalDisplay = itemsWithDetails.reduce((sum, item) => sum + Number(item.subtotalDisplay ?? 0), 0);
+  const hasDisplaySubtotal = itemsWithDetails.length > 0 && itemsWithDetails.every((item) => item.subtotalDisplay !== null);
 
   const reasonTypeLabels = {
     defective: t('admin.rmas.reason_types.defective', 'Defecto'),
@@ -120,7 +141,7 @@ export default function Create({ invoices = [], customers = [], products = [] })
           backLabel={t('admin.rmas.create.back_to_list', 'Volver al listado')}
           stats={[
             { label: t('admin.rmas.create.stats.items', 'Ítems'), value: itemsWithDetails.length },
-            { label: `${t('admin.rmas.create.stats.estimated_total', 'Total estimado')} ${displayCurrency}`, value: formatActiveAmount(subtotalUsd) },
+            { label: `${t('admin.rmas.create.stats.estimated_total', 'Total estimado')} ${displayCurrency}`, value: hasDisplaySubtotal ? formatServerAmount(displayCurrency, subtotalDisplay) : formatActiveAmount(subtotalUsd) },
             { label: t('admin.rmas.create.stats.reason', 'Motivo'), value: reasonTypeLabels[data.reason_type] ?? reasonTypeLabels.other },
           ]}
           sections={sections}
@@ -146,13 +167,13 @@ export default function Create({ invoices = [], customers = [], products = [] })
                       <p className="truncate font-medium text-slate-900">{item.product?.name ?? t('admin.rmas.values.product_fallback', 'Producto')}</p>
                       <p className="text-xs text-slate-500">x{item.quantity}</p>
                     </div>
-                    <p className="font-semibold text-slate-900">{formatActiveAmount(item.subtotal)}</p>
+                    <p className="font-semibold text-slate-900">{item.subtotalDisplay !== null ? formatServerAmount(displayCurrency, item.subtotalDisplay) : formatActiveAmount(item.subtotal)}</p>
                   </div>
                 ))}
               </div>
               <div className="mt-4 flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 text-sm">
                 <span className="text-slate-600">{t('admin.rmas.create.summary.estimated_impact', 'Impacto estimado')}</span>
-                <strong className="text-slate-900">{formatActiveAmount(subtotalUsd)}</strong>
+                <strong className="text-slate-900">{hasDisplaySubtotal ? formatServerAmount(displayCurrency, subtotalDisplay) : formatActiveAmount(subtotalUsd)}</strong>
               </div>
             </div>
           }
@@ -183,7 +204,7 @@ export default function Create({ invoices = [], customers = [], products = [] })
                   <select value={data.invoice_id} onChange={(event) => setData('invoice_id', event.target.value)} className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900">
                     <option value="">{t('admin.rmas.create.form.without_invoice', 'Sin factura')}</option>
                     {invoices.map((invoice) => (
-                      <option key={invoice.id} value={invoice.id}>{invoice.number} · {formatActiveAmount(invoice.total_usd ?? 0)}</option>
+                      <option key={invoice.id} value={invoice.id}>{invoice.number} · {getInvoiceAmount(invoice)}</option>
                     ))}
                   </select>
                 </div>
@@ -238,7 +259,7 @@ export default function Create({ invoices = [], customers = [], products = [] })
                         <li key={product.id} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50">
                           <div className="flex flex-col">
                             <span className="text-sm font-medium text-slate-900">{product.name}</span>
-                            <span className="text-xs text-slate-500">{formatActiveAmount(product.price_usd ?? 0)}{typeof product.stock !== 'undefined' ? ` · ${t('admin.rmas.create.items.current_stock', 'Stock actual')}: ${product.stock}` : ''}</span>
+                            <span className="text-xs text-slate-500">{getProductDisplayPrice(product) !== undefined ? formatServerAmount(displayCurrency, getProductDisplayPrice(product)) : formatActiveAmount(product.price_usd ?? 0)}{typeof product.stock !== 'undefined' ? ` · ${t('admin.rmas.create.items.current_stock', 'Stock actual')}: ${product.stock}` : ''}</span>
                           </div>
                           <button type="button" onClick={() => handleAddProduct(product)} className="rounded-2xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-800">{t('admin.rmas.create.items.add', 'Agregar')}</button>
                         </li>
@@ -272,8 +293,8 @@ export default function Create({ invoices = [], customers = [], products = [] })
                                 <td className="px-4 py-3 text-center">
                                   <input type="number" min={1} value={item.quantity} onChange={(event) => handleQuantityChange(index, event.target.value)} className="w-20 rounded-xl border border-slate-300 bg-white px-2 py-2 text-center text-xs text-slate-900" />
                                 </td>
-                                <td className="px-4 py-3 text-right text-slate-900">{formatActiveAmount(item.price)}</td>
-                                <td className="px-4 py-3 text-right font-semibold text-slate-900">{formatActiveAmount(item.subtotal)}</td>
+                                <td className="px-4 py-3 text-right text-slate-900">{item.priceDisplay !== undefined ? formatServerAmount(displayCurrency, item.priceDisplay) : formatActiveAmount(item.price)}</td>
+                                <td className="px-4 py-3 text-right font-semibold text-slate-900">{item.subtotalDisplay !== null ? formatServerAmount(displayCurrency, item.subtotalDisplay) : formatActiveAmount(item.subtotal)}</td>
                                 <td className="px-4 py-3 text-slate-900">
                                   <textarea value={item.reason || ''} onChange={(event) => handleReasonChange(index, event.target.value)} rows={2} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900" placeholder={t('admin.rmas.create.items.reason_placeholder', 'Descripción del problema de este producto')} />
                                 </td>

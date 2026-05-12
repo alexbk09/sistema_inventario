@@ -7,14 +7,19 @@ import { useI18n } from '@/Hooks/useI18n';
 import { useLocaleFormat } from '@/Hooks/useLocaleFormat';
 import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates';
 
-export default function SalesReportIndex({ invoices, filters = {}, metrics, warehouses = [], customers = [], paymentMethods = [], sellers = [] }) {
+export default function SalesReportIndex({ invoices, filters = {}, metrics, metricsByCurrency = {}, adminCurrencyContext = {}, warehouses = [], customers = [], paymentMethods = [], sellers = [] }) {
   const { t } = useI18n();
-  const { formatDateTime, formatNumber } = useLocaleFormat();
+  const { formatDateTime, formatCurrency } = useLocaleFormat();
   const { displayCurrency, comparisonCurrency, formatPriceFromUsd, hasRateForCurrency } = useConfiguredCurrencyRates();
   const secondaryCurrency = comparisonCurrency && comparisonCurrency !== displayCurrency && hasRateForCurrency(comparisonCurrency)
     ? comparisonCurrency
     : null;
   const formatActiveAmount = (value, currency = displayCurrency) => formatPriceFromUsd(Number(value || 0), currency);
+  const visibleCurrencyCodes = Array.isArray(adminCurrencyContext?.codes) && adminCurrencyContext.codes.length > 0
+    ? adminCurrencyContext.codes
+    : [displayCurrency, ...(secondaryCurrency ? [secondaryCurrency] : [])];
+  const statsCurrencyCodes = [...new Set(visibleCurrencyCodes.filter(Boolean))];
+  const formatServerAmount = (code, value) => formatCurrency(Number(value || 0), code);
   const [localFilters, setLocalFilters] = useState({
     date_from: filters.date_from || '',
     date_to: filters.date_to || '',
@@ -72,6 +77,9 @@ export default function SalesReportIndex({ invoices, filters = {}, metrics, ware
     window.location.href = qs ? `${base}?${qs}` : base;
   };
 
+  const translateDocumentType = (value) => typeLabels[value] ?? t(`admin.reports.sales.document_types.${value}`, value ?? t('admin.reports.sales.values.empty_dash', '—'));
+  const translateStatus = (value) => statusLabels[value] ?? t(`admin.reports.sales.statuses.${value}`, value ?? t('admin.reports.sales.values.empty_dash', '—'));
+
   const typeLabels = {
     invoice: t('admin.reports.sales.document_types.invoice', 'Factura'),
     delivery_note: t('admin.reports.sales.document_types.delivery_note', 'Nota de entrega'),
@@ -96,9 +104,18 @@ export default function SalesReportIndex({ invoices, filters = {}, metrics, ware
         description={t('admin.reports.sales.hero_description', 'La vista reúne métricas, navegación entre reportes, filtros comerciales y exportaciones sin obligar al usuario a recorrer una pantalla plana.')}
         stats={[
           { label: t('admin.reports.sales.stats.invoices', 'Facturas'), value: metrics.total_invoices },
-          { label: `${t('admin.reports.sales.stats.total_usd', 'Total')} ${displayCurrency}`, value: formatActiveAmount(metrics.total_usd || 0) },
-          { label: secondaryCurrency ? `${t('admin.reports.sales.stats.total_bs', 'Total')} ${secondaryCurrency}` : t('admin.reports.sales.stats.total_bs', 'Referencia'), value: secondaryCurrency ? formatActiveAmount(metrics.total_usd || 0, secondaryCurrency) : '—' },
-          { label: `${t('admin.reports.sales.stats.avg_ticket', 'Ticket')} ${displayCurrency}`, value: formatActiveAmount(metrics.avg_ticket_usd || 0) },
+          ...statsCurrencyCodes.map((code) => ({
+            label: `${t('admin.reports.sales.stats.total_usd', 'Total')} ${code}`,
+            value: metricsByCurrency?.[code] !== undefined
+              ? formatServerAmount(code, metricsByCurrency[code])
+              : formatActiveAmount(metrics.total_usd || 0, code),
+          })),
+          {
+            label: `${t('admin.reports.sales.stats.avg_ticket', 'Ticket')} ${displayCurrency}`,
+            value: metrics.avg_ticket_admin_totals?.[displayCurrency] !== undefined
+              ? formatServerAmount(displayCurrency, metrics.avg_ticket_admin_totals[displayCurrency])
+              : formatActiveAmount(metrics.avg_ticket_usd || 0),
+          },
         ]}
         contextTitle={t('admin.reports.sales.context_title', 'Reporte de ventas')}
         contextDescription={t('admin.reports.sales.context_description', 'Cruza fechas, sucursal, cliente, vendedor y método de pago con acceso inmediato a exportaciones del resultado actual.')}
@@ -275,8 +292,9 @@ export default function SalesReportIndex({ invoices, filters = {}, metrics, ware
                 <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.sales.table.customer', 'Cliente')}</th>
                 <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.sales.table.branch', 'Sucursal')}</th>
                 <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.sales.table.status', 'Estado')}</th>
-                <th className="px-3 py-2 text-right font-semibold">{displayCurrency}</th>
-                <th className="px-3 py-2 text-right font-semibold">{secondaryCurrency || t('admin.reports.sales.table.reference', 'Ref.')}</th>
+                {statsCurrencyCodes.map((code) => (
+                  <th key={code} className="px-3 py-2 text-right font-semibold">{code}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -284,17 +302,22 @@ export default function SalesReportIndex({ invoices, filters = {}, metrics, ware
                 <tr key={inv.id} className="border-b border-border hover:bg-muted/40">
                   <td className="px-3 py-2 text-xs">{formatDateTime(inv.created_at)}</td>
                   <td className="px-3 py-2 text-xs">{inv.number}</td>
-                  <td className="px-3 py-2 text-xs">{typeLabels[inv.document_type] ?? inv.document_type}</td>
+                  <td className="px-3 py-2 text-xs">{translateDocumentType(inv.document_type)}</td>
                   <td className="px-3 py-2 text-xs">{inv.customer?.name ?? t('admin.reports.sales.table.na', 'N/A')}</td>
-                  <td className="px-3 py-2 text-xs">{inv.warehouse?.name ?? inv.warehouse?.code ?? '-'}</td>
-                  <td className="px-3 py-2 text-xs">{statusLabels[inv.status] ?? inv.status}</td>
-                  <td className="px-3 py-2 text-xs text-right">{formatActiveAmount(inv.total_usd)}</td>
-                  <td className="px-3 py-2 text-xs text-right">{secondaryCurrency ? formatActiveAmount(inv.total_usd, secondaryCurrency) : '—'}</td>
+                  <td className="px-3 py-2 text-xs">{inv.warehouse?.name ?? inv.warehouse?.code ?? t('admin.reports.sales.values.empty_dash', '—')}</td>
+                  <td className="px-3 py-2 text-xs">{translateStatus(inv.status)}</td>
+                  {statsCurrencyCodes.map((code) => (
+                    <td key={`${inv.id}-${code}`} className="px-3 py-2 text-xs text-right">
+                      {inv.admin_totals?.[code] !== undefined
+                        ? formatServerAmount(code, inv.admin_totals[code])
+                        : formatActiveAmount(inv.total_usd, code)}
+                    </td>
+                  ))}
                 </tr>
               ))}
               {invoices.data.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-3 py-6 text-center text-sm text-muted-foreground">
+                  <td colSpan={6 + statsCurrencyCodes.length} className="px-3 py-6 text-center text-sm text-muted-foreground">
                     {t('admin.reports.sales.empty', 'No hay facturas para los filtros seleccionados.')}
                   </td>
                 </tr>

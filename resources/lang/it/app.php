@@ -100,19 +100,8 @@ return [
                 'name' => 'Nome',
                 'email' => 'Email',
             ],
-            'verification' => [
-                'unverified' => 'Il tuo indirizzo email non è ancora verificato.',
-                'resend' => 'Clicca qui per inviare di nuovo l’email di verifica.',
-                'sent' => 'Un nuovo link di verifica è stato inviato al tuo indirizzo email.',
-            ],
-        ],
-        'password' => [
-            'title' => 'Aggiorna password',
-            'description' => 'Usa una password lunga e sicura per proteggere il tuo account.',
-            'fields' => [
-                'current_password' => 'Password attuale',
-                'new_password' => 'Nuova password',
-                'confirm_password' => 'Conferma password',
+            'notifications' => [
+                'updated' => 'Profilo aggiornato con successo.',
             ],
         ],
         'customer' => [
@@ -284,8 +273,11 @@ return [
         ],
         'notifications' => [
             'title' => 'Notifiche',
+            'generic_type' => 'Notifica',
             'alerts_count' => '{count} avviso|{count} avvisi',
             'no_alerts' => 'Nessun avviso',
+            'view_history' => 'Vedi cronologia',
+            'unread_count' => '{count} non letta|{count} non lette',
             'low_stock' => 'Scorte basse',
             'products_count' => '{count} prodotto|{count} prodotti',
             'expired_layaways' => 'Prenotazioni scadute',
@@ -293,7 +285,136 @@ return [
             'view_detail' => 'Vedi dettaglio',
             'manage_layaways' => 'Gestisci prenotazioni',
             'customer_fallback' => 'Cliente',
-            'empty' => 'Non ci sono avvisi al momento.',
+            'empty' => 'Al momento non ci sono notifiche in sospeso.',
+            'page_title' => 'Cronologia notifiche',
+            'history_title' => 'Cronologia delle notifiche operative',
+            'history_description' => 'Consulta gli avvisi in sospeso e letti, filtra per gravità o tipo e torna al dettaglio di ogni incidente senza dipendere dal menu della campanella.',
+            'stats' => [
+                'total' => 'Totale',
+                'unread' => 'Non lette',
+                'critical' => 'Critiche',
+                'warnings' => 'Avvisi',
+            ],
+            'context_title' => 'Centro avvisi',
+            'context_description' => 'Usa questa vista per gestire la tua coda personale di avvisi, rivedere le priorità e mantenere pulita la cronologia con azioni precise di lettura ed eliminazione.',
+            'context_items' => [
+                'active_filters' => 'Filtri attivi',
+                'page' => 'Pagina',
+                'scope' => 'Ambito',
+                'personal' => 'Solo le mie notifiche',
+            ],
+            'action_error' => 'Impossibile completare l’azione.',
+            'loading_mark_read' => 'Contrassegno della notifica come letta...',
+            'loading_delete_selected' => 'Eliminazione delle notifiche selezionate...',
+            'loading_delete_single' => 'Eliminazione della notifica...',
+            'loading_mark_selected' => 'Contrassegno delle notifiche selezionate...',
+            'loading_save_preferences' => 'Salvataggio delle preferenze di notifica...',
+            'loading_toggle_bell' => 'Aggiornamento del silenzio in campanella...',
+            'loading_toggle_history' => 'Aggiornamento della visibilità nella cronologia...',
+            'loading_mark_all' => 'Contrassegno di tutte le notifiche...',
+            'preferences_updated' => 'Preferenze di notifica aggiornate.',
+            'selected_marked_read' => 'Notifiche selezionate contrassegnate come lette.',
+            'selected_deleted' => 'Notifiche selezionate eliminate.',
+            'mark_all_read' => 'Segna tutte',
+            'selected_count' => ':count selezionate',
+            'mark_selected_read' => 'Segna selezionate',
+            'delete_selected' => 'Elimina selezionate',
+            'generated' => [
+                'low_stock' => [
+                    'title' => 'Prodotto con scorte basse: :product',
+                    'current_stock' => 'Scorte attuali: :stock',
+                    'min_stock' => 'Minimo: :min_stock',
+                    'sku' => 'SKU: :sku',
+                    'action' => 'Controlla inventario',
+                ],
+            ],
+            'filters' => [
+                'search' => 'Cerca',
+                'search_placeholder' => 'Titolo o messaggio',
+                'status' => 'Stato',
+                'severity' => 'Gravità',
+                'type' => 'Tipo',
+                'all_severities' => 'Tutte',
+                'all_types' => 'Tutti',
+                'statuses' => [
+                    'all' => 'Tutti',
+                    'unread' => 'Non lette',
+                    'read' => 'Lette',
+                ],
+            ],
+            'groups' => [
+                'danger' => 'Critiche',
+                'warning' => 'Attenzione',
+                'success' => 'Follow-up',
+                'info' => 'Informative',
+            ],
+            'quick_filters' => [
+                'visible' => 'Visibili nella cronologia',
+                'bell_muted' => 'Nascoste nella campanella',
+                'history_muted' => 'Nascoste nella cronologia',
+            ],
+            'visibility_notice' => [
+                'visible_title' => 'Cronologia visibile attiva',
+                'visible_description' => 'Stai vedendo solo le notifiche che restano visibili nella tua cronologia personale.',
+                'bell_muted_title' => 'Nascoste nella campanella',
+                'bell_muted_description' => 'Questa vista mostra i tipi silenziati nella campanella. Puoi riattivarli o mantenerli fuori dal menu senza eliminare la cronologia.',
+                'history_muted_title' => 'Nascoste nella cronologia',
+                'history_muted_description' => 'Stai controllando notifiche che la tua cronologia normalmente nasconde per preferenza. Da qui puoi riattivarle rapidamente.',
+                'count' => 'Corrispondenze attuali: :count',
+            ],
+            'clear_filters' => 'Pulisci filtri',
+            'apply_filters' => 'Applica filtri',
+            'preferences_title' => 'Preferenze personali',
+            'preferences_description' => 'Configura separatamente quali tipi nascondere nella campanella e quali rimuovere dalla cronologia senza perdere la persistenza dell’avviso.',
+            'muted_bell_count' => 'Campanella: :count',
+            'muted_history_count' => 'Cronologia: :count',
+            'preference_target' => 'Regolazione di questo tipo',
+            'preference_bell' => 'Nascondi nella campanella',
+            'preference_history' => 'Nascondi nella cronologia',
+            'unmute_all' => 'Riattiva entrambi i canali',
+            'save_preferences' => 'Salva preferenze',
+            'table' => [
+                'select_all' => 'Seleziona tutte',
+                'date' => 'Data',
+                'severity' => 'Gravità',
+                'type' => 'Tipo',
+                'title' => 'Titolo',
+                'message' => 'Messaggio',
+                'status' => 'Stato',
+                'actions' => 'Azioni',
+                'select_row' => 'Seleziona notifica',
+            ],
+            'mute_bell' => 'Nascondi nella campanella',
+            'unmute_bell' => 'Mostra nella campanella',
+            'mute_history' => 'Nascondi nella cronologia',
+            'unmute_history' => 'Mostra nella cronologia',
+            'mark_read' => 'Segna come letta',
+            'open' => 'Apri',
+            'delete' => 'Elimina',
+            'empty_history' => 'Non ci sono notifiche per i filtri selezionati.',
+            'confirm_delete_title' => 'Conferma eliminazione',
+            'confirm_delete_bulk' => 'Eliminare le notifiche selezionate? Questa azione non può essere annullata.',
+            'confirm_delete_single' => 'Eliminare questa notifica? Questa azione non può essere annullata.',
+            'cancel' => 'Annulla',
+            'preferences_link' => 'Preferenze',
+            'types' => [
+                'low_stock' => 'Scorte basse',
+                'expired_layaway' => 'Prenotazione scaduta',
+                'manual_checkout_payment_pending' => 'Pagamento manuale in sospeso',
+                'overdue_credit_charge' => 'Addebito di credito scaduto',
+                'stale_pending_invoice' => 'Fattura in sospeso stagnante',
+                'stale_rma' => 'RMA stagnante',
+                'invoice_created' => 'Fattura creata',
+                'invoice_status_changed' => 'Stato fattura aggiornato',
+                'layaway_created' => 'Prenotazione creata',
+                'layaway_status_changed' => 'Stato prenotazione aggiornato',
+                'rma_created' => 'RMA creato',
+                'rma_status_changed' => 'Stato RMA aggiornato',
+                'transfer_created' => 'Trasferimento creato',
+                'transfer_status_changed' => 'Stato trasferimento aggiornato',
+                'credit_account_created' => 'Conto di credito creato',
+                'credit_movement_created' => 'Movimento di credito creato',
+            ],
         ],
         'dashboard' => [
             'page_title' => 'Dashboard',
@@ -321,6 +442,9 @@ return [
                     'paid_invoices_count' => ':count fatture pagate',
                     'low_stock_products' => 'Prodotti con scorte basse',
                     'low_stock_help' => 'Include prodotti a zero o negativi.',
+                    'values' => [
+                        'empty_dash' => '—',
+                    ],
                 ],
             ],
             'summary' => [
@@ -389,6 +513,9 @@ return [
                         'product' => 'Prodotto',
                         'stock' => 'Scorte',
                         'min_stock' => 'Min.',
+                    ],
+                    'values' => [
+                        'empty_dash' => '—',
                     ],
                     'empty' => 'Non ci sono prodotti con scorte basse secondo la configurazione attuale.',
                 ],
@@ -478,7 +605,6 @@ return [
                     'rotation' => 'Rotazione prodotti',
                 ],
                 'filters' => [
-                    'all_female' => 'Tutte',
                     'warehouse' => 'Filiale/Magazzino',
                     'search_placeholder' => 'Nome, SKU o codice a barre',
                 ],
@@ -486,6 +612,9 @@ return [
                     'page_title' => 'Report inventario',
                     'hero_title' => 'Consulta la valorizzazione dell’inventario con una gerarchia visiva migliore',
                     'hero_description' => 'La vista integra metriche di stock, navigazione tra sotto-report, esportazioni e filtri senza ridursi a una tabella piatta.',
+                    'values' => [
+                        'empty_dash' => '—',
+                    ],
                     'stats' => [
                         'units' => 'Unità',
                         'cost_usd' => 'Costo USD',
@@ -538,6 +667,9 @@ return [
                     'filters' => [
                         'search_product' => 'Cerca prodotto',
                     ],
+                    'values' => [
+                        'empty_dash' => '—',
+                    ],
                     'table' => [
                         'branch' => 'Filiale',
                         'product' => 'Prodotto',
@@ -580,6 +712,9 @@ return [
                         'sku' => 'SKU',
                         'barcode' => 'Codice',
                         'current_stock' => 'Stock attuale',
+                    ],
+                    'values' => [
+                        'empty_dash' => '—',
                     ],
                     'table' => [
                         'date' => 'Data',
@@ -662,6 +797,9 @@ return [
                 'movement_statuses' => [
                     'pending' => 'In sospeso',
                     'paid' => 'Pagato',
+                ],
+                'values' => [
+                    'empty_dash' => '—',
                 ],
                 'states' => [
                     'not_available' => 'N/D',
@@ -801,6 +939,9 @@ return [
                 'page_title' => 'Report vendite',
                 'hero_title' => 'Analizza le vendite con un cruscotto più chiaro per consultazione ed esportazione',
                 'hero_description' => 'La vista riunisce metriche, navigazione tra report, filtri commerciali ed esportazioni senza costringere l’utente a scorrere una schermata piatta.',
+                'values' => [
+                    'empty_dash' => '—',
+                ],
                 'stats' => [
                     'invoices' => 'Fatture',
                     'total_usd' => 'Totale USD',
@@ -1280,6 +1421,24 @@ return [
                 'invoice_status' => 'Stato',
                 'without_invoice' => 'Nessuna fattura associata',
                 'customer' => 'CLIENTE',
+            'common' => [
+                'close' => 'Chiudi',
+                'table' => [
+                    'actions' => 'Azioni',
+                    'loading' => 'Caricamento...',
+                    'empty' => 'Nessun record',
+                    'view' => 'Vedi',
+                    'edit' => 'Modifica',
+                    'delete' => 'Elimina',
+                    'values' => [
+                        'empty_dash' => '—',
+                    ],
+                ],
+            ],
+            'filters' => [
+                'search_placeholder' => 'Cerca...',
+                'new' => 'Nuovo',
+            ],
                 'without_customer' => 'Nessun cliente associato',
                 'general_reason' => 'MOTIVO GENERALE',
                 'no_description' => 'Nessuna descrizione dettagliata.',
@@ -1715,6 +1874,7 @@ return [
                         'contact_name' => 'Nome del referente',
                         'contact_placeholder' => 'Es.: Carlos Martínez',
                         'phone' => 'Telefono',
+                        'phone_placeholder' => '+58 212-1234567',
                         'email' => 'Email',
                         'email_placeholder' => 'contatto@azienda.com',
                         'address' => 'Indirizzo',
@@ -1913,6 +2073,7 @@ return [
                 'bulk_import' => [
                     'title' => 'Importazione massiva di prodotti',
                     'description' => 'Carica un file Excel (.xlsx/.xls/.csv) con colonne:',
+                    'columns' => 'name, sku, price_usd, stock, description, image_url',
                     'description_suffix' => 'Se includi image_url, l’immagine verrà scaricata e assegnata come principale quando possibile.',
                     'file' => 'File',
                     'branch_optional' => 'Filiale (opzionale)',
@@ -1933,6 +2094,12 @@ return [
                     'notifications' => [
                         'movement_registered' => 'Movimento di inventario registrato con successo.',
                     ],
+                    'errors' => [
+                        'quantity_positive' => 'La quantità deve essere maggiore di 0.',
+                        'auth_required' => 'È richiesto un utente autenticato per registrare un movimento di inventario.',
+                        'reason_required' => 'Devi indicare un motivo per il movimento di inventario.',
+                        'insufficient_stock' => 'Non c’è stock sufficiente per questa uscita.',
+                    ],
                     'types' => [
                         'entry' => 'Entrata',
                         'exit' => 'Uscita',
@@ -1940,6 +2107,7 @@ return [
                     'cards' => [
                         'product' => [
                             'title' => 'Prodotto',
+                            'sku_label' => 'SKU',
                             'current_stock' => 'Stock attuale',
                             'reference_price' => 'Prezzo di riferimento',
                         ],
@@ -1975,6 +2143,12 @@ return [
                         'apply_filters' => 'Applica filtri',
                         'clear' => 'Pulisci',
                         'empty' => 'Non ci sono movimenti registrati per questo prodotto.',
+                        'sources' => [
+                            'purchase' => 'Acquisto',
+                            'sale' => 'Vendita',
+                            'adjustment' => 'Regolazione',
+                            'return' => 'Reso',
+                        ],
                         'table' => [
                             'date' => 'Data',
                             'type' => 'Tipo',
@@ -2619,6 +2793,7 @@ return [
                     ],
                     'tabs' => [
                         'manual' => [
+                            'label' => 'Bonifico bancario',
                             'title' => 'Manuale',
                             'eyebrow' => 'Bonifici',
                             'description' => 'Conti bancari e riferimenti manuali.',
@@ -2666,6 +2841,11 @@ return [
                         ],
                     ],
                     'manual' => [
+                        'enable' => 'Abilita il pagamento manuale al checkout',
+                        'defaults' => [
+                            'description' => 'Pagamento tramite bonifico o deposito con riferimento manuale.',
+                            'instructions' => 'Completa il bonifico e condividi i dati del pagamento durante il checkout.',
+                        ],
                         'experience' => [
                             'eyebrow' => 'Esperienza',
                             'title' => 'Bonifici chiari per il cliente',
@@ -2705,6 +2885,10 @@ return [
                         ],
                     ],
                     'paypal' => [
+                        'defaults' => [
+                            'description' => 'Abilita PayPal quando le credenziali sono pronte.',
+                            'instructions' => 'Configura Client ID e Secret per attivarlo.',
+                        ],
                         'enable' => 'Abilita PayPal al checkout',
                         'environment' => 'Ambiente',
                         'client_id' => 'Client ID',
@@ -2720,6 +2904,10 @@ return [
                         ],
                     ],
                     'stripe' => [
+                        'defaults' => [
+                            'description' => 'Accetta pagamenti con carta tramite Stripe.',
+                            'instructions' => 'Configura Publishable Key e Secret Key per attivare l’addebito con carta.',
+                        ],
                         'enable' => 'Abilita Stripe al checkout',
                         'environment' => 'Ambiente',
                         'publishable_key' => 'Publishable Key',

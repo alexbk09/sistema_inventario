@@ -5,9 +5,22 @@ import AdminTable from '@/Components/admin/provider/AdminTableProviders.jsx';
 import AdminFilters from '@/Components/common/AdminFilters.jsx';
 import AdminIndexShell from '@/Components/admin/AdminIndexShell.jsx';
 import { useI18n } from '@/Hooks/useI18n';
+import { useLocaleFormat } from '@/Hooks/useLocaleFormat';
+import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates';
 
-export default function Index({ customers, filters, identificationTypes = [] }) {
+export default function Index({ customers, filters, adminCurrencyContext = {}, identificationTypes = [] }) {
   const { t } = useI18n();
+  const { formatCurrency } = useLocaleFormat();
+  const { displayCurrency, comparisonCurrency, formatPriceFromUsd, hasRateForCurrency } = useConfiguredCurrencyRates();
+  const secondaryCurrency = comparisonCurrency && comparisonCurrency !== displayCurrency && hasRateForCurrency(comparisonCurrency)
+    ? comparisonCurrency
+    : null;
+  const visibleCurrencyCodes = Array.isArray(adminCurrencyContext?.codes) && adminCurrencyContext.codes.length > 0
+    ? adminCurrencyContext.codes
+    : [displayCurrency, ...(secondaryCurrency ? [secondaryCurrency] : [])].filter(Boolean);
+  const currencyColumns = [...new Set(visibleCurrencyCodes)];
+  const formatActiveAmount = (value, currency = displayCurrency) => formatPriceFromUsd(Number(value || 0), currency);
+  const formatServerAmount = (code, value) => formatCurrency(Number(value || 0), code);
   const { data } = customers;
   const page = customers.current_page ?? customers?.meta?.current_page ?? 1;
   const totalPages = customers.last_page ?? customers?.meta?.last_page ?? 1;
@@ -103,6 +116,14 @@ export default function Index({ customers, filters, identificationTypes = [] }) 
       label: t('admin.customers.index.table.purchases', 'Compras'),
       width: '10%',
     },
+    ...currencyColumns.map((code) => ({
+      key: `spent_${code}`,
+      label: `${t('admin.customers.index.table.total_spent', 'Gastado')} ${code}`,
+      width: '14%',
+      render: (value, row) => row?.admin_total_spent?.[code] !== undefined
+        ? formatServerAmount(code, row.admin_total_spent[code])
+        : formatActiveAmount(row?.invoices_total_usd ?? 0, code),
+    })),
   ];
 
   return (

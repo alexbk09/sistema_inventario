@@ -4,14 +4,19 @@ import { useI18n } from '@/Hooks/useI18n';
 import { useLocaleFormat } from '@/Hooks/useLocaleFormat';
 import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates';
 
-export default function Show({ layaway, rateBs }) {
+export default function Show({ layaway, adminCurrencyContext = {} }) {
   const { t } = useI18n();
-  const { formatDate, formatNumber } = useLocaleFormat();
+  const { formatDate, formatCurrency } = useLocaleFormat();
   const { displayCurrency, comparisonCurrency, formatPriceFromUsd, hasRateForCurrency } = useConfiguredCurrencyRates();
   const secondaryCurrency = comparisonCurrency && comparisonCurrency !== displayCurrency && hasRateForCurrency(comparisonCurrency)
     ? comparisonCurrency
     : null;
+  const visibleCurrencyCodes = Array.isArray(adminCurrencyContext?.codes) && adminCurrencyContext.codes.length > 0
+    ? adminCurrencyContext.codes
+    : [displayCurrency, ...(secondaryCurrency ? [secondaryCurrency] : [])].filter(Boolean);
+  const currencyColumns = [...new Set(visibleCurrencyCodes)];
   const formatActiveAmount = (value, currency = displayCurrency) => formatPriceFromUsd(Number(value || 0), currency);
+  const formatServerAmount = (code, value) => formatCurrency(Number(value || 0), code);
   const { data, setData, put, processing } = useForm({
     status: layaway.status,
   });
@@ -89,7 +94,9 @@ export default function Show({ layaway, rateBs }) {
                       <th className="px-3 py-2 text-left">{t('admin.layaways.show.table.product', 'Producto')}</th>
                       <th className="px-3 py-2 text-center w-24">{t('admin.layaways.show.table.quantity', 'Cantidad')}</th>
                       <th className="px-3 py-2 text-right w-24">{`${t('admin.layaways.show.table.price_usd', 'Precio')} ${displayCurrency}`}</th>
-                      <th className="px-3 py-2 text-right w-28">{`${t('admin.layaways.show.table.subtotal', 'Subtotal')} ${displayCurrency}`}</th>
+                      {currencyColumns.map((code) => (
+                        <th key={code} className="px-3 py-2 text-right w-28">{`${t('admin.layaways.show.table.subtotal', 'Subtotal')} ${code}`}</th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
@@ -97,8 +104,14 @@ export default function Show({ layaway, rateBs }) {
                       <tr key={item.id} className="border-t border-border">
                         <td className="px-3 py-2 text-foreground">{item.product?.name ?? t('admin.layaways.values.product_fallback', 'Producto')}</td>
                         <td className="px-3 py-2 text-center text-foreground">{item.quantity}</td>
-                        <td className="px-3 py-2 text-right text-foreground">{formatActiveAmount(item.unit_price_usd ?? 0)}</td>
-                        <td className="px-3 py-2 text-right text-foreground">{formatActiveAmount(item.subtotal_usd ?? 0)}</td>
+                        <td className="px-3 py-2 text-right text-foreground">{item.unit_price_admin_totals?.[displayCurrency] !== undefined ? formatServerAmount(displayCurrency, item.unit_price_admin_totals[displayCurrency]) : formatActiveAmount(item.unit_price_usd ?? 0)}</td>
+                        {currencyColumns.map((code) => (
+                          <td key={`${item.id}-${code}`} className="px-3 py-2 text-right text-foreground">
+                            {item.document_totals?.[code] !== undefined
+                              ? formatServerAmount(code, item.document_totals[code])
+                              : formatActiveAmount(item.subtotal_usd ?? 0, code)}
+                          </td>
+                        ))}
                       </tr>
                     ))}
                   </tbody>
@@ -110,18 +123,26 @@ export default function Show({ layaway, rateBs }) {
           <div>
             <div className="bg-card border border-border rounded-lg p-6 space-y-3">
               <h2 className="text-lg font-bold text-foreground mb-2">{t('admin.layaways.show.summary', 'Resumen')}</h2>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{`${t('admin.layaways.show.total_usd', 'Total')}: ${displayCurrency}`}</span>
-                <span className="font-semibold text-foreground">{formatActiveAmount(layaway.total_usd ?? 0)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{secondaryCurrency ? `${t('admin.layaways.show.total_bs', 'Referencia')}: ${secondaryCurrency}` : t('admin.layaways.show.total_bs', 'Referencia')}</span>
-                <span className="font-semibold text-foreground">{secondaryCurrency ? formatActiveAmount(layaway.total_usd ?? 0, secondaryCurrency) : '—'}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{`${t('admin.layaways.show.paid_usd', 'Pagado')}: ${displayCurrency}`}</span>
-                <span className="font-semibold text-foreground">{formatActiveAmount(layaway.paid_usd ?? 0)}</span>
-              </div>
+              {currencyColumns.map((code) => (
+                <div key={`total-${code}`} className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">{`${t('admin.layaways.show.total_usd', 'Total')}: ${code}`}</span>
+                  <span className="font-semibold text-foreground">
+                    {layaway.document_totals?.[code] !== undefined
+                      ? formatServerAmount(code, layaway.document_totals[code])
+                      : formatActiveAmount(layaway.total_usd ?? 0, code)}
+                  </span>
+                </div>
+              ))}
+              {currencyColumns.map((code) => (
+                <div key={`paid-${code}`} className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">{`${t('admin.layaways.show.paid_usd', 'Pagado')}: ${code}`}</span>
+                  <span className="font-semibold text-foreground">
+                    {layaway.paid_admin_totals?.[code] !== undefined
+                      ? formatServerAmount(code, layaway.paid_admin_totals[code])
+                      : formatActiveAmount(layaway.paid_usd ?? 0, code)}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         </div>

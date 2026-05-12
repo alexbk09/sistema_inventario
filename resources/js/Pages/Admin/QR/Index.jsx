@@ -6,6 +6,7 @@ import { useI18n } from '@/Hooks/useI18n';
 export default function Index({ invoices = [], products = [], qr = {} }) {
   const { t } = useI18n();
   const hasWhatsAppUrl = Boolean(qr.whatsapp_contact_url);
+  const translateInvoiceStatus = (status) => t(`admin.invoices.statuses.${status}`, status ?? t('admin.qr.values.empty', '-'));
 
   return (
     <AuthenticatedLayout>
@@ -69,7 +70,7 @@ export default function Index({ invoices = [], products = [], qr = {} }) {
                   {invoices.map((invoice) => (
                     <tr key={invoice.id} className="border-b border-border/60 last:border-0">
                       <td className="py-2 pr-4 font-medium">{invoice.number}</td>
-                      <td className="py-2 pr-4 text-muted-foreground capitalize">{invoice.status}</td>
+                      <td className="py-2 pr-4 text-muted-foreground capitalize">{translateInvoiceStatus(invoice.status)}</td>
                       <td className="py-2 pr-4">
                         <a
                           href={route('qr.invoice', invoice.id)}

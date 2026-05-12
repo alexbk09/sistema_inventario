@@ -33,11 +33,24 @@ export default function InvoiceModal({
 }) {
   const { t } = useI18n()
   const { formatDate, formatDateTime, formatNumber } = useLocaleFormat()
-  const { displayCurrency, comparisonCurrency, formatPriceFromUsd, hasRateForCurrency } = useConfiguredCurrencyRates()
+  const { displayCurrency, comparisonCurrency, formatPriceFromUsd, hasRateForCurrency, availableCurrencies, baseCurrency, ratesByCode } = useConfiguredCurrencyRates()
   const secondaryCurrency = comparisonCurrency && comparisonCurrency !== displayCurrency && hasRateForCurrency(comparisonCurrency)
     ? comparisonCurrency
     : null
   const formatDisplayCurrency = (value, currency = displayCurrency) => formatPriceFromUsd(Number(value || 0), currency)
+  const toBaseAmount = (value, currency = displayCurrency) => {
+    const numericValue = Number(value || 0)
+    if (currency === baseCurrency) {
+      return numericValue
+    }
+
+    const rate = Number(ratesByCode?.[currency] ?? 0)
+    if (!rate) {
+      return numericValue
+    }
+
+    return numericValue / rate
+  }
 
   if (!isOpen || !invoice) return null
 
@@ -60,6 +73,7 @@ export default function InvoiceModal({
       quantity: item.quantity,
       price: item.price_usd,
       total: item.subtotal_usd,
+      document_totals: item.monetary_breakdown_json?.totals ?? null,
     }))
   ))
   const [saving, setSaving] = useState(false)
@@ -67,8 +81,9 @@ export default function InvoiceModal({
     (invoice.payments || []).map((p) => ({
       id: p.id,
       method: p.method,
-      amount_usd: p.amount_usd,
+      amount_usd: p.amount_original ?? p.amount_usd,
       amount_bs: p.amount_bs,
+      currency_code: p.payment_currency_code ?? 'USD',
       reference: p.reference ?? '',
       bank: p.bank ?? '',
       notes: p.notes ?? '',
@@ -79,7 +94,8 @@ export default function InvoiceModal({
       (invoice.adjustments || []).map((a) => ({
         id: a.id,
         type: a.type,
-        amount_usd: a.amount_usd,
+        amount_usd: a.amount_original ?? a.amount_usd,
+        currency_code: a.currency_code ?? 'USD',
         description: a.description ?? '',
       }))
     ))
@@ -92,12 +108,14 @@ export default function InvoiceModal({
       quantity: item.quantity,
       price: item.price_usd,
       total: item.subtotal_usd,
+      document_totals: item.monetary_breakdown_json?.totals ?? null,
     })))
     setPayments((invoice.payments || []).map((p) => ({
       id: p.id,
       method: p.method,
-      amount_usd: p.amount_usd,
+      amount_usd: p.amount_original ?? p.amount_usd,
       amount_bs: p.amount_bs,
+      currency_code: p.payment_currency_code ?? 'USD',
       reference: p.reference ?? '',
       bank: p.bank ?? '',
       notes: p.notes ?? '',
@@ -108,7 +126,8 @@ export default function InvoiceModal({
       setAdjustments((invoice.adjustments || []).map((a) => ({
         id: a.id,
         type: a.type,
-        amount_usd: a.amount_usd,
+        amount_usd: a.amount_original ?? a.amount_usd,
+        currency_code: a.currency_code ?? 'USD',
         description: a.description ?? '',
       })))
   }, [invoice, t])
@@ -128,10 +147,64 @@ export default function InvoiceModal({
   const [publicNotes, setPublicNotes] = useState(invoice.public_notes || '')
 
   const itemsSubtotal = items.reduce((sum, it) => sum + (it.total || 0), 0)
-  const paymentsTotalUsd = payments.reduce((sum, p) => sum + (Number(p.amount_usd) || 0), 0)
-  const shippingCost = 200.0
-  const total = typeof invoice.total_usd === 'number' ? invoice.total_usd : itemsSubtotal + shippingCost
-  const tax = total - itemsSubtotal - shippingCost
+  const paymentsTotalUsd = payments.reduce((sum, p) => sum + toBaseAmount(p.amount_usd, p.currency_code || displayCurrency), 0)
+  const invoiceDocumentTotals = invoice.document_totals ?? invoice.monetary_totals_json?.totals ?? null
+  const hasDocumentSummary = Boolean(
+    invoiceDocumentTotals
+    && items.every((item) => item.document_totals && typeof item.document_totals === 'object')
+  )
+  const itemsDocumentSubtotalByCurrency = items.reduce((carry, item) => {
+    if (!item.document_totals || typeof item.document_totals !== 'object') {
+      return carry
+    }
+
+    Object.entries(item.document_totals).forEach(([currency, amount]) => {
+      carry[currency] = (carry[currency] ?? 0) + Number(amount || 0)
+    })
+
+    return carry
+  }, {})
+  const total = typeof invoice.total_usd === 'number' ? invoice.total_usd : itemsSubtotal
+  const tax = Math.max(0, total - itemsSubtotal)
+  const getSummaryAmount = (type, currency = displayCurrency) => {
+    if (hasDocumentSummary) {
+      if (type === 'subtotal') {
+        return formatDisplayCurrency(itemsDocumentSubtotalByCurrency[currency] ?? 0, currency)
+      }
+
+      if (type === 'shipping') {
+        return formatDisplayCurrency(0, currency)
+      }
+
+      if (type === 'tax') {
+        const totalAmount = Number(invoiceDocumentTotals?.[currency] ?? 0)
+        const subtotalAmount = Number(itemsDocumentSubtotalByCurrency[currency] ?? 0)
+
+        return formatDisplayCurrency(Math.max(0, totalAmount - subtotalAmount), currency)
+      }
+
+      if (type === 'total') {
+        return formatDisplayCurrency(invoiceDocumentTotals?.[currency] ?? 0, currency)
+      }
+    }
+
+    if (type === 'subtotal') {
+      return formatDisplayCurrency(itemsSubtotal, currency)
+    }
+
+    if (type === 'shipping') {
+      return formatDisplayCurrency(0, currency)
+    }
+
+    if (type === 'tax') {
+      return formatDisplayCurrency(tax, currency)
+    }
+
+    return formatDisplayCurrency(total, currency)
+  }
+  const getDocumentAmount = (totals, fallback, currency = displayCurrency) => totals?.[currency] !== undefined
+    ? formatDisplayCurrency(totals[currency], currency)
+    : formatDisplayCurrency(fallback, currency)
 
   const whatsappUrl = (() => {
     const phone = contact.phone || '';
@@ -269,7 +342,7 @@ export default function InvoiceModal({
                   type="button"
                   onClick={() => setAdjustments((prev) => ([
                     ...prev,
-                    { type: 'credit', amount_usd: '', description: '' },
+                    { type: 'credit', amount_usd: '', currency_code: displayCurrency, description: '' },
                   ]))}
                   className="px-3 py-1.5 text-xs rounded bg-blue-600 text-white hover:bg-blue-700"
                 >
@@ -299,11 +372,24 @@ export default function InvoiceModal({
                       <option value="credit">{t('admin.invoices.modal.adjustment_types.credit', 'Nota de crédito')}</option>
                       <option value="debit">{t('admin.invoices.modal.adjustment_types.debit', 'Nota de débito')}</option>
                     </select>
+                    <select
+                      className="md:col-span-1 border border-border rounded px-2 py-1 bg-background"
+                      value={a.currency_code || 'USD'}
+                      disabled={!isEditable}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        setAdjustments((prev) => prev.map((adj, i) => i === idx ? { ...adj, currency_code: value } : adj))
+                      }}
+                    >
+                      {availableCurrencies.map((currency) => (
+                        <option key={currency} value={currency}>{currency}</option>
+                      ))}
+                    </select>
                     <input
                       type="number"
                       min="0"
                       step="0.01"
-                      placeholder={`${t('admin.invoices.modal.amount_usd', 'Monto')} ${displayCurrency}`}
+                      placeholder={`${t('admin.invoices.modal.amount_usd', 'Monto')} ${a.currency_code || displayCurrency}`}
                       className="md:col-span-1 border border-border rounded px-2 py-1 bg-background"
                       disabled={!isEditable}
                       value={a.amount_usd}
@@ -315,7 +401,7 @@ export default function InvoiceModal({
                     <input
                       type="text"
                       placeholder={t('admin.invoices.modal.description', 'Descripción')}
-                      className="md:col-span-2 border border-border rounded px-2 py-1 bg-background"
+                      className="md:col-span-1 border border-border rounded px-2 py-1 bg-background"
                       disabled={!isEditable}
                       value={a.description}
                       onChange={(e) => {
@@ -349,7 +435,7 @@ export default function InvoiceModal({
             {isEditable && (
               <button
                 type="button"
-                onClick={() => setPayments((prev) => [...prev, { method: 'efectivo', amount_usd: '', amount_bs: '', reference: '', bank: '', notes: '' }])}
+                onClick={() => setPayments((prev) => [...prev, { method: 'efectivo', amount_usd: '', amount_bs: '', currency_code: displayCurrency, reference: '', bank: '', notes: '' }])}
                 className="px-3 py-1.5 text-xs rounded bg-orange-600 text-white hover:bg-orange-700"
               >
                 {t('admin.invoices.modal.add_payment', 'Añadir pago')}
@@ -378,11 +464,24 @@ export default function InvoiceModal({
                     <option value="zelle">{t('admin.invoices.create.payment_methods.zelle', 'Zelle')}</option>
                     <option value="otro">{t('admin.invoices.create.payment_methods.other', 'Otro')}</option>
                   </select>
+                  <select
+                    className="md:col-span-1 border border-border rounded px-2 py-1 bg-background"
+                    value={p.currency_code || 'USD'}
+                    disabled={!isEditable}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      setPayments((prev) => prev.map((pay, i) => i === idx ? { ...pay, currency_code: value } : pay))
+                    }}
+                  >
+                    {availableCurrencies.map((currency) => (
+                      <option key={currency} value={currency}>{currency}</option>
+                    ))}
+                  </select>
                   <input
                     type="number"
                     min="0"
                     step="0.01"
-                    placeholder={`${t('admin.invoices.modal.amount_usd', 'Monto')} ${displayCurrency}`}
+                    placeholder={`${t('admin.invoices.modal.amount_usd', 'Monto')} ${p.currency_code || displayCurrency}`}
                     className="md:col-span-1 border border-border rounded px-2 py-1 bg-background"
                     disabled={!isEditable}
                     value={p.amount_usd}
@@ -546,7 +645,7 @@ export default function InvoiceModal({
                             const value = Math.max(1, Number(e.target.value) || 1)
                             setItems((prev) => prev.map((it) => (
                               it.id === item.id
-                                ? { ...it, quantity: value, total: value * it.price }
+                                ? { ...it, quantity: value, total: value * it.price, document_totals: null }
                                 : it
                             )))
                           }}
@@ -558,7 +657,7 @@ export default function InvoiceModal({
                     </td>
                     <td className="px-4 py-3 text-sm text-foreground text-right">{formatDisplayCurrency(item.price)}</td>
                     <td className="px-4 py-3 text-sm font-semibold text-foreground text-right">
-                      {formatDisplayCurrency(item.total)}
+                      {getDocumentAmount(item.document_totals, item.total)}
                     </td>
                   </tr>
                 ))}
@@ -573,23 +672,23 @@ export default function InvoiceModal({
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">{t('admin.invoices.modal.totals.subtotal', 'Subtotal:')}</span>
-              <span>{formatDisplayCurrency(itemsSubtotal)}</span>
+              <span>{getSummaryAmount('subtotal')}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">{t('admin.invoices.modal.totals.shipping', 'Envío:')}</span>
-              <span>{formatDisplayCurrency(shippingCost)}</span>
+              <span>{getSummaryAmount('shipping')}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">{t('admin.invoices.modal.totals.taxes', 'Impuestos (15%):')}</span>
-              <span>{formatDisplayCurrency(tax)}</span>
+              <span>{getSummaryAmount('tax')}</span>
             </div>
             <div className="border-t border-border pt-2 flex justify-between font-bold text-foreground">
               <span>{`${t('admin.invoices.modal.totals.total_usd', 'Total')}: ${displayCurrency}`}</span>
-              <span className="text-primary">{formatDisplayCurrency(total)}</span>
+              <span className="text-primary">{getSummaryAmount('total')}</span>
             </div>
             <div className="bg-accent/10 border border-accent rounded p-2 flex justify-between font-bold text-accent mt-2">
               <span>{comparisonCurrency ? `${t('admin.invoices.modal.totals.total_bs', 'Referencia')}: ${comparisonCurrency}` : t('admin.invoices.modal.totals.total_bs', 'Referencia')}</span>
-              <span>{comparisonCurrency ? formatDisplayCurrency(total, comparisonCurrency) : '—'}</span>
+              <span>{comparisonCurrency ? getSummaryAmount('total', comparisonCurrency) : t('admin.common.table.values.empty_dash', '—')}</span>
             </div>
           </div>
         </div>
@@ -610,6 +709,7 @@ export default function InvoiceModal({
                   payments: payments.map((p) => ({
                     method: p.method,
                     amount_usd: Number(p.amount_usd) || 0,
+                    currency_code: p.currency_code || 'USD',
                     amount_bs: Number(p.amount_bs) || 0,
                     reference: p.reference || null,
                     bank: p.bank || null,
@@ -618,6 +718,7 @@ export default function InvoiceModal({
                   adjustments: adjustments.map((a) => ({
                     type: a.type,
                     amount_usd: Number(a.amount_usd) || 0,
+                    currency_code: a.currency_code || 'USD',
                     description: a.description || null,
                   })),
                 }

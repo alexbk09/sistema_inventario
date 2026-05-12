@@ -65,7 +65,7 @@ export default function ProductModal({ isOpen, onClose, onSave, editingProduct }
       <div className="relative w-full max-w-lg mx-4 bg-card border border-border rounded-xl shadow-lg">
         <div className="px-5 py-4 border-b border-border flex items-center justify-between">
           <h2 className="text-lg font-semibold text-foreground">{editingProduct ? t('admin.products.modal.edit_title', 'Editar producto') : t('admin.products.modal.create_title', 'Nuevo producto')}</h2>
-          <button onClick={onClose} className="px-2 py-1 text-muted-foreground hover:text-foreground">×</button>
+          <button aria-label={t('admin.common.close', 'Cerrar')} onClick={onClose} className="px-2 py-1 text-muted-foreground hover:text-foreground">×</button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4 px-5 py-4">
           <div>

@@ -6,12 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\InventoryMovement;
 use App\Models\Product;
 use App\Models\Warehouse;
+use App\Services\AdminMoneyService;
+use App\Support\Settings;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class InventoryByWarehouseController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, AdminMoneyService $adminMoneyService)
     {
         $filters = [
             'warehouse_id' => $request->input('warehouse_id'),
@@ -34,12 +36,30 @@ class InventoryByWarehouseController extends Controller
             })
             ->groupBy('product_id', 'warehouse_id');
 
+        $currencySettings = Settings::get('currency', []);
+        $adminCurrencyContext = $adminMoneyService->getAdminCurrencyContext($currencySettings);
+
         $rows = $query
             ->with(['product:id,name,sku,barcode,average_cost_usd,price_usd', 'warehouse:id,name,code'])
             ->orderBy('warehouses.name')
             ->orderBy('products.name')
             ->paginate(50)
             ->withQueryString();
+
+        $rows->getCollection()->transform(function ($row) use ($adminMoneyService, $currencySettings) {
+            $units = (int) ($row->stock_units ?? 0);
+            $averageCostUsd = (float) ($row->product->average_cost_usd ?? 0);
+            $priceUsd = (float) ($row->product->price_usd ?? 0);
+            $valueCostUsd = $units * $averageCostUsd;
+            $valuePriceUsd = $units * $priceUsd;
+
+            $row->average_cost_admin_totals = $adminMoneyService->buildAdminTotals($averageCostUsd, $currencySettings)['totals'];
+            $row->price_admin_totals = $adminMoneyService->buildAdminTotals($priceUsd, $currencySettings)['totals'];
+            $row->value_cost_admin_totals = $adminMoneyService->buildAdminTotals($valueCostUsd, $currencySettings)['totals'];
+            $row->value_price_admin_totals = $adminMoneyService->buildAdminTotals($valuePriceUsd, $currencySettings)['totals'];
+
+            return $row;
+        });
 
         $warehouses = Warehouse::orderBy('name')->get(['id', 'name', 'code']);
 
@@ -62,7 +82,12 @@ class InventoryByWarehouseController extends Controller
             'rows' => $rows,
             'filters' => $filters,
             'warehouses' => $warehouses,
-            'valuation' => $valuation,
+            'valuation' => [
+                ...$valuation,
+                'total_cost_admin_totals' => $adminMoneyService->buildAdminTotals((float) ($valuation['total_cost_usd'] ?? 0), $currencySettings)['totals'],
+                'total_price_admin_totals' => $adminMoneyService->buildAdminTotals((float) ($valuation['total_price_usd'] ?? 0), $currencySettings)['totals'],
+            ],
+            'adminCurrencyContext' => $adminCurrencyContext,
         ]);
     }
 }

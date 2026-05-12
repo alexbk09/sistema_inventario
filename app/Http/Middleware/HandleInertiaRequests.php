@@ -41,6 +41,7 @@ class HandleInertiaRequests extends Middleware
         $locale = app()->getLocale();
         $supportedLocales = config('locales.supported', []);
         $currentLocaleConfig = $supportedLocales[$locale] ?? $supportedLocales[config('app.fallback_locale')] ?? null;
+        $appTranslations = $this->normalizeAppTranslations(Lang::get('app'));
 
         $notifications = [
             'unread_count' => 0,
@@ -79,7 +80,7 @@ class HandleInertiaRequests extends Middleware
             'localeConfig' => $currentLocaleConfig,
             'supportedLocales' => array_values($supportedLocales),
             'translations' => [
-                'app' => Lang::get('app'),
+                'app' => $appTranslations,
             ],
             'auth' => [
                 'user' => $user ? [
@@ -117,5 +118,45 @@ class HandleInertiaRequests extends Middleware
 
         return in_array($user->type, ['admin', 'supervisor', 'cashier', 'warehouse'], true)
             || $roles->intersect(['admin', 'supervisor', 'cashier', 'warehouse'])->isNotEmpty();
+    }
+
+    private function normalizeAppTranslations(array $translations): array
+    {
+        $adminModuleFallbacks = [
+            'rmas' => ['admin.invoices.rmas'],
+            'transfers' => ['admin.invoices.transfers', 'admin.transfers', 'auth.admin.transfers'],
+            'layaways' => ['admin.invoices.transfers.layaways', 'admin.transfers.layaways', 'auth.admin.transfers.layaways'],
+            'providers' => ['admin.invoices.transfers.providers', 'admin.transfers.providers', 'auth.admin.transfers.providers'],
+            'customers' => ['admin.invoices.transfers.customers', 'admin.transfers.customers', 'auth.admin.transfers.customers'],
+            'products' => ['admin.invoices.transfers.products', 'admin.transfers.products', 'auth.admin.transfers.products'],
+            'users' => ['admin.invoices.transfers.users', 'admin.transfers.users', 'auth.admin.transfers.users'],
+            'security' => ['admin.invoices.transfers.security', 'admin.transfers.security', 'auth.admin.transfers.security'],
+            'categories' => ['admin.invoices.transfers.categories', 'admin.transfers.categories', 'auth.admin.transfers.categories'],
+            'qr' => ['admin.invoices.transfers.qr', 'admin.transfers.qr', 'auth.admin.transfers.qr'],
+            'qr_scanner' => ['admin.invoices.transfers.qr_scanner', 'admin.transfers.qr_scanner', 'auth.admin.transfers.qr_scanner'],
+            'warehouses' => ['admin.invoices.transfers.warehouses', 'admin.transfers.warehouses', 'auth.admin.transfers.warehouses'],
+            'credits' => ['admin.invoices.transfers.credits', 'admin.transfers.credits', 'auth.admin.transfers.credits'],
+            'settings' => ['admin.invoices.transfers.settings', 'admin.transfers.settings', 'auth.admin.transfers.settings'],
+        ];
+
+        foreach ($adminModuleFallbacks as $targetKey => $fallbackPaths) {
+            $targetPath = "admin.{$targetKey}";
+
+            if (data_get($translations, $targetPath) !== null) {
+                continue;
+            }
+
+            foreach ((array) $fallbackPaths as $fallbackPath) {
+                $fallbackValue = data_get($translations, $fallbackPath);
+
+                if ($fallbackValue !== null) {
+                    data_set($translations, $targetPath, $fallbackValue);
+
+                    break;
+                }
+            }
+        }
+
+        return $translations;
     }
 }

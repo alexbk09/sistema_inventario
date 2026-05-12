@@ -9,14 +9,19 @@ import { useI18n } from '@/Hooks/useI18n';
 import { useLocaleFormat } from '@/Hooks/useLocaleFormat';
 import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates';
 
-export default function Index({ invoices, filters }) {
+export default function Index({ invoices, filters, adminCurrencyContext = {} }) {
   const { t } = useI18n();
-  const { formatNumber } = useLocaleFormat();
+  const { formatCurrency, formatNumber } = useLocaleFormat();
   const { displayCurrency, comparisonCurrency, formatPriceFromUsd, hasRateForCurrency } = useConfiguredCurrencyRates();
   const secondaryCurrency = comparisonCurrency && comparisonCurrency !== displayCurrency && hasRateForCurrency(comparisonCurrency)
     ? comparisonCurrency
     : null;
   const formatActiveAmount = (value, currency = displayCurrency) => formatPriceFromUsd(Number(value || 0), currency);
+  const visibleCurrencyCodes = Array.isArray(adminCurrencyContext?.codes) && adminCurrencyContext.codes.length > 0
+    ? adminCurrencyContext.codes
+    : [displayCurrency, ...(secondaryCurrency ? [secondaryCurrency] : [])].filter(Boolean);
+  const currencyColumns = [...new Set(visibleCurrencyCodes)];
+  const formatServerAmount = (code, value) => formatCurrency(Number(value || 0), code);
   const { data } = invoices;
   const page = invoices.current_page ?? invoices?.meta?.current_page ?? 1;
   const totalPages = invoices.last_page ?? invoices?.meta?.last_page ?? 1;
@@ -74,8 +79,14 @@ export default function Index({ invoices, filters }) {
         );
       },
     },
-    { key: 'total_usd', label: displayCurrency, width: '15%', render: (v) => formatActiveAmount(v) },
-    { key: 'total_bs', label: secondaryCurrency || t('admin.invoices.index.table.total_bs', 'Referencia'), width: '15%', render: (v, row) => secondaryCurrency ? formatActiveAmount(row?.total_usd ?? 0, secondaryCurrency) : '—' },
+    ...currencyColumns.map((code) => ({
+      key: `total_${code}`,
+      label: code,
+      width: '15%',
+      render: (v, row) => row?.document_totals?.[code] !== undefined
+        ? formatServerAmount(code, row.document_totals[code])
+        : formatActiveAmount(row?.total_usd ?? 0, code),
+    })),
   ];
 
   const handleViewInvoice = (invoice) => {

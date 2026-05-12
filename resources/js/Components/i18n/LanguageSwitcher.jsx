@@ -43,7 +43,10 @@ export default function LanguageSwitcher({ className = '', align = 'right', mobi
     setOpen(false)
     post(route('locale.switch', nextLocale), {
       preserveScroll: true,
-      preserveState: true,
+      preserveState: false,
+      onSuccess: () => {
+        window.location.assign(page.url || window.location.href)
+      },
     })
   }
 

@@ -30,7 +30,9 @@ export default function BulkImportModal({ isOpen, onClose, warehouses = [] }) {
     <Modal show={isOpen} onClose={onClose} maxWidth="lg">
       <div className="p-6 space-y-4">
         <h3 className="text-xl font-bold">{t('admin.products.bulk_import.title', 'Importación masiva de productos')}</h3>
-        <p className="text-sm text-muted-foreground">{t('admin.products.bulk_import.description', 'Sube un archivo Excel (.xlsx/.xls/.csv) con columnas:')} <strong>name, sku, price_usd, stock, description, image_url</strong>. {t('admin.products.bulk_import.description_suffix', 'Si incluyes image_url se intentará descargar la imagen y asignarla como primaria.')}</p>
+        <p className="text-sm text-muted-foreground">
+          {t('admin.products.bulk_import.description', 'Sube un archivo Excel (.xlsx/.xls/.csv) con columnas:')} <strong>{t('admin.products.bulk_import.columns', 'name, sku, price_usd, stock, description, image_url')}</strong>. {t('admin.products.bulk_import.description_suffix', 'Si incluyes image_url se intentará descargar la imagen y asignarla como primaria.')}
+        </p>
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">{t('admin.products.bulk_import.file', 'Archivo')}</label>

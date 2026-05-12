@@ -7,11 +7,15 @@ import { useI18n } from '@/Hooks/useI18n';
 import { useLocaleFormat } from '@/Hooks/useLocaleFormat';
 import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates';
 
-export default function InventoryByWarehouse({ rows, filters = {}, warehouses = [], valuation }) {
+export default function InventoryByWarehouse({ rows, filters = {}, warehouses = [], valuation, adminCurrencyContext = {} }) {
   const { t } = useI18n();
-  const { formatNumber } = useLocaleFormat();
+  const { formatNumber, formatCurrency } = useLocaleFormat();
   const { displayCurrency, formatPriceFromUsd } = useConfiguredCurrencyRates();
   const formatActiveAmount = (value) => formatPriceFromUsd(Number(value || 0), displayCurrency);
+  const visibleCurrencyCodes = Array.isArray(adminCurrencyContext?.codes) && adminCurrencyContext.codes.length > 0
+    ? adminCurrencyContext.codes
+    : [displayCurrency];
+  const formatServerAmount = (code, value) => formatCurrency(Number(value || 0), code);
   const [localFilters, setLocalFilters] = useState({
     warehouse_id: filters.warehouse_id || '',
     search: filters.search || '',
@@ -44,8 +48,18 @@ export default function InventoryByWarehouse({ rows, filters = {}, warehouses = 
         description={t('admin.reports.inventory.by_warehouse.hero_description', 'La vista muestra stock, valor costo y valor venta por sede y producto dentro del mismo marco visual de reportes administrativos.')}
         stats={[
           { label: t('admin.reports.inventory.by_warehouse.stats.units', 'Unidades página'), value: formatNumber(valuation.total_units || 0, { maximumFractionDigits: 0 }) },
-          { label: `${t('admin.reports.inventory.by_warehouse.stats.cost_usd', 'Costo')} ${displayCurrency}`, value: formatActiveAmount(valuation.total_cost_usd || 0) },
-          { label: `${t('admin.reports.inventory.by_warehouse.stats.price_usd', 'Venta')} ${displayCurrency}`, value: formatActiveAmount(valuation.total_price_usd || 0) },
+          {
+            label: `${t('admin.reports.inventory.by_warehouse.stats.cost_usd', 'Costo')} ${displayCurrency}`,
+            value: valuation.total_cost_admin_totals?.[displayCurrency] !== undefined
+              ? formatServerAmount(displayCurrency, valuation.total_cost_admin_totals[displayCurrency])
+              : formatActiveAmount(valuation.total_cost_usd || 0),
+          },
+          {
+            label: `${t('admin.reports.inventory.by_warehouse.stats.price_usd', 'Venta')} ${displayCurrency}`,
+            value: valuation.total_price_admin_totals?.[displayCurrency] !== undefined
+              ? formatServerAmount(displayCurrency, valuation.total_price_admin_totals[displayCurrency])
+              : formatActiveAmount(valuation.total_price_usd || 0),
+          },
           { label: t('admin.reports.inventory.by_warehouse.stats.filters', 'Filtros'), value: activeFilters },
         ]}
         contextTitle={t('admin.reports.inventory.by_warehouse.context_title', 'Inventario por bodega')}
@@ -128,33 +142,52 @@ export default function InventoryByWarehouse({ rows, filters = {}, warehouses = 
                 <th className="px-3 py-2 text-right font-semibold">{t('admin.reports.inventory.by_warehouse.table.stock_units', 'Stock unidades')}</th>
                 <th className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.inventory.by_warehouse.table.avg_cost', 'Costo prom.')} ${displayCurrency}`}</th>
                 <th className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.inventory.by_warehouse.table.price', 'Precio')} ${displayCurrency}`}</th>
-                <th className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.inventory.by_warehouse.table.cost_value', 'Valor costo')} ${displayCurrency}`}</th>
-                <th className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.inventory.by_warehouse.table.sales_value', 'Valor venta')} ${displayCurrency}`}</th>
+                {visibleCurrencyCodes.map((code) => (
+                  <th key={`cost-${code}`} className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.inventory.by_warehouse.table.cost_value', 'Valor costo')} ${code}`}</th>
+                ))}
+                {visibleCurrencyCodes.map((code) => (
+                  <th key={`sales-${code}`} className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.inventory.by_warehouse.table.sales_value', 'Valor venta')} ${code}`}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {rows.data.map((row) => {
-                const units = Number(row.stock_units ?? 0);
-                const cost = Number(row.product?.average_cost_usd ?? 0);
-                const price = Number(row.product?.price_usd ?? 0);
-                const valueCost = units * cost;
-                const valuePrice = units * price;
                 return (
                   <tr key={`${row.product_id}-${row.warehouse_id}`} className="border-b border-border hover:bg-muted/40">
-                    <td className="px-3 py-2 text-xs">{row.warehouse?.name || row.warehouse?.code || '—'}</td>
+                    <td className="px-3 py-2 text-xs">{row.warehouse?.name || row.warehouse?.code || t('admin.reports.inventory.by_warehouse.values.empty_dash', '—')}</td>
                     <td className="px-3 py-2 text-xs">{row.product?.name || t('admin.reports.inventory.by_warehouse.table.deleted_product', 'Producto eliminado')}</td>
-                    <td className="px-3 py-2 text-xs">{row.product?.sku || row.product?.barcode || '—'}</td>
-                    <td className="px-3 py-2 text-xs text-right">{formatNumber(units, { maximumFractionDigits: 0 })}</td>
-                    <td className="px-3 py-2 text-xs text-right">{formatActiveAmount(cost)}</td>
-                    <td className="px-3 py-2 text-xs text-right">{formatActiveAmount(price)}</td>
-                    <td className="px-3 py-2 text-xs text-right">{formatActiveAmount(valueCost)}</td>
-                    <td className="px-3 py-2 text-xs text-right">{formatActiveAmount(valuePrice)}</td>
+                    <td className="px-3 py-2 text-xs">{row.product?.sku || row.product?.barcode || t('admin.reports.inventory.by_warehouse.values.empty_dash', '—')}</td>
+                    <td className="px-3 py-2 text-xs text-right">{formatNumber(row.stock_units ?? 0, { maximumFractionDigits: 0 })}</td>
+                    <td className="px-3 py-2 text-xs text-right">
+                      {row.average_cost_admin_totals?.[displayCurrency] !== undefined
+                        ? formatServerAmount(displayCurrency, row.average_cost_admin_totals[displayCurrency])
+                        : formatActiveAmount(row.product?.average_cost_usd || 0)}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-right">
+                      {row.price_admin_totals?.[displayCurrency] !== undefined
+                        ? formatServerAmount(displayCurrency, row.price_admin_totals[displayCurrency])
+                        : formatActiveAmount(row.product?.price_usd || 0)}
+                    </td>
+                    {visibleCurrencyCodes.map((code) => (
+                      <td key={`${row.product_id}-${row.warehouse_id}-cost-${code}`} className="px-3 py-2 text-xs text-right">
+                        {row.value_cost_admin_totals?.[code] !== undefined
+                          ? formatServerAmount(code, row.value_cost_admin_totals[code])
+                          : formatActiveAmount((row.stock_units || 0) * (row.product?.average_cost_usd || 0))}
+                      </td>
+                    ))}
+                    {visibleCurrencyCodes.map((code) => (
+                      <td key={`${row.product_id}-${row.warehouse_id}-sales-${code}`} className="px-3 py-2 text-xs text-right">
+                        {row.value_price_admin_totals?.[code] !== undefined
+                          ? formatServerAmount(code, row.value_price_admin_totals[code])
+                          : formatActiveAmount((row.stock_units || 0) * (row.product?.price_usd || 0))}
+                      </td>
+                    ))}
                   </tr>
                 );
               })}
               {rows.data.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-3 py-6 text-center text-sm text-muted-foreground">
+                  <td colSpan={6 + (visibleCurrencyCodes.length * 2)} className="px-3 py-6 text-center text-sm text-muted-foreground">
                     {t('admin.reports.inventory.by_warehouse.empty', 'No hay registros para los filtros seleccionados.')}
                   </td>
                 </tr>

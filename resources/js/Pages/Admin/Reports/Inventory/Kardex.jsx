@@ -7,11 +7,13 @@ import { useI18n } from '@/Hooks/useI18n';
 import { useLocaleFormat } from '@/Hooks/useLocaleFormat';
 import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates';
 
-export default function InventoryKardex({ movements, filters = {}, product, products = [], warehouses = [] }) {
+export default function InventoryKardex({ movements, filters = {}, product, products = [], warehouses = [], adminCurrencyContext = {} }) {
   const { t } = useI18n();
-  const { formatDateTime, formatNumber } = useLocaleFormat();
+  const { formatDateTime, formatNumber, formatCurrency } = useLocaleFormat();
   const { displayCurrency, formatPriceFromUsd } = useConfiguredCurrencyRates();
   const formatActiveAmount = (value) => formatPriceFromUsd(Number(value || 0), displayCurrency);
+  const formatServerAmount = (code, value) => formatCurrency(Number(value || 0), code);
+  const translateMovementType = (type) => t(`admin.products.inventory.types.${type}`, type ?? t('admin.reports.inventory.kardex.values.empty_dash', '—'));
   const [localFilters, setLocalFilters] = useState({
     product_id: filters.product_id || '',
     warehouse_id: filters.warehouse_id || '',
@@ -153,7 +155,7 @@ export default function InventoryKardex({ movements, filters = {}, product, prod
             <div>
               <div className="text-xs uppercase text-muted-foreground mb-1">{t('admin.reports.inventory.kardex.summary.product', 'Producto')}</div>
               <div className="font-semibold">{product.name}</div>
-              <div className="text-xs text-muted-foreground">{t('admin.reports.inventory.kardex.summary.sku', 'SKU')}: {product.sku || '—'} / {t('admin.reports.inventory.kardex.summary.barcode', 'Código')}: {product.barcode || '—'}</div>
+              <div className="text-xs text-muted-foreground">{t('admin.reports.inventory.kardex.summary.sku', 'SKU')}: {product.sku || t('admin.reports.inventory.kardex.values.empty_dash', '—')} / {t('admin.reports.inventory.kardex.summary.barcode', 'Código')}: {product.barcode || t('admin.reports.inventory.kardex.values.empty_dash', '—')}</div>
             </div>
             <div>
               <div className="text-xs uppercase text-muted-foreground mb-1">{t('admin.reports.inventory.kardex.summary.current_stock', 'Stock actual')}</div>
@@ -181,13 +183,13 @@ export default function InventoryKardex({ movements, filters = {}, product, prod
               {movements.data.map((mov) => (
                 <tr key={mov.id} className="border-b border-border hover:bg-muted/40">
                   <td className="px-3 py-2 text-xs">{formatDateTime(mov.created_at)}</td>
-                  <td className="px-3 py-2 text-xs">{mov.movement_type?.name || mov.type}</td>
-                  <td className="px-3 py-2 text-xs">{mov.warehouse?.name || mov.warehouse?.code || '—'}</td>
+                  <td className="px-3 py-2 text-xs">{mov.movement_type?.name || translateMovementType(mov.type)}</td>
+                  <td className="px-3 py-2 text-xs">{mov.warehouse?.name || mov.warehouse?.code || t('admin.reports.inventory.kardex.values.empty_dash', '—')}</td>
                   <td className="px-3 py-2 text-xs text-right">{formatNumber(mov.quantity ?? 0, { maximumFractionDigits: 0 })}</td>
-                  <td className="px-3 py-2 text-xs text-right">{formatActiveAmount(mov.unit_price_usd ?? mov.cost_usd ?? 0)}</td>
-                  <td className="px-3 py-2 text-xs text-right">{formatActiveAmount(mov.total_value_usd ?? 0)}</td>
-                  <td className="px-3 py-2 text-xs">{mov.reference || '—'}</td>
-                  <td className="px-3 py-2 text-xs">{mov.notes || '—'}</td>
+                  <td className="px-3 py-2 text-xs text-right">{mov.unit_price_admin_totals?.[displayCurrency] !== undefined ? formatServerAmount(displayCurrency, mov.unit_price_admin_totals[displayCurrency]) : formatActiveAmount(mov.unit_price_usd ?? mov.cost_usd ?? 0)}</td>
+                  <td className="px-3 py-2 text-xs text-right">{mov.total_value_admin_totals?.[displayCurrency] !== undefined ? formatServerAmount(displayCurrency, mov.total_value_admin_totals[displayCurrency]) : formatActiveAmount(mov.total_value_usd ?? 0)}</td>
+                  <td className="px-3 py-2 text-xs">{mov.reference || t('admin.reports.inventory.kardex.values.empty_dash', '—')}</td>
+                  <td className="px-3 py-2 text-xs">{mov.notes || t('admin.reports.inventory.kardex.values.empty_dash', '—')}</td>
                 </tr>
               ))}
               {movements.data.length === 0 && (

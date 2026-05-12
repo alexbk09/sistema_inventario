@@ -65,7 +65,7 @@ export default function SupplierModal({
       <div className="relative w-full max-w-lg mx-4 bg-card border border-border rounded-xl shadow-lg">
         <div className="px-5 py-4 border-b border-border flex items-center justify-between">
           <h2 className="text-lg font-semibold text-foreground">{editingSupplier ? t('admin.providers.modal.edit_title', 'Editar proveedor') : t('admin.providers.modal.create_title', 'Nuevo proveedor')}</h2>
-          <button onClick={onClose} className="px-2 py-1 text-muted-foreground hover:text-foreground">×</button>
+          <button aria-label={t('admin.common.close', 'Cerrar')} onClick={onClose} className="px-2 py-1 text-muted-foreground hover:text-foreground">×</button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4  p-4">
         <div>
@@ -108,7 +108,7 @@ export default function SupplierModal({
               value={formData.phone}
               onChange={handleChange}
               className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-primary transition"
-              placeholder="+58 212-1234567"
+              placeholder={t('admin.providers.modal.form.phone_placeholder', '+58 212-1234567')}
             />
           </div>
 

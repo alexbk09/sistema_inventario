@@ -142,6 +142,18 @@ Desde la raíz del proyecto:
 docker-compose up --build
 ```
 
+En Windows también puedes usar el helper del repo para levantar el stack y esperar a que quede saludable:
+
+```powershell
+./tools/docker-up.ps1
+```
+
+Si además quieres forzar rebuild de imágenes:
+
+```powershell
+./tools/docker-up.ps1 -Build
+```
+
 Esto levantará:
 - `app` (PHP-FPM + Laravel + worker de colas bajo Supervisor)
 - `db` (MySQL, datos persistentes en volumen `db_data`)

@@ -15,11 +15,19 @@ const isExpired = (layaway) => {
     return exp < now && ['active', 'pending'].includes(layaway.status);
 };
 
-export default function LayawayReportIndex({ layaways, filters = {}, metrics, customers = [], statuses = [] }) {
+export default function LayawayReportIndex({ layaways, filters = {}, metrics, customers = [], statuses = [], adminCurrencyContext = {} }) {
     const { t } = useI18n();
-    const { formatDate, formatNumber } = useLocaleFormat();
-    const { displayCurrency, formatPriceFromUsd } = useConfiguredCurrencyRates();
-    const formatActiveAmount = (value) => formatPriceFromUsd(Number(value || 0), displayCurrency);
+    const { formatDate, formatCurrency } = useLocaleFormat();
+    const { displayCurrency, comparisonCurrency, formatPriceFromUsd, hasRateForCurrency } = useConfiguredCurrencyRates();
+    const formatActiveAmount = (value, currency = displayCurrency) => formatPriceFromUsd(Number(value || 0), currency);
+    const secondaryCurrency = comparisonCurrency && comparisonCurrency !== displayCurrency && hasRateForCurrency(comparisonCurrency)
+        ? comparisonCurrency
+        : null;
+    const visibleCurrencyCodes = Array.isArray(adminCurrencyContext?.codes) && adminCurrencyContext.codes.length > 0
+        ? adminCurrencyContext.codes
+        : [displayCurrency, ...(secondaryCurrency ? [secondaryCurrency] : [])].filter(Boolean);
+    const currencyColumns = [...new Set(visibleCurrencyCodes)];
+    const formatServerAmount = (code, value) => formatCurrency(Number(value || 0), code);
     const [localFilters, setLocalFilters] = useState({
         customer_id: filters.customer_id || '',
         status: filters.status || '',
@@ -58,7 +66,7 @@ export default function LayawayReportIndex({ layaways, filters = {}, metrics, cu
                 stats={[
                     { label: t('admin.reports.layaway.stats.page_layaways', 'Apartados página'), value: metrics.page_layaways },
                     { label: t('admin.reports.layaway.stats.active', 'Activos'), value: metrics.status_counts?.active ?? 0 },
-                    { label: `${t('admin.reports.layaway.stats.pending_usd', 'Pendiente')} ${displayCurrency}`, value: formatActiveAmount(metrics.pending_usd || 0) },
+                    { label: `${t('admin.reports.layaway.stats.pending_usd', 'Pendiente')} ${displayCurrency}`, value: metrics.pending_admin_totals?.[displayCurrency] !== undefined ? formatServerAmount(displayCurrency, metrics.pending_admin_totals[displayCurrency]) : formatActiveAmount(metrics.pending_usd || 0) },
                     { label: t('admin.reports.layaway.stats.filters', 'Filtros'), value: activeFilters },
                 ]}
                 contextTitle={t('admin.reports.layaway.context_title', 'Reporte de apartados')}
@@ -181,11 +189,19 @@ export default function LayawayReportIndex({ layaways, filters = {}, metrics, cu
                     </div>
                     <div className="rounded-lg border border-border bg-white p-4">
                         <div className="text-xs uppercase text-muted-foreground mb-1">{`${t('admin.reports.layaway.cards.total_usd', 'Total (página)')} ${displayCurrency}`}</div>
-                        <div className="text-2xl font-semibold">{formatActiveAmount(metrics.total_usd || 0)}</div>
+                        <div className="text-2xl font-semibold">
+                            {metrics.total_document_totals?.[displayCurrency] !== undefined
+                                ? formatServerAmount(displayCurrency, metrics.total_document_totals[displayCurrency])
+                                : formatActiveAmount(metrics.total_usd || 0)}
+                        </div>
                     </div>
                     <div className="rounded-lg border border-border bg-white p-4">
                         <div className="text-xs uppercase text-muted-foreground mb-1">{`${t('admin.reports.layaway.cards.pending_usd', 'Pendiente (página)')} ${displayCurrency}`}</div>
-                        <div className="text-2xl font-semibold">{formatActiveAmount(metrics.pending_usd || 0)}</div>
+                        <div className="text-2xl font-semibold">
+                            {metrics.pending_admin_totals?.[displayCurrency] !== undefined
+                                ? formatServerAmount(displayCurrency, metrics.pending_admin_totals[displayCurrency])
+                                : formatActiveAmount(metrics.pending_usd || 0)}
+                        </div>
                     </div>
                 </div>
 
@@ -199,15 +215,20 @@ export default function LayawayReportIndex({ layaways, filters = {}, metrics, cu
                                 <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.layaway.table.created_at', 'Creado')}</th>
                                 <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.layaway.table.expires_at', 'Vence')}</th>
                                 <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.layaway.table.status', 'Estado')}</th>
-                                <th className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.layaway.table.total_usd', 'Total')} ${displayCurrency}`}</th>
-                                <th className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.layaway.table.paid_usd', 'Pagado')} ${displayCurrency}`}</th>
-                                <th className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.layaway.table.pending_usd', 'Pendiente')} ${displayCurrency}`}</th>
+                                {currencyColumns.map((code) => (
+                                    <th key={`total-${code}`} className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.layaway.table.total_usd', 'Total')} ${code}`}</th>
+                                ))}
+                                {currencyColumns.map((code) => (
+                                    <th key={`paid-${code}`} className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.layaway.table.paid_usd', 'Pagado')} ${code}`}</th>
+                                ))}
+                                {currencyColumns.map((code) => (
+                                    <th key={`pending-${code}`} className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.layaway.table.pending_usd', 'Pendiente')} ${code}`}</th>
+                                ))}
                                 <th className="px-3 py-2 text-right font-semibold">{t('admin.reports.layaway.table.actions', 'Acciones')}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {layaways.data.map((l) => {
-                                const pendingUsd = Math.max((l.total_usd || 0) - (l.paid_usd || 0), 0);
                                 const expired = isExpired(l);
 
                                 return (
@@ -239,9 +260,27 @@ export default function LayawayReportIndex({ layaways, filters = {}, metrics, cu
                                                 {expired ? t('admin.reports.layaway.statuses.expired', 'Vencido') : translateStatus(l.status)}
                                             </span>
                                         </td>
-                                        <td className="px-3 py-2 text-xs text-right">{formatActiveAmount(l.total_usd || 0)}</td>
-                                        <td className="px-3 py-2 text-xs text-right">{formatActiveAmount(l.paid_usd || 0)}</td>
-                                        <td className="px-3 py-2 text-xs text-right font-semibold">{formatActiveAmount(pendingUsd)}</td>
+                                        {currencyColumns.map((code) => (
+                                            <td key={`${l.id}-total-${code}`} className="px-3 py-2 text-xs text-right">
+                                                {l.document_totals?.[code] !== undefined
+                                                    ? formatServerAmount(code, l.document_totals[code])
+                                                    : formatActiveAmount(l.total_usd || 0, code)}
+                                            </td>
+                                        ))}
+                                        {currencyColumns.map((code) => (
+                                            <td key={`${l.id}-paid-${code}`} className="px-3 py-2 text-xs text-right">
+                                                {l.paid_admin_totals?.[code] !== undefined
+                                                    ? formatServerAmount(code, l.paid_admin_totals[code])
+                                                    : formatActiveAmount(l.paid_usd || 0, code)}
+                                            </td>
+                                        ))}
+                                        {currencyColumns.map((code) => (
+                                            <td key={`${l.id}-pending-${code}`} className="px-3 py-2 text-xs text-right font-semibold">
+                                                {l.pending_admin_totals?.[code] !== undefined
+                                                    ? formatServerAmount(code, l.pending_admin_totals[code])
+                                                    : formatActiveAmount(l.pending_usd || 0, code)}
+                                            </td>
+                                        ))}
                                         <td className="px-3 py-2 text-xs text-right">
                                             <Link
                                                 href={route('admin.layaways.show', l.id)}
@@ -255,7 +294,7 @@ export default function LayawayReportIndex({ layaways, filters = {}, metrics, cu
                             })}
                             {layaways.data.length === 0 && (
                                 <tr>
-                                    <td colSpan={9} className="px-3 py-6 text-center text-sm text-muted-foreground">
+                                    <td colSpan={6 + (currencyColumns.length * 3)} className="px-3 py-6 text-center text-sm text-muted-foreground">
                                         {t('admin.reports.layaway.empty', 'No se encontraron apartados para los filtros seleccionados.')}
                                     </td>
                                 </tr>

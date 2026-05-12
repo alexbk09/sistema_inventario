@@ -7,11 +7,15 @@ import { useI18n } from '@/Hooks/useI18n';
 import { useLocaleFormat } from '@/Hooks/useLocaleFormat';
 import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates';
 
-export default function InventoryReportIndex({ products, filters = {}, valuation, categories = [] }) {
+export default function InventoryReportIndex({ products, filters = {}, valuation, categories = [], adminCurrencyContext = {} }) {
   const { t } = useI18n();
-  const { formatNumber } = useLocaleFormat();
+  const { formatNumber, formatCurrency } = useLocaleFormat();
   const { displayCurrency, formatPriceFromUsd } = useConfiguredCurrencyRates();
   const formatActiveAmount = (value) => formatPriceFromUsd(Number(value || 0), displayCurrency);
+  const visibleCurrencyCodes = Array.isArray(adminCurrencyContext?.codes) && adminCurrencyContext.codes.length > 0
+    ? adminCurrencyContext.codes
+    : [displayCurrency];
+  const formatServerAmount = (code, value) => formatCurrency(Number(value || 0), code);
   const [localFilters, setLocalFilters] = useState({
     category_id: filters.category_id || '',
     search: filters.search || '',
@@ -77,8 +81,18 @@ export default function InventoryReportIndex({ products, filters = {}, valuation
         description={t('admin.reports.inventory.index.hero_description', 'La vista integra métricas de stock, navegación entre subreportes, exportaciones y filtros sin caer en un layout plano de tabla.')}
         stats={[
           { label: t('admin.reports.inventory.index.stats.units', 'Unidades'), value: formatNumber(valuation.total_units || 0, { maximumFractionDigits: 0 }) },
-          { label: `${t('admin.reports.inventory.index.stats.cost_usd', 'Costo')} ${displayCurrency}`, value: formatActiveAmount(valuation.total_cost_usd || 0) },
-          { label: `${t('admin.reports.inventory.index.stats.price_usd', 'Venta')} ${displayCurrency}`, value: formatActiveAmount(valuation.total_price_usd || 0) },
+          {
+            label: `${t('admin.reports.inventory.index.stats.cost_usd', 'Costo')} ${displayCurrency}`,
+            value: valuation.total_cost_admin_totals?.[displayCurrency] !== undefined
+              ? formatServerAmount(displayCurrency, valuation.total_cost_admin_totals[displayCurrency])
+              : formatActiveAmount(valuation.total_cost_usd || 0),
+          },
+          {
+            label: `${t('admin.reports.inventory.index.stats.price_usd', 'Venta')} ${displayCurrency}`,
+            value: valuation.total_price_admin_totals?.[displayCurrency] !== undefined
+              ? formatServerAmount(displayCurrency, valuation.total_price_admin_totals[displayCurrency])
+              : formatActiveAmount(valuation.total_price_usd || 0),
+          },
           { label: t('admin.reports.inventory.index.stats.filters', 'Filtros'), value: activeFilters },
         ]}
         contextTitle={t('admin.reports.inventory.index.context_title', 'Inventario global')}
@@ -172,31 +186,53 @@ export default function InventoryReportIndex({ products, filters = {}, valuation
                 <th className="px-3 py-2 text-right font-semibold">{t('admin.reports.inventory.index.table.stock', 'Stock')}</th>
                 <th className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.inventory.index.table.avg_cost', 'Costo prom.')} ${displayCurrency}`}</th>
                 <th className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.inventory.index.table.price', 'Precio')} ${displayCurrency}`}</th>
-                <th className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.inventory.index.table.cost_value', 'Valor costo')} ${displayCurrency}`}</th>
-                <th className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.inventory.index.table.sales_value', 'Valor venta')} ${displayCurrency}`}</th>
+                {visibleCurrencyCodes.map((code) => (
+                  <th key={`cost-${code}`} className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.inventory.index.table.cost_value', 'Valor costo')} ${code}`}</th>
+                ))}
+                {visibleCurrencyCodes.map((code) => (
+                  <th key={`sales-${code}`} className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.inventory.index.table.sales_value', 'Valor venta')} ${code}`}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {products.data.map((p) => {
                 const categoriesNames = (p.categories || []).map((c) => c.name).join(', ');
-                const valueCost = (p.stock || 0) * (p.average_cost_usd || 0);
-                const valuePrice = (p.stock || 0) * (p.price_usd || 0);
                 return (
                   <tr key={p.id} className="border-b border-border hover:bg-muted/40">
                     <td className="px-3 py-2 text-xs">{p.name}</td>
                     <td className="px-3 py-2 text-xs">{p.sku}</td>
-                    <td className="px-3 py-2 text-xs">{categoriesNames || '-'}</td>
+                    <td className="px-3 py-2 text-xs">{categoriesNames || t('admin.reports.inventory.index.values.empty_dash', '—')}</td>
                     <td className="px-3 py-2 text-xs text-right">{formatNumber(p.stock || 0, { maximumFractionDigits: 0 })}</td>
-                    <td className="px-3 py-2 text-xs text-right">{formatActiveAmount(p.average_cost_usd || 0)}</td>
-                    <td className="px-3 py-2 text-xs text-right">{formatActiveAmount(p.price_usd || 0)}</td>
-                    <td className="px-3 py-2 text-xs text-right">{formatActiveAmount(valueCost)}</td>
-                    <td className="px-3 py-2 text-xs text-right">{formatActiveAmount(valuePrice)}</td>
+                    <td className="px-3 py-2 text-xs text-right">
+                      {p.average_cost_admin_totals?.[displayCurrency] !== undefined
+                        ? formatServerAmount(displayCurrency, p.average_cost_admin_totals[displayCurrency])
+                        : formatActiveAmount(p.average_cost_usd || 0)}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-right">
+                      {p.price_admin_totals?.[displayCurrency] !== undefined
+                        ? formatServerAmount(displayCurrency, p.price_admin_totals[displayCurrency])
+                        : formatActiveAmount(p.price_usd || 0)}
+                    </td>
+                    {visibleCurrencyCodes.map((code) => (
+                      <td key={`${p.id}-cost-${code}`} className="px-3 py-2 text-xs text-right">
+                        {p.value_cost_admin_totals?.[code] !== undefined
+                          ? formatServerAmount(code, p.value_cost_admin_totals[code])
+                          : formatActiveAmount((p.stock || 0) * (p.average_cost_usd || 0))}
+                      </td>
+                    ))}
+                    {visibleCurrencyCodes.map((code) => (
+                      <td key={`${p.id}-sales-${code}`} className="px-3 py-2 text-xs text-right">
+                        {p.value_price_admin_totals?.[code] !== undefined
+                          ? formatServerAmount(code, p.value_price_admin_totals[code])
+                          : formatActiveAmount((p.stock || 0) * (p.price_usd || 0))}
+                      </td>
+                    ))}
                   </tr>
                 );
               })}
               {products.data.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-3 py-6 text-center text-sm text-muted-foreground">
+                  <td colSpan={6 + (visibleCurrencyCodes.length * 2)} className="px-3 py-6 text-center text-sm text-muted-foreground">
                     {t('admin.reports.inventory.index.empty', 'No hay productos para los filtros seleccionados.')}
                   </td>
                 </tr>

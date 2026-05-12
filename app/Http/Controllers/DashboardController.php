@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\{Invoice, InvoiceItem, Warehouse, Product, Category, Provider, Customer, User, Rma, Layaway, CreditAccount};
+use App\Services\AdminMoneyService;
 use App\Services\CurrencyService;
 use App\Support\Settings;
 use Carbon\Carbon;
@@ -11,10 +12,13 @@ use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, AdminMoneyService $adminMoneyService)
     {
         $mode = $request->input('mode', 'daily'); // daily|monthly (por ahora solo daily)
         $warehouseId = $request->input('warehouse_id');
+        $currencySettings = Settings::get('currency', []);
+        $adminCurrencyContext = $adminMoneyService->getAdminCurrencyContext($currencySettings);
+        $currencyCodes = $adminCurrencyContext['codes'] ?? [];
 
         $today = Carbon::today();
         $startCurrent = $today->copy()->subDays(29);
@@ -27,48 +31,57 @@ class DashboardController extends Controller
                 $q->where('warehouse_id', $wid);
             });
 
-        // Ventas por día – período actual
-        $currentSalesRaw = (clone $baseInvoiceScope)
+        $currentInvoices = (clone $baseInvoiceScope)
             ->whereBetween('created_at', [$startCurrent->copy()->startOfDay(), $today->copy()->endOfDay()])
-            ->selectRaw('DATE(created_at) as date, SUM(total_usd) as total_usd')
-            ->groupBy('date')
-            ->orderBy('date')
-            ->pluck('total_usd', 'date');
+            ->with('customer:id,name')
+            ->get(['id', 'customer_id', 'credit_account_id', 'total_usd', 'created_at', 'currency_code', 'base_currency_code', 'monetary_totals_json']);
 
-        // Ventas por día – período anterior
-        $previousSalesRaw = (clone $baseInvoiceScope)
+        $previousInvoices = (clone $baseInvoiceScope)
             ->whereBetween('created_at', [$startPrevious->copy()->startOfDay(), $endPrevious->copy()->endOfDay()])
-            ->selectRaw('DATE(created_at) as date, SUM(total_usd) as total_usd')
-            ->groupBy('date')
-            ->orderBy('date')
-            ->pluck('total_usd', 'date');
+            ->get(['id', 'customer_id', 'credit_account_id', 'total_usd', 'created_at', 'currency_code', 'base_currency_code', 'monetary_totals_json']);
+
+        $zeroTotals = $this->buildZeroTotals($currencyCodes);
+        $currentSalesByDate = $this->aggregateInvoicesByDate($currentInvoices, $adminMoneyService, $currencySettings, $zeroTotals);
+        $previousSalesByDate = $this->aggregateInvoicesByDate($previousInvoices, $adminMoneyService, $currencySettings, $zeroTotals);
 
         $labels = [];
         $currentSeries = [];
         $previousSeries = [];
+        $currentSeriesByCurrency = [];
+        $previousSeriesByCurrency = [];
+
+        foreach ($currencyCodes as $code) {
+            $currentSeriesByCurrency[$code] = [];
+            $previousSeriesByCurrency[$code] = [];
+        }
 
         $periodCurrent = CarbonPeriod::create($startCurrent, $today);
         foreach ($periodCurrent as $index => $date) {
             $key = $date->toDateString();
             $labels[] = $date->format('d/m');
-            $currentSeries[] = (float) ($currentSalesRaw[$key] ?? 0);
+            $currentSeries[] = (float) ($currentSalesByDate[$key]['USD'] ?? 0);
+
+            foreach ($currencyCodes as $code) {
+                $currentSeriesByCurrency[$code][] = (float) ($currentSalesByDate[$key][$code] ?? 0);
+            }
 
             // mismo índice relativo en el período anterior
             $prevDate = $startPrevious->copy()->addDays($index);
             $prevKey = $prevDate->toDateString();
-            $previousSeries[] = (float) ($previousSalesRaw[$prevKey] ?? 0);
+            $previousSeries[] = (float) ($previousSalesByDate[$prevKey]['USD'] ?? 0);
+
+            foreach ($currencyCodes as $code) {
+                $previousSeriesByCurrency[$code][] = (float) ($previousSalesByDate[$prevKey][$code] ?? 0);
+            }
         }
 
         // KPIs básicos período actual
-        $metricsRow = (clone $baseInvoiceScope)
-            ->whereBetween('created_at', [$startCurrent->copy()->startOfDay(), $today->copy()->endOfDay()])
-            ->selectRaw('COUNT(*) as total_invoices, COALESCE(SUM(total_usd),0) as total_usd')
-            ->first();
-
-        $totalInvoices = (int) ($metricsRow->total_invoices ?? 0);
-        $totalUsd = (float) ($metricsRow->total_usd ?? 0);
+        $totalInvoices = (int) $currentInvoices->count();
+        $totalUsd = (float) $currentInvoices->sum('total_usd');
+        $totalSalesTotals = $this->sumInvoiceDocumentTotals($currentInvoices, $adminMoneyService, $currencySettings, $zeroTotals);
 
         $avgTicket = $totalInvoices > 0 ? $totalUsd / $totalInvoices : 0.0;
+        $avgTicketTotals = $this->divideTotals($totalSalesTotals, $totalInvoices, $zeroTotals);
 
         // Estimación de margen: ventas - costo promedio
         $marginUsd = 0.0;
@@ -94,13 +107,11 @@ class DashboardController extends Controller
         }
 
         // % crédito vs contado (por facturas con cuenta de crédito asociada)
-        $creditSales = (clone $baseInvoiceScope)
-            ->whereBetween('created_at', [$startCurrent->copy()->startOfDay(), $today->copy()->endOfDay()])
-            ->whereNotNull('credit_account_id')
-            ->sum('total_usd');
-
-        $creditSales = (float) $creditSales;
+        $creditInvoices = $currentInvoices->filter(fn (Invoice $invoice) => $invoice->credit_account_id !== null)->values();
+        $creditSales = (float) $creditInvoices->sum('total_usd');
         $cashSales = max($totalUsd - $creditSales, 0.0);
+        $creditSalesTotals = $this->sumInvoiceDocumentTotals($creditInvoices, $adminMoneyService, $currencySettings, $zeroTotals);
+        $cashSalesTotals = $this->subtractTotals($totalSalesTotals, $creditSalesTotals, $zeroTotals);
 
         $creditShare = $totalUsd > 0 ? ($creditSales / $totalUsd) * 100 : 0.0;
         $cashShare = $totalUsd > 0 ? ($cashSales / $totalUsd) * 100 : 0.0;
@@ -129,25 +140,21 @@ class DashboardController extends Controller
             ->values();
 
         // Top clientes (por monto vendido)
-        $topCustomers = Invoice::query()
-            ->selectRaw('customer_id, SUM(total_usd) as total_sales_usd, COUNT(*) as total_invoices')
-            ->with('customer:id,name')
-            ->whereNull('cancelled_at')
-            ->when($warehouseId, function ($q, $wid) {
-                $q->where('warehouse_id', $wid);
-            })
-            ->whereBetween('created_at', [$startCurrent->copy()->startOfDay(), $today->copy()->endOfDay()])
-            ->groupBy('customer_id')
-            ->orderByDesc('total_sales_usd')
-            ->limit(5)
-            ->get()
-            ->map(function ($row) {
+        $topCustomers = $currentInvoices
+            ->groupBy(fn (Invoice $invoice) => $invoice->customer_id ?: 'guest')
+            ->map(function ($customerInvoices) use ($adminMoneyService, $currencySettings, $zeroTotals) {
+                /** @var \Illuminate\Support\Collection $customerInvoices */
+                $firstInvoice = $customerInvoices->first();
+
                 return [
-                    'label' => optional($row->customer)->name ?? 'Sin cliente',
-                    'total_sales_usd' => (float) $row->total_sales_usd,
-                    'total_invoices' => (int) $row->total_invoices,
+                    'label' => $firstInvoice?->customer?->name ?? 'Sin cliente',
+                    'total_sales_usd' => (float) $customerInvoices->sum('total_usd'),
+                    'total_invoices' => (int) $customerInvoices->count(),
+                    'admin_totals' => $this->sumInvoiceDocumentTotals($customerInvoices, $adminMoneyService, $currencySettings, $zeroTotals),
                 ];
             })
+            ->sortByDesc('total_sales_usd')
+            ->take(5)
             ->values();
 
         $warehouses = Warehouse::orderBy('name')->get(['id', 'name', 'code']);
@@ -189,11 +196,19 @@ class DashboardController extends Controller
             ->when($warehouseId, fn($q) => $q->where('warehouse_id', $warehouseId))
             ->where('created_at', '>=', $monthStart);
 
+        $todayCompletedInvoices = (clone $todayCompleted)
+            ->get(['id', 'total_usd', 'currency_code', 'base_currency_code', 'monetary_totals_json']);
+        $monthCompletedInvoices = (clone $monthCompleted)
+            ->get(['id', 'total_usd', 'currency_code', 'base_currency_code', 'monetary_totals_json']);
+
+        $todaySalesTotals = $this->sumInvoiceDocumentTotals($todayCompletedInvoices, $adminMoneyService, $currencySettings, $zeroTotals);
+        $monthSalesTotals = $this->sumInvoiceDocumentTotals($monthCompletedInvoices, $adminMoneyService, $currencySettings, $zeroTotals);
+
         $legacyMetrics = [
-            'today_sales_usd' => (float) $todayCompleted->sum('total_usd'),
-            'today_sales_count' => (int) $todayCompleted->count(),
-            'month_sales_usd' => (float) $monthCompleted->sum('total_usd'),
-            'month_sales_count' => (int) $monthCompleted->count(),
+            'today_sales_usd' => (float) $todayCompletedInvoices->sum('total_usd'),
+            'today_sales_count' => (int) $todayCompletedInvoices->count(),
+            'month_sales_usd' => (float) $monthCompletedInvoices->sum('total_usd'),
+            'month_sales_count' => (int) $monthCompletedInvoices->count(),
             'low_stock_products' => (int) (clone $lowStockQuery)->count(),
             'total_stock' => (int) Product::sum('stock'),
             'invoice_pending' => (int) Invoice::where('status', 'pending')->when($warehouseId, fn($q) => $q->where('warehouse_id', $warehouseId))->count(),
@@ -227,7 +242,23 @@ class DashboardController extends Controller
             ->with('customer:id,name')
             ->orderBy('expires_at')
             ->take(10)
-            ->get(['id', 'number', 'customer_id', 'total_usd', 'expires_at', 'status']);
+            ->get(['id', 'number', 'customer_id', 'total_usd', 'currency_code', 'base_currency_code', 'monetary_totals_json', 'expires_at', 'status']);
+
+        $dashboardMoney = [
+            'total_sales' => ['totals' => $totalSalesTotals],
+            'avg_ticket' => ['totals' => $avgTicketTotals],
+            'margin' => $adminMoneyService->buildAdminTotals($marginUsd),
+            'credit_sales' => ['totals' => $creditSalesTotals],
+            'cash_sales' => ['totals' => $cashSalesTotals],
+            'today_sales' => ['totals' => $todaySalesTotals],
+            'month_sales' => ['totals' => $monthSalesTotals],
+        ];
+
+        $expiredLayaways = $expiredLayaways->map(function (Layaway $layaway) use ($adminMoneyService, $currencySettings) {
+            $layaway->document_totals = $this->resolveLayawayDocumentTotals($layaway, $adminMoneyService, $currencySettings);
+
+            return $layaway;
+        })->values();
 
         return inertia('Admin/Dashboard', [
             'filters' => [
@@ -239,6 +270,8 @@ class DashboardController extends Controller
                     'labels' => $labels,
                     'current' => $currentSeries,
                     'previous' => $previousSeries,
+                    'currentByCurrency' => $currentSeriesByCurrency,
+                    'previousByCurrency' => $previousSeriesByCurrency,
                 ],
             ],
             'metrics' => [
@@ -252,6 +285,8 @@ class DashboardController extends Controller
                 'credit_share' => $creditShare,
                 'cash_share' => $cashShare,
             ],
+            'adminCurrencyContext' => $adminCurrencyContext,
+            'dashboardMoney' => $dashboardMoney,
             'legacyMetrics' => $legacyMetrics,
             'counts' => $counts,
             'lowStockProducts' => $lowStockProducts,
@@ -262,5 +297,111 @@ class DashboardController extends Controller
             'selected_warehouse' => $warehouseId,
             'rate' => $rate,
         ]);
+    }
+
+    protected function buildZeroTotals(array $currencyCodes): array
+    {
+        $totals = [];
+
+        foreach ($currencyCodes as $code) {
+            $totals[$code] = 0.0;
+        }
+
+        return $totals;
+    }
+
+    protected function aggregateInvoicesByDate($invoices, AdminMoneyService $adminMoneyService, array $currencySettings, array $zeroTotals): array
+    {
+        $totalsByDate = [];
+
+        foreach ($invoices as $invoice) {
+            $dateKey = optional($invoice->created_at)->toDateString();
+            if (! $dateKey) {
+                continue;
+            }
+
+            if (! array_key_exists($dateKey, $totalsByDate)) {
+                $totalsByDate[$dateKey] = $zeroTotals;
+            }
+
+            $documentTotals = $this->resolveInvoiceDocumentTotals($invoice, $adminMoneyService, $currencySettings);
+            foreach ($totalsByDate[$dateKey] as $code => $amount) {
+                $totalsByDate[$dateKey][$code] = round($amount + (float) ($documentTotals[$code] ?? 0), 2);
+            }
+        }
+
+        return $totalsByDate;
+    }
+
+    protected function sumInvoiceDocumentTotals($invoices, AdminMoneyService $adminMoneyService, array $currencySettings, array $zeroTotals): array
+    {
+        $totals = $zeroTotals;
+
+        foreach ($invoices as $invoice) {
+            $documentTotals = $this->resolveInvoiceDocumentTotals($invoice, $adminMoneyService, $currencySettings);
+            foreach ($totals as $code => $amount) {
+                $totals[$code] = round($amount + (float) ($documentTotals[$code] ?? 0), 2);
+            }
+        }
+
+        return $totals;
+    }
+
+    protected function divideTotals(array $totals, int $divisor, array $zeroTotals): array
+    {
+        if ($divisor <= 0) {
+            return $zeroTotals;
+        }
+
+        $result = $zeroTotals;
+        foreach ($totals as $code => $amount) {
+            $result[$code] = round((float) $amount / $divisor, 2);
+        }
+
+        return $result;
+    }
+
+    protected function subtractTotals(array $totals, array $subtract, array $zeroTotals): array
+    {
+        $result = $zeroTotals;
+        foreach ($result as $code => $amount) {
+            $result[$code] = round(max(((float) ($totals[$code] ?? 0)) - ((float) ($subtract[$code] ?? 0)), 0), 2);
+        }
+
+        return $result;
+    }
+
+    protected function resolveInvoiceDocumentTotals(Invoice $invoice, AdminMoneyService $adminMoneyService, array $currencySettings): array
+    {
+        if (is_array($invoice->monetary_totals_json['totals'] ?? null)) {
+            return $invoice->monetary_totals_json['totals'];
+        }
+
+        $snapshot = is_array($invoice->monetary_totals_json['rates'] ?? null)
+            ? [
+                'base_currency' => (string) ($invoice->base_currency_code ?: 'USD'),
+                'captured_at' => $invoice->monetary_totals_json['captured_at'] ?? null,
+                'rates' => $invoice->monetary_totals_json['rates'],
+            ]
+            : null;
+
+        return $adminMoneyService->buildDocumentTotals((float) ($invoice->total_usd ?? 0), $currencySettings, $snapshot)['totals'];
+    }
+
+    protected function resolveLayawayDocumentTotals(Layaway $layaway, AdminMoneyService $adminMoneyService, array $currencySettings): array
+    {
+        if (is_array($layaway->monetary_totals_json['totals'] ?? null)) {
+            return $layaway->monetary_totals_json['totals'];
+        }
+
+        $snapshot = is_array($layaway->monetary_totals_json['rates'] ?? null)
+            ? [
+                'base_currency' => (string) ($layaway->base_currency_code ?: 'USD'),
+                'captured_at' => $layaway->monetary_totals_json['captured_at'] ?? null,
+                'rates' => $layaway->monetary_totals_json['rates'],
+            ]
+            : null;
+
+        return $adminMoneyService->buildDocumentTotals((float) ($layaway->total_usd ?? 0), $currencySettings, $snapshot)['totals'];
     }
 }

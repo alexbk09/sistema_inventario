@@ -7,6 +7,8 @@ use App\Models\Category;
 use App\Models\InventoryMovement;
 use App\Models\ProductImage;
 use App\Jobs\ProcessProductImage;
+use App\Services\AdminMoneyService;
+use App\Support\Settings;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Request;
@@ -14,9 +16,11 @@ use Inertia\Inertia;
 
 class ProductController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, AdminMoneyService $adminMoneyService)
     {
         $search = trim((string) $request->input('search', ''));
+        $currencySettings = Settings::get('currency', []);
+        $adminCurrencyContext = $adminMoneyService->getAdminCurrencyContext($currencySettings);
         $products = Product::query()
             ->when($search !== '', function ($q) use ($search) {
                 $q->where(function ($qq) use ($search) {
@@ -30,6 +34,12 @@ class ProductController extends Controller
             ->paginate(12)
             ->withQueryString();
 
+        $products->getCollection()->transform(function (Product $product) use ($adminMoneyService, $currencySettings) {
+            $product->price_admin_totals = $adminMoneyService->buildAdminTotals((float) ($product->price_usd ?? 0), $currencySettings)['totals'];
+
+            return $product;
+        });
+
         $totalProductsValueUsd = (float) Product::query()
             ->select(DB::raw('SUM(stock * price_usd) as total'))
             ->value('total');
@@ -37,6 +47,7 @@ class ProductController extends Controller
         $summary = [
             'total_products' => (int) Product::count(),
             'total_products_value_usd' => $totalProductsValueUsd,
+            'total_products_value_admin_totals' => $adminMoneyService->buildAdminTotals($totalProductsValueUsd, $currencySettings)['totals'],
             'last_30_days_exits' => (int) InventoryMovement::where('type', 'exit')
                 ->where('created_at', '>=', now()->subDays(30))
                 ->sum('quantity'),
@@ -46,6 +57,7 @@ class ProductController extends Controller
             'products' => $products,
             'filters' => ['search' => $search],
             'summary' => $summary,
+            'adminCurrencyContext' => $adminCurrencyContext,
             'warehouses' => \App\Models\Warehouse::orderBy('name')->get(['id','name','code']),
         ]);
     }

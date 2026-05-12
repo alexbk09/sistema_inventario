@@ -41,6 +41,30 @@ export default function AutenticateNav() {
     const totalNotifications = notifications.unread_count || 0;
     const dashboardRoute = isCliente ? '/mi-panel' : route('dashboard');
 
+    const groupedNotifications = useMemo(() => {
+        const groups = {
+            danger: [],
+            warning: [],
+            success: [],
+            info: [],
+        };
+
+        notificationItems.forEach((notification) => {
+            const severity = ['danger', 'warning', 'success', 'info'].includes(notification.severity)
+                ? notification.severity
+                : 'info';
+
+            groups[severity].push(notification);
+        });
+
+        return [
+            { key: 'danger', label: t('admin.notifications.groups.danger', 'Criticas'), items: groups.danger },
+            { key: 'warning', label: t('admin.notifications.groups.warning', 'Atencion'), items: groups.warning },
+            { key: 'success', label: t('admin.notifications.groups.success', 'Seguimiento'), items: groups.success },
+            { key: 'info', label: t('admin.notifications.groups.info', 'Informativas'), items: groups.info },
+        ].filter((group) => group.items.length > 0);
+    }, [notificationItems, t]);
+
     const notificationTone = (severity) => {
         switch (severity) {
             case 'danger':
@@ -52,6 +76,62 @@ export default function AutenticateNav() {
             default:
                 return 'border-sky-200 bg-sky-50 text-sky-700';
         }
+    };
+
+    const notificationTypeLabel = (notification) => {
+        const fallback = notification.type
+            ?.split('_')
+            .filter(Boolean)
+            .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+            .join(' ');
+
+        return t(`admin.notifications.types.${notification.type}`, fallback || t('admin.notifications.generic_type', 'Notificación'));
+    };
+
+    const resolveNotificationContent = (notification) => {
+        if (notification.type !== 'low_stock') {
+            return {
+                title: notification.title,
+                message: notification.message,
+                actionLabel: notification.action_label,
+            };
+        }
+
+        const data = notification.data || {};
+
+        if (!data.product_name && data.stock === undefined && !data.sku && data.min_stock === undefined) {
+            return {
+                title: notification.title,
+                message: notification.message,
+                actionLabel: notification.action_label,
+            };
+        }
+
+        const messageParts = [
+            t('admin.notifications.generated.low_stock.current_stock', 'Stock actual: :stock', {
+                stock: data.stock ?? t('admin.common.table.values.empty_dash', '—'),
+            }),
+        ];
+
+        if (data.min_stock !== null && data.min_stock !== undefined && Number(data.min_stock) > 0) {
+            messageParts.push(t('admin.notifications.generated.low_stock.min_stock', 'Mínimo: :min_stock', {
+                min_stock: data.min_stock,
+            }));
+        }
+
+        if (data.sku) {
+            messageParts.push(t('admin.notifications.generated.low_stock.sku', 'SKU: :sku', {
+                sku: data.sku,
+            }));
+        }
+
+        return {
+            title: t('admin.notifications.generated.low_stock.title', 'Producto con stock bajo: :product', {
+                product: data.product_name ?? notification.title,
+            }),
+            message: messageParts.join(' / '),
+            actionLabel: t('admin.notifications.generated.low_stock.action', 'Revisar inventario'),
+        };
     };
 
     const handleMarkNotificationAsRead = (notificationId, onSuccess) => {
@@ -79,6 +159,8 @@ export default function AutenticateNav() {
             router.visit(notification.action_url);
         });
     };
+
+    const notificationPreferenceUrl = (notificationType) => `${route('admin.notifications.index')}?preference_type=${encodeURIComponent(notificationType)}`;
 
     return (
         <nav className="border-b border-gray-100 bg-white">
@@ -398,7 +480,15 @@ export default function AutenticateNav() {
                                         <div className="absolute right-0 mt-2 w-96 max-h-[32rem] overflow-y-auto rounded-md bg-white shadow-lg ring-1 ring-black/5 z-30 text-sm">
                                             <div className="px-3 py-2 border-b border-gray-100 flex items-center justify-between">
                                                 <span className="font-semibold text-gray-700">{t('admin.notifications.title', 'Notificaciones')}</span>
-                                                {totalNotifications > 0 ? (
+                                                <div className="flex items-center gap-2">
+                                                    <Link
+                                                        href={route('admin.notifications.index')}
+                                                        className="text-[11px] font-medium text-sky-700 hover:text-sky-900"
+                                                        onClick={() => setShowingNotifications(false)}
+                                                    >
+                                                        {t('admin.notifications.view_history', 'Ver historial')}
+                                                    </Link>
+                                                    {totalNotifications > 0 ? (
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-xs text-gray-500">{t('admin.notifications.unread_count', '{count} sin leer|{count} sin leer', { count: totalNotifications })}</span>
                                                         <button
@@ -415,49 +505,68 @@ export default function AutenticateNav() {
                                                 ) : (
                                                     <span className="text-xs text-gray-400">{t('admin.notifications.no_alerts', 'Sin alertas')}</span>
                                                 )}
+                                                </div>
                                             </div>
                                             <div className="py-2">
-                                                {notificationItems.map((notification) => (
-                                                    <div key={notification.id} className="border-b border-gray-100 px-3 py-3 last:border-b-0">
-                                                        <div className="flex items-start justify-between gap-3">
-                                                            <div className="min-w-0 flex-1">
-                                                                <div className="mb-1 flex items-center gap-2">
-                                                                    <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold ${notificationTone(notification.severity)}`}>
-                                                                        {t(`admin.notifications.types.${notification.type}`, notification.title)}
-                                                                    </span>
-                                                                    <span className="text-[11px] text-gray-400">
-                                                                        {formatDate(notification.created_at, { dateStyle: 'short', timeStyle: 'short' })}
-                                                                    </span>
+                                                {groupedNotifications.map((group) => (
+                                                    <div key={group.key} className="border-b border-gray-100 last:border-b-0">
+                                                        <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-400">
+                                                            {group.label}
+                                                        </div>
+                                                        {group.items.map((notification) => {
+                                                            const notificationContent = resolveNotificationContent(notification);
+
+                                                            return (
+                                                            <div key={notification.id} className="border-t border-gray-100 px-3 py-3 first:border-t-0">
+                                                                <div className="flex items-start justify-between gap-3">
+                                                                    <div className="min-w-0 flex-1">
+                                                                        <div className="mb-1 flex items-center gap-2">
+                                                                            <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold ${notificationTone(notification.severity)}`}>
+                                                                                {notificationTypeLabel(notification)}
+                                                                            </span>
+                                                                            <span className="text-[11px] text-gray-400">
+                                                                                {formatDate(notification.created_at, { dateStyle: 'short', timeStyle: 'short' })}
+                                                                            </span>
+                                                                        </div>
+                                                                        <p className="truncate text-sm font-semibold text-gray-800">{notificationContent.title}</p>
+                                                                        <p className="mt-1 text-xs leading-5 text-gray-600">{notificationContent.message}</p>
+                                                                    </div>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="text-xs font-medium text-gray-400 hover:text-red-600"
+                                                                        onClick={() => handleDeleteNotification(notification.id)}
+                                                                    >
+                                                                        {t('admin.notifications.delete', 'Eliminar')}
+                                                                    </button>
                                                                 </div>
-                                                                <p className="truncate text-sm font-semibold text-gray-800">{notification.title}</p>
-                                                                <p className="mt-1 text-xs leading-5 text-gray-600">{notification.message}</p>
+                                                                <div className="mt-3 flex items-center justify-end gap-3 text-[11px] font-medium">
+                                                                    <Link
+                                                                        href={notificationPreferenceUrl(notification.type)}
+                                                                        className="text-amber-700 hover:text-amber-900"
+                                                                        onClick={() => setShowingNotifications(false)}
+                                                                    >
+                                                                        {t('admin.notifications.preferences_link', 'Preferencias')}
+                                                                    </Link>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="text-gray-500 hover:text-gray-900"
+                                                                        onClick={() => handleMarkNotificationAsRead(notification.id)}
+                                                                    >
+                                                                        {t('admin.notifications.mark_read', 'Marcar leida')}
+                                                                    </button>
+                                                                    {notification.action_url && (
+                                                                        <button
+                                                                            type="button"
+                                                                            className="text-sky-700 hover:text-sky-900"
+                                                                            onClick={() => handleOpenNotification(notification)}
+                                                                        >
+                                                                            {notificationContent.actionLabel || t('admin.notifications.open', 'Abrir')}
+                                                                        </button>
+                                                                    )}
+                                                                </div>
                                                             </div>
-                                                            <button
-                                                                type="button"
-                                                                className="text-xs font-medium text-gray-400 hover:text-red-600"
-                                                                onClick={() => handleDeleteNotification(notification.id)}
-                                                            >
-                                                                {t('admin.notifications.delete', 'Eliminar')}
-                                                            </button>
-                                                        </div>
-                                                        <div className="mt-3 flex items-center justify-end gap-3 text-[11px] font-medium">
-                                                            <button
-                                                                type="button"
-                                                                className="text-gray-500 hover:text-gray-900"
-                                                                onClick={() => handleMarkNotificationAsRead(notification.id)}
-                                                            >
-                                                                {t('admin.notifications.mark_read', 'Marcar leida')}
-                                                            </button>
-                                                            {notification.action_url && (
-                                                                <button
-                                                                    type="button"
-                                                                    className="text-sky-700 hover:text-sky-900"
-                                                                    onClick={() => handleOpenNotification(notification)}
-                                                                >
-                                                                    {notification.action_label || t('admin.notifications.open', 'Abrir')}
-                                                                </button>
-                                                            )}
-                                                        </div>
+                                                            );
+                                                        })}
                                                     </div>
                                                 ))}
 
@@ -686,7 +795,7 @@ export default function AutenticateNav() {
                                                 href={route('admin.reports.credits.index')}
                                                 active={route().current('admin.reports.credits.*')}
                                             >
-                                                Créditos
+                                                {t('admin.nav.credits', 'Créditos')}
                                             </ResponsiveNavLink>
                                         )}
                                     </>
@@ -696,7 +805,7 @@ export default function AutenticateNav() {
                                         href={route('admin.users.index')}
                                         active={route().current('admin.users.*')}
                                     >
-                                        Usuarios
+                                        {t('admin.nav.users', 'Usuarios')}
                                     </ResponsiveNavLink>
                                 )}
 
@@ -706,7 +815,7 @@ export default function AutenticateNav() {
                                         href={route('admin.warehouses.index')}
                                         active={route().current('admin.warehouses.*')}
                                     >
-                                        Sucursales
+                                        {t('admin.nav.warehouses', 'Sucursales')}
                                     </ResponsiveNavLink>
                                 )}
                                 {canManageSettings && (
@@ -714,7 +823,7 @@ export default function AutenticateNav() {
                                         href={route('admin.settings.index')}
                                         active={route().current('admin.settings.*')}
                                     >
-                                        Configuración
+                                        {t('admin.nav.settings', 'Configuración')}
                                     </ResponsiveNavLink>
                                 )}
                                 <ResponsiveNavLink

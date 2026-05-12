@@ -23,6 +23,7 @@ class User extends Authenticatable
         'email',
         'password',
         'type',
+        'notification_preferences',
     ];
 
     /**
@@ -45,6 +46,31 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'notification_preferences' => 'array',
         ];
+    }
+
+    public function mutedNotificationTypes(?string $channel = null): array
+    {
+        $preferences = is_array($this->notification_preferences) ? $this->notification_preferences : [];
+        $legacyMutedTypes = $preferences['muted_types'] ?? [];
+        $channelMutedTypes = match ($channel) {
+            'bell' => $preferences['channels']['bell']['muted_types'] ?? $legacyMutedTypes,
+            'history' => $preferences['channels']['history']['muted_types'] ?? $legacyMutedTypes,
+            default => array_merge(
+                is_array($preferences['channels']['bell']['muted_types'] ?? null) ? $preferences['channels']['bell']['muted_types'] : [],
+                is_array($preferences['channels']['history']['muted_types'] ?? null) ? $preferences['channels']['history']['muted_types'] : [],
+                is_array($legacyMutedTypes) ? $legacyMutedTypes : [],
+            ),
+        };
+
+        if (! is_array($channelMutedTypes)) {
+            return [];
+        }
+
+        return array_values(array_unique(array_filter(array_map(
+            static fn ($type) => is_string($type) ? trim($type) : null,
+            $channelMutedTypes,
+        ))));
     }
 }

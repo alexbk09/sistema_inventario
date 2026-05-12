@@ -16,6 +16,7 @@
         'delivered' => __('app.report_exports.sales.statuses.delivered'),
         'cancelled' => __('app.report_exports.sales.statuses.cancelled'),
     ];
+    $primaryCurrency = $adminCurrencyCodes[0] ?? 'USD';
 @endphp
 
 <!DOCTYPE html>
@@ -41,7 +42,11 @@
         @if(!empty($filters['date_from']) || !empty($filters['date_to']))
             {{ __('app.report_exports.sales.range') }} {{ $filters['date_from'] ?? __('app.report_exports.sales.range_start') }} - {{ $filters['date_to'] ?? __('app.report_exports.sales.range_today') }}<br>
         @endif
-        {{ __('app.report_exports.sales.metrics.total_invoices') }} {{ $metrics['total_invoices'] }} | {{ __('app.report_exports.sales.metrics.total_usd') }} {{ $formatNumber($metrics['total_usd']) }} | {{ __('app.report_exports.sales.metrics.total_bs') }} {{ $formatNumber($metrics['total_bs']) }} | {{ __('app.report_exports.sales.metrics.avg_ticket_usd') }} {{ $formatNumber($metrics['avg_ticket_usd'] ?? 0) }}
+        {{ __('app.report_exports.sales.metrics.total_invoices') }} {{ $metrics['total_invoices'] }}
+        @foreach(($adminCurrencyCodes ?? []) as $code)
+            | {{ __('app.report_exports.sales.metrics.total_usd') }} {{ $code }} {{ $formatNumber($metricsByCurrency[$code] ?? 0) }}
+        @endforeach
+        | {{ __('app.report_exports.sales.metrics.avg_ticket_usd') }} {{ $primaryCurrency }} {{ $formatNumber($metrics['avg_ticket_admin_totals'][$primaryCurrency] ?? ($metrics['avg_ticket_usd'] ?? 0)) }}
         @if($invoices->count() >= $maxRows)
             <br><span class="small">* {{ __('app.report_exports.sales.max_rows_notice', ['rows' => $maxRows]) }}</span>
         @endif
@@ -56,8 +61,9 @@
             <th>{{ __('app.report_exports.sales.columns.customer') }}</th>
             <th>{{ __('app.report_exports.sales.columns.branch_warehouse') }}</th>
             <th>{{ __('app.report_exports.sales.columns.status') }}</th>
-            <th class="right">{{ __('app.report_exports.sales.columns.total_usd') }}</th>
-            <th class="right">{{ __('app.report_exports.sales.columns.total_bs') }}</th>
+            @foreach(($adminCurrencyCodes ?? []) as $code)
+                <th class="right">{{ __('app.report_exports.sales.columns.total_usd') }} {{ $code }}</th>
+            @endforeach
         </tr>
         </thead>
         <tbody>
@@ -69,12 +75,13 @@
                 <td>{{ optional($invoice->customer)->name }}</td>
                 <td>{{ $invoice->warehouse->name ?? $invoice->warehouse->code ?? '' }}</td>
                 <td>{{ $statusLabels[$invoice->status] ?? $invoice->status }}</td>
-                <td class="right">{{ $formatNumber((float) $invoice->total_usd) }}</td>
-                <td class="right">{{ $formatNumber((float) $invoice->total_bs) }}</td>
+                @foreach(($adminCurrencyCodes ?? []) as $code)
+                    <td class="right">{{ $formatNumber((float) ($invoice->admin_totals[$code] ?? 0)) }}</td>
+                @endforeach
             </tr>
         @empty
             <tr>
-                <td colspan="8" class="small">{{ __('app.report_exports.sales.no_results') }}</td>
+                <td colspan="{{ 6 + count($adminCurrencyCodes ?? []) }}" class="small">{{ __('app.report_exports.sales.no_results') }}</td>
             </tr>
         @endforelse
         </tbody>

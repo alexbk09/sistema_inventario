@@ -11,7 +11,7 @@ class InvoiceItem extends Model
     use HasFactory;
 
     protected $fillable = [
-        'invoice_id', 'product_id', 'quantity', 'price_usd', 'subtotal_usd', 'subtotal_bs'
+        'invoice_id', 'product_id', 'quantity', 'price_usd', 'subtotal_usd', 'subtotal_bs', 'unit_currency_code', 'unit_price_original', 'subtotal_original', 'exchange_rate_snapshot', 'monetary_breakdown_json'
     ];
 
     protected $casts = [
@@ -19,6 +19,10 @@ class InvoiceItem extends Model
         'price_usd' => 'float',
         'subtotal_usd' => 'float',
         'subtotal_bs' => 'float',
+        'unit_price_original' => 'float',
+        'subtotal_original' => 'float',
+        'exchange_rate_snapshot' => 'float',
+        'monetary_breakdown_json' => 'array',
     ];
 
     public function invoice(): BelongsTo

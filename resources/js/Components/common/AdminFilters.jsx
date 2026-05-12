@@ -1,14 +1,19 @@
 import React from 'react'
 import { Search, Plus } from 'lucide-react'
+import { useI18n } from '@/Hooks/useI18n'
 
 export default function AdminFilters({
-  searchPlaceholder = 'Buscar...',
+  searchPlaceholder,
   searchValue = '',
   onSearchChange = () => {},
   onAddNew,
-  addButtonLabel = 'Nuevo',
+  addButtonLabel,
   children,
 }) {
+  const { t } = useI18n()
+  const resolvedSearchPlaceholder = searchPlaceholder ?? t('admin.filters.search_placeholder', 'Buscar...')
+  const resolvedAddButtonLabel = addButtonLabel ?? t('admin.filters.new', 'Nuevo')
+
   return (
     <div className="space-y-4 mb-6">
       <div className="flex flex-col md:flex-row gap-3">
@@ -16,7 +21,7 @@ export default function AdminFilters({
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
           <input
             type="text"
-            placeholder={searchPlaceholder}
+            placeholder={resolvedSearchPlaceholder}
             value={searchValue}
             onChange={(e) => onSearchChange(e.target.value)}
             className="w-full pl-10 pr-4 py-2 bg-card border border-border rounded-lg text-foreground focus:outline-none focus:border-primary transition"
@@ -28,7 +33,7 @@ export default function AdminFilters({
             className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition font-medium whitespace-nowrap"
           >
             <Plus className="w-5 h-5" />
-            {addButtonLabel}
+            {resolvedAddButtonLabel}
           </button>
         )}
       </div>

@@ -7,11 +7,19 @@ import { useI18n } from '@/Hooks/useI18n';
 import { useLocaleFormat } from '@/Hooks/useLocaleFormat';
 import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates';
 
-export default function SalesTopProducts({ items, filters = {}, warehouses = [] }) {
+export default function SalesTopProducts({ items, filters = {}, warehouses = [], adminCurrencyContext = {} }) {
   const { t } = useI18n();
-  const { formatNumber } = useLocaleFormat();
-  const { displayCurrency, formatPriceFromUsd } = useConfiguredCurrencyRates();
-  const formatActiveAmount = (value) => formatPriceFromUsd(Number(value || 0), displayCurrency);
+  const { formatNumber, formatCurrency } = useLocaleFormat();
+  const { displayCurrency, comparisonCurrency, formatPriceFromUsd, hasRateForCurrency } = useConfiguredCurrencyRates();
+  const formatActiveAmount = (value, currency = displayCurrency) => formatPriceFromUsd(Number(value || 0), currency);
+  const secondaryCurrency = comparisonCurrency && comparisonCurrency !== displayCurrency && hasRateForCurrency(comparisonCurrency)
+    ? comparisonCurrency
+    : null;
+  const visibleCurrencyCodes = Array.isArray(adminCurrencyContext?.codes) && adminCurrencyContext.codes.length > 0
+    ? adminCurrencyContext.codes
+    : [displayCurrency, ...(secondaryCurrency ? [secondaryCurrency] : [])].filter(Boolean);
+  const currencyColumns = [...new Set(visibleCurrencyCodes)];
+  const formatServerAmount = (code, value) => formatCurrency(Number(value || 0), code);
   const [localFilters, setLocalFilters] = useState({
     date_from: filters.date_from || '',
     date_to: filters.date_to || '',
@@ -186,7 +194,9 @@ export default function SalesTopProducts({ items, filters = {}, warehouses = [] 
                 <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.sales.top_products.table.product', 'Producto')}</th>
                 <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.sales.top_products.table.sku_barcode', 'SKU / Código')}</th>
                 <th className="px-3 py-2 text-right font-semibold">{t('admin.reports.sales.top_products.table.total_quantity', 'Cantidad vendida')}</th>
-                <th className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.sales.top_products.table.total_usd', 'Total')} ${displayCurrency}`}</th>
+                {currencyColumns.map((code) => (
+                  <th key={code} className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.sales.top_products.table.total_usd', 'Total')} ${code}`}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -196,14 +206,20 @@ export default function SalesTopProducts({ items, filters = {}, warehouses = [] 
                     {(page - 1) * perPage + index + 1}
                   </td>
                   <td className="px-3 py-2 text-xs">{row.product?.name ?? t('admin.reports.sales.top_products.table.deleted_product', 'Producto eliminado')}</td>
-                  <td className="px-3 py-2 text-xs">{row.product?.sku || row.product?.barcode || '-'}</td>
+                  <td className="px-3 py-2 text-xs">{row.product?.sku || row.product?.barcode || t('admin.reports.sales.values.empty_dash', '—')}</td>
                   <td className="px-3 py-2 text-xs text-right">{formatNumber(row.total_quantity, { maximumFractionDigits: 0 })}</td>
-                  <td className="px-3 py-2 text-xs text-right">{formatActiveAmount(row.total_sales_usd)}</td>
+                  {currencyColumns.map((code) => (
+                    <td key={`${row.product_id}-${code}`} className="px-3 py-2 text-xs text-right">
+                      {row.document_totals?.[code] !== undefined
+                        ? formatServerAmount(code, row.document_totals[code])
+                        : formatActiveAmount(row.total_sales_usd, code)}
+                    </td>
+                  ))}
                 </tr>
               ))}
               {items.data.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-3 py-6 text-center text-sm text-muted-foreground">
+                  <td colSpan={4 + currencyColumns.length} className="px-3 py-6 text-center text-sm text-muted-foreground">
                     {t('admin.reports.sales.top_products.empty', 'No hay ventas para los filtros seleccionados.')}
                   </td>
                 </tr>

@@ -21,6 +21,18 @@ class Rma extends Model
         'resolution_type',
         'total_usd',
         'total_bs',
+        'currency_code',
+        'base_currency_code',
+        'exchange_rate_snapshot',
+        'exchange_rate_source',
+        'monetary_totals_json',
+    ];
+
+    protected $casts = [
+        'total_usd' => 'float',
+        'total_bs' => 'float',
+        'exchange_rate_snapshot' => 'float',
+        'monetary_totals_json' => 'array',
     ];
 
     public function invoice(): BelongsTo

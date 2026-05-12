@@ -41,6 +41,9 @@ Route::middleware(['auth', 'verified', 'role:cliente', 'permission:view customer
 
 Route::middleware(['auth', 'verified', 'role:admin|supervisor|cashier|warehouse'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/admin/notifications', [AdminNotificationController::class, 'index'])->name('admin.notifications.index');
+    Route::put('/admin/notifications/preferences', [AdminNotificationController::class, 'updatePreferences'])->name('admin.notifications.preferences');
+    Route::post('/admin/notifications/bulk', [AdminNotificationController::class, 'bulkUpdate'])->name('admin.notifications.bulk');
     Route::post('/admin/notifications/read-all', [AdminNotificationController::class, 'markAllRead'])->name('admin.notifications.read_all');
     Route::post('/admin/notifications/{notification}/read', [AdminNotificationController::class, 'markRead'])->name('admin.notifications.read');
     Route::delete('/admin/notifications/{notification}', [AdminNotificationController::class, 'destroy'])->name('admin.notifications.destroy');

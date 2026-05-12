@@ -7,11 +7,19 @@ import { useI18n } from '@/Hooks/useI18n';
 import { useLocaleFormat } from '@/Hooks/useLocaleFormat';
 import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates';
 
-export default function SalesByCategory({ rows, filters = {}, warehouses = [], metrics }) {
+export default function SalesByCategory({ rows, filters = {}, warehouses = [], metrics, adminCurrencyContext = {} }) {
   const { t } = useI18n();
-  const { formatNumber } = useLocaleFormat();
-  const { displayCurrency, formatPriceFromUsd } = useConfiguredCurrencyRates();
-  const formatActiveAmount = (value) => formatPriceFromUsd(Number(value || 0), displayCurrency);
+  const { formatNumber, formatCurrency } = useLocaleFormat();
+  const { displayCurrency, comparisonCurrency, formatPriceFromUsd, hasRateForCurrency } = useConfiguredCurrencyRates();
+  const formatActiveAmount = (value, currency = displayCurrency) => formatPriceFromUsd(Number(value || 0), currency);
+  const secondaryCurrency = comparisonCurrency && comparisonCurrency !== displayCurrency && hasRateForCurrency(comparisonCurrency)
+    ? comparisonCurrency
+    : null;
+  const visibleCurrencyCodes = Array.isArray(adminCurrencyContext?.codes) && adminCurrencyContext.codes.length > 0
+    ? adminCurrencyContext.codes
+    : [displayCurrency, ...(secondaryCurrency ? [secondaryCurrency] : [])].filter(Boolean);
+  const currencyColumns = [...new Set(visibleCurrencyCodes)];
+  const formatServerAmount = (code, value) => formatCurrency(Number(value || 0), code);
   const [localFilters, setLocalFilters] = useState({
     date_from: filters.date_from || '',
     date_to: filters.date_to || '',
@@ -62,7 +70,7 @@ export default function SalesByCategory({ rows, filters = {}, warehouses = [], m
         description={t('admin.reports.sales.by_category.hero_description', 'La vista resume volumen y monto vendido por categoría dentro del mismo sistema visual de reportes, con filtros y navegación integrados.')}
         stats={[
           { label: t('admin.reports.sales.by_category.stats.total_quantity', 'Cantidad vendida'), value: formatNumber(metrics.total_quantity || 0, { maximumFractionDigits: 0 }) },
-          { label: `${t('admin.reports.sales.by_category.stats.total_usd', 'Total')} ${displayCurrency}`, value: formatActiveAmount(metrics.total_sales_usd || 0) },
+          { label: `${t('admin.reports.sales.by_category.stats.total_usd', 'Total')} ${displayCurrency}`, value: metrics.total_sales_admin_totals?.[displayCurrency] !== undefined ? formatServerAmount(displayCurrency, metrics.total_sales_admin_totals[displayCurrency]) : formatActiveAmount(metrics.total_sales_usd || 0) },
           { label: t('admin.reports.sales.by_category.stats.active_filters', 'Filtros activos'), value: activeFilters },
         ]}
         contextTitle={t('admin.reports.sales.by_category.context_title', 'Ventas por categoría')}
@@ -185,7 +193,9 @@ export default function SalesByCategory({ rows, filters = {}, warehouses = [], m
                 <th className="px-3 py-2 text-left font-semibold">#</th>
                 <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.sales.by_category.table.category', 'Categoría')}</th>
                 <th className="px-3 py-2 text-right font-semibold">{t('admin.reports.sales.by_category.table.total_quantity', 'Cantidad vendida')}</th>
-                <th className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.sales.by_category.table.total_usd', 'Total')} ${displayCurrency}`}</th>
+                {currencyColumns.map((code) => (
+                  <th key={code} className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.sales.by_category.table.total_usd', 'Total')} ${code}`}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -194,12 +204,18 @@ export default function SalesByCategory({ rows, filters = {}, warehouses = [], m
                   <td className="px-3 py-2 text-xs">{(page - 1) * perPage + index + 1}</td>
                   <td className="px-3 py-2 text-xs">{row.category_name}</td>
                   <td className="px-3 py-2 text-xs text-right">{formatNumber(row.total_quantity, { maximumFractionDigits: 0 })}</td>
-                  <td className="px-3 py-2 text-xs text-right">{formatActiveAmount(row.total_sales_usd)}</td>
+                  {currencyColumns.map((code) => (
+                    <td key={`${row.category_name}-${code}`} className="px-3 py-2 text-xs text-right">
+                      {row.document_totals?.[code] !== undefined
+                        ? formatServerAmount(code, row.document_totals[code])
+                        : formatActiveAmount(row.total_sales_usd, code)}
+                    </td>
+                  ))}
                 </tr>
               ))}
               {rows.data.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-3 py-6 text-center text-sm text-muted-foreground">
+                  <td colSpan={3 + currencyColumns.length} className="px-3 py-6 text-center text-sm text-muted-foreground">
                     {t('admin.reports.sales.by_category.empty', 'No hay ventas para los filtros seleccionados.')}
                   </td>
                 </tr>

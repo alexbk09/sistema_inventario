@@ -6,12 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\CreditAccount;
 use App\Models\CreditMovement;
 use App\Models\Customer;
+use App\Services\AdminMoneyService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class CreditMovementsReportController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, AdminMoneyService $adminMoneyService)
     {
         $filters = [
             'customer_id' => $request->input('customer_id'),
@@ -53,13 +54,63 @@ class CreditMovementsReportController extends Controller
 
         $movements = $query->paginate(50)->withQueryString();
 
-        $collection = $movements->getCollection();
+        $adminCurrencyContext = $adminMoneyService->getAdminCurrencyContext();
+
+        $collection = $movements->getCollection()->map(function (CreditMovement $movement) use ($adminMoneyService) {
+            $snapshot = is_array($movement->monetary_totals_json['rates'] ?? null)
+                ? [
+                    'base_currency' => (string) ($movement->base_currency_code ?: 'USD'),
+                    'captured_at' => $movement->monetary_totals_json['captured_at'] ?? null,
+                    'rates' => $movement->monetary_totals_json['rates'],
+                ]
+                : null;
+
+            $movement->admin_totals = $adminMoneyService->buildAdminTotals((float) ($movement->amount_usd ?? 0), null, $snapshot)['totals'];
+            $movement->display_currency_code = (string) ($movement->currency_code ?: ($movement->monetary_totals_json['currency_code'] ?? 'USD'));
+            $movement->display_original_amount = (float) ($movement->amount_original ?? ($movement->monetary_totals_json['original_amount'] ?? ($movement->amount_usd ?? 0)));
+
+            return $movement;
+        });
+
+        $movements->setCollection($collection);
+
+        $zeroTotals = [];
+        foreach ($adminCurrencyContext['codes'] as $code) {
+            $zeroTotals[$code] = 0.0;
+        }
+
+        $chargeTotals = $zeroTotals;
+        $paymentTotals = $zeroTotals;
+
+        foreach ($collection as $movement) {
+            foreach ($movement->admin_totals ?? [] as $code => $amount) {
+                if (! array_key_exists($code, $zeroTotals)) {
+                    continue;
+                }
+
+                if ($movement->type === 'charge') {
+                    $chargeTotals[$code] += (float) $amount;
+                } else {
+                    $paymentTotals[$code] += (float) $amount;
+                }
+            }
+        }
+
+        $netTotals = [];
+        foreach ($zeroTotals as $code => $amount) {
+            $netTotals[$code] = round(($chargeTotals[$code] ?? 0) - ($paymentTotals[$code] ?? 0), 2);
+            $chargeTotals[$code] = round((float) ($chargeTotals[$code] ?? 0), 2);
+            $paymentTotals[$code] = round((float) ($paymentTotals[$code] ?? 0), 2);
+        }
 
         $metrics = [
             'total_movements' => $movements->total(),
             'page_movements' => $collection->count(),
             'total_charges_usd' => (float) $collection->where('type', 'charge')->sum('amount_usd'),
             'total_payments_usd' => (float) $collection->where('type', 'payment')->sum('amount_usd'),
+            'total_charges_admin_totals' => $chargeTotals,
+            'total_payments_admin_totals' => $paymentTotals,
+            'net_balance_admin_totals' => $netTotals,
             'net_balance_usd' => 0,
         ];
         $metrics['net_balance_usd'] = $metrics['total_charges_usd'] - $metrics['total_payments_usd'];
@@ -88,6 +139,7 @@ class CreditMovementsReportController extends Controller
             'accounts' => $accounts,
             'types' => $types,
             'statuses' => $statuses,
+            'adminCurrencyContext' => $adminCurrencyContext,
         ]);
     }
 }

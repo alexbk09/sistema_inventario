@@ -34,7 +34,7 @@ export default function AdminTable({
               ))}
               {(onEdit || onDelete || onView) && (
                 <th className="px-4 py-3 text-left text-sm font-semibold text-foreground">
-                  {t('admin.providers.index.table.actions', 'Acciones')}
+                  {t('admin.common.table.actions', 'Actions')}
                 </th>
               )}
             </tr>
@@ -43,13 +43,13 @@ export default function AdminTable({
             {loading ? (
               <tr>
                 <td colSpan={columns.length + (onEdit || onDelete || onView ? 1 : 0)} className="px-4 py-8 text-center text-muted-foreground">
-                  {t('admin.providers.index.states.loading', 'Cargando...')}
+                  {t('admin.common.table.loading', 'Loading...')}
                 </td>
               </tr>
             ) : data.length === 0 ? (
               <tr>
                 <td colSpan={columns.length + (onEdit || onDelete || onView ? 1 : 0)} className="px-4 py-8 text-center text-muted-foreground">
-                  {t('admin.providers.index.states.empty', 'No hay registros')}
+                  {t('admin.common.table.empty', 'No records found')}
                 </td>
               </tr>
             ) : (
@@ -59,7 +59,7 @@ export default function AdminTable({
                     <td key={String(col.key)} className="px-4 py-3 text-sm text-foreground">
                       {col.render
                         ? col.render(row[col.key], row)
-                        : String(row[col.key] || '-')}
+                        : String(row[col.key] || t('admin.common.table.values.empty_dash', '—'))}
                     </td>
                   ))}
                   {(onEdit || onDelete || onView) && (
@@ -69,7 +69,7 @@ export default function AdminTable({
                           <button
                             onClick={() => onView(row)}
                             className="p-1 hover:bg-muted rounded transition text-foreground"
-                            title={t('admin.providers.index.actions.view', 'Ver')}
+                            title={t('admin.common.table.view', 'View')}
                           >
                             <Eye className="w-4 h-4" />
                           </button>
@@ -78,7 +78,7 @@ export default function AdminTable({
                           <button
                             onClick={() => onEdit(row)}
                             className="p-1 hover:bg-muted rounded transition text-accent"
-                            title={t('admin.providers.index.actions.edit', 'Editar')}
+                            title={t('admin.common.table.edit', 'Edit')}
                           >
                             <Edit className="w-4 h-4" />
                           </button>
@@ -87,7 +87,7 @@ export default function AdminTable({
                           <button
                             onClick={() => onDelete(row)}
                             className="p-1 hover:bg-destructive/10 rounded transition text-destructive"
-                            title={t('admin.providers.index.actions.delete', 'Eliminar')}
+                            title={t('admin.common.table.delete', 'Delete')}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
