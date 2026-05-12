@@ -1,392 +1,671 @@
-
-## Últimas Actualizaciones (marzo 2026)
-
-- Unificada la lógica de imágenes de productos en Home y Tienda: ahora el campo `image` siempre entrega la primera imagen del carrusel (si existe) o el `image_url` de respaldo, igual que en carrito y recomendaciones. Esto asegura visualización consistente en todos los módulos del frontend (carrusel, listado, recomendaciones, carrito).
-
----
-
-## Dashboard de Clientes
-
-Ruta: `/mi-panel` (solo usuarios con rol cliente)
-
-Incluye:
-- Resumen de compras (total gastado, compras, última compra)
-- Historial de compras
-- Productos más comprados
-- Datos de perfil
 # Sistema de Inventario
 
-Aplicación web de gestión de inventario, ventas y clientes pensada para comercios que venden en USD y BS. Está construida con **Laravel 12**, **Inertia.js + React** y **Tailwind CSS**, e incluye panel administrativo, tienda pública y módulos avanzados como créditos, apartados, multi‑bodega y RMA.
+Plataforma web integral para comercios que necesitan controlar inventario, ventas, clientes, facturacion, creditos, apartados, garantias, multiples bodegas y operacion administrativa desde un solo sistema.
 
-Para una descripción técnica más profunda de modelos, servicios y flujos de negocio revisa la documentación ampliada en [docs/documentacion-sistema-inventario.md](docs/documentacion-sistema-inventario.md).
+El proyecto combina una tienda publica con checkout, un backoffice con reportes y exportaciones, y una capa de configuracion avanzada para branding, moneda, seguridad, pagos y parametros operativos. Esta documentacion esta pensada para tres usos:
 
----
+- presentar el sistema en GitHub de forma profesional
+- facilitar instalacion y puesta en marcha
+- dejar explicito el alcance funcional y tecnico del producto si se desea comercializar
 
-## Características principales
+Para documentacion tecnica complementaria revisa [docs/documentacion-sistema-inventario.md](docs/documentacion-sistema-inventario.md), [docs/plan-tecnico-multimoneda-admin.md](docs/plan-tecnico-multimoneda-admin.md) y [docs/transicion-legacy-multimoneda.md](docs/transicion-legacy-multimoneda.md).
 
+## 1. Resumen ejecutivo
 
+Este sistema permite operar un negocio con catalogo, stock, ventas, clientes y reportes en una sola aplicacion. Incluye:
 
-# ⚠️ NOTA IMPORTANTE (abril 2026)
+- panel administrativo con control por roles y permisos
+- tienda publica con carrito y checkout autenticado
+- facturacion manual y ventas desde tienda
+- inventario con entradas, salidas, kardex, valorizacion y rotacion
+- multi bodega con transferencias internas
+- CRM basico de clientes
+- creditos y apartados
+- RMA para devoluciones y garantias
+- notificaciones administrativas y auditoria
+- exportaciones CSV, Excel y PDF
+- configuracion multimoneda con visibilidad por admin y snapshot historico en documentos
+- integracion opcional con PayPal, Stripe e IA local para imagenes
 
-El servicio de IA para procesamiento de imágenes y todas sus referencias han sido **deshabilitadas temporalmente** en Docker y en el backend (jobs y controladores) para acelerar el build y evitar errores mientras se resuelven problemas con los contenedores Python/IA.
+## 2. Propuesta de valor
 
-Si necesitas reactivar la funcionalidad de IA, descomenta las secciones correspondientes en `docker-compose.yml`, `ProcessProductImage.php` y `ProductController.php`.
+El sistema esta orientado a negocios que necesitan trazabilidad operativa y capacidad de crecimiento sin depender de hojas de calculo o herramientas separadas.
 
-- `/` – Home con productos destacados y tasa de cambio.
-- `/shop` – Tienda pública con listado de productos y filtros.
-- `/dashboard` – Dashboard administrativo (requiere usuario autenticado con rol `admin`).
-- `/admin/...` – Gestión de productos, inventario, bodegas, facturas, clientes, proveedores, créditos, apartados, RMA y escáner QR.
+### Beneficios de negocio
 
----
+- centraliza ventas, inventario, clientes y postventa
+- reduce errores de stock y de facturacion manual
+- permite operar con multiples bodegas y distintos perfiles internos
+- ofrece reportes exportables para gerencia y administracion
+- soporta multimoneda con criterio historico para no distorsionar documentos viejos
+- deja base tecnica suficiente para personalizacion por cliente final
 
+### Casos de uso ideales
 
+- tiendas retail y distribuidores pequenos o medianos
+- negocios con ventas fisicas y catalogo online
+- operaciones con pago contado, credito y apartados
+- empresas que necesitan exportar reportes administrativos y comerciales
 
-## Últimas Actualizaciones
+## 3. Arquitectura y stack tecnologico
 
-- **30/04/2026:**
-   - Se corrigió el arranque Docker de `app` reescribiendo la configuración de Supervisor para administrar explícitamente `php-fpm` y `queue-worker`.
-   - Se eliminó el fallo de permisos `EACCES` del worker de colas y el socket de Supervisor quedó operativo con configuración consistente.
-   - El `entrypoint` ahora arranca Supervisor con archivo de configuración explícito y ajusta permisos mínimos para Laravel (`storage` y `bootstrap/cache`).
-   - Se optimizó el build Docker agregando `.dockerignore`, usando capas cacheables para Composer y npm, y sustituyendo `npm install` por `npm ci`.
-   - Se eliminó la clave obsoleta `version` de `docker-compose.yml` para evitar warnings innecesarios.
+### Backend
 
-- **28/03/2026:**
-   - Se unificaron los módulos de cliente y usuario: ahora los clientes se registran como usuarios con rol `cliente` y pueden acceder a su propio dashboard en `/mi-panel`.
-   - Se implementó el dashboard de clientes con resumen de compras, historial y productos más comprados.
-   - La navegación y el menú admin ahora se adaptan dinámicamente según el rol y permisos del usuario (cliente, admin, etc.).
-   - Se mejoró el feedback visual de errores en formularios (registro, login, checkout) usando notificaciones (react-hot-toast).
-   - Se escribieron y ajustaron tests feature para los nuevos flujos de registro, login, checkout y dashboard, asegurando la correcta gestión de permisos y roles (Spatie Permission).
-   - El checkout ahora muestra los productos con el mismo diseño visual que el carrito de compra: tarjetas con imagen, nombre, categoría, precio editable, cantidad (+/−) y botón eliminar. Esto mejora la experiencia de usuario y la consistencia visual en el flujo de compra.
+- PHP 8.2
+- Laravel 12
+- Eloquent ORM
+- Laravel Queue con conexion database
+- Spatie Permission para roles y permisos
+- Maatwebsite Excel para exportaciones XLSX
+- DomPDF para exportaciones PDF
+- Simple QR Code para codigos QR
 
----
+### Frontend
 
-## Tecnologías
+- Inertia.js 2
+- React 18
+- Vite 7
+- Tailwind CSS 3
+- Headless UI
+- Chart.js y react-chartjs-2
+- react-hot-toast
+- lucide-react
 
-- **Backend:** Laravel 12 (PHP 8.2), MySQL/MariaDB.
-- **Frontend:** Inertia.js + React 18, Vite, Tailwind CSS, Headless UI, Lucide Icons.
-- **Colas de trabajo:** Laravel Queue con `QUEUE_CONNECTION=database`.
-- **Gráficos y UI:** Chart.js + react-chartjs-2, react-hot-toast, react-qr-reader.
-- **IA opcional:** FastAPI (Python) para generar captions y tags de imágenes (ver carpeta `tools/`).
+### Integraciones opcionales
 
----
+- PayPal
+- Stripe
+- FastAPI + Python para procesamiento local de imagenes
 
-## Requisitos
+### Base de datos y despliegue
 
-- PHP **8.2** (XAMPP, Laragon u otro stack similar).
-- Composer.
-- Node.js + npm (para Vite y React).
-- MySQL/MariaDB en ejecución.
-- Python 3.10+ (solo si usarás el servicio de IA local).
+- MySQL 8 en Docker
+- compatible con MySQL o MariaDB en entornos locales tipo XAMPP o Laragon
+- nginx + php-fpm en stack Docker
 
-En Windows se recomienda usar **Laragon** o **XAMPP**. Los ejemplos de comandos están pensados para **PowerShell**.
+## 4. Idiomas y capacidades transversales
 
----
+El sistema ya cuenta con base de internacionalizacion y dispone de archivos de idioma para:
 
-## Configuración de entorno (.env)
+- espanol
+- ingles
+- frances
+- italiano
+- portugues
 
-Desde la raíz del proyecto (`c:/xampp/htdocs/sistema_inventario`):
+Ademas incluye estas capacidades transversales:
+
+- autenticacion y verificacion de correo
+- control de acceso por roles y permisos
+- auditoria de acciones internas
+- notificaciones administrativas persistentes
+- exportaciones administrativas
+- configuracion centralizada desde backoffice
+- compatibilidad con multimoneda administrativa
+
+## 5. Alcance funcional completo del sistema
+
+Esta seccion resume lo que el sistema hace actualmente a nivel funcional y operativo.
+
+### 5.1. Sitio publico y experiencia de compra
+
+- Home con productos destacados
+- Tienda publica con listado de productos
+- Vista individual de producto
+- Carrito autenticado
+- Checkout autenticado
+- Confirmacion de compra
+- Seguimiento publico de pedido o factura
+- Newsletter
+- Cambio de idioma
+
+### 5.2. Autenticacion, usuarios y roles
+
+- registro de usuarios
+- inicio y cierre de sesion
+- recuperacion de contrasena
+- verificacion de correo
+- perfil de usuario
+- roles internos como admin, supervisor, cashier y warehouse
+- rol cliente con acceso a panel propio
+- permisos granulares por modulo
+
+### 5.3. Dashboard administrativo
+
+El dashboard central del backoffice muestra indicadores operativos y comerciales, incluyendo:
+
+- ventas del dia y del mes
+- ticket promedio
+- margen estimado
+- ventas contado versus credito
+- stock total y productos con bajo inventario
+- resumen por estados de factura
+- alertas de apartados vencidos
+- resumen de creditos
+- filtros por bodega cuando aplica
+
+### 5.4. Configuracion general del sistema
+
+Desde el modulo de ajustes se pueden administrar:
+
+- datos generales de la empresa
+- datos de ubicacion
+- branding, logo y colores
+- parametros de facturacion
+- configuracion de monedas
+- textos de tienda publica
+- parametros de inventario
+- reglas de bodega por defecto
+- reglas basicas de seguridad
+- enlaces QR
+- textos de correo
+- metodos de pago y cuentas bancarias
+
+### 5.5. Configuracion multimoneda
+
+El sistema ya soporta un modelo administrativo multimoneda con estas caracteristicas:
+
+- moneda base configurable
+- moneda de visualizacion por defecto
+- catalogo dinamico de monedas soportadas
+- monedas activas o inactivas
+- visibilidad separada para tienda y admin
+- monedas habilitadas o no para checkout
+- tasa manual o automatica por moneda
+- sincronizacion de tasas desde configuracion
+- snapshots historicos para documentos transaccionales
+- reportes y exportaciones alineados con monedas visibles en admin
+
+Esto permite que la operacion administrativa use varias monedas visibles sin alterar documentos historicos cuando cambian las tasas.
+
+### 5.6. Productos y categorias
+
+- CRUD de productos
+- CRUD de categorias
+- imagen principal y galeria de imagenes
+- SKU y codigo de barras
+- productos destacados
+- importacion masiva de productos
+- relacion producto-categoria
+- soporte para precio base y visualizacion multimoneda
+
+### 5.7. Inventario
+
+- historial de movimientos por producto
+- entradas de inventario
+- salidas de inventario
+- resumen de entradas y salidas
+- costo unitario y valorizacion
+- notas y referencias por movimiento
+- integracion con proveedores y bodegas
+- kardex administrativo
+- reporte global de inventario
+- reporte de inventario por bodega
+- reporte de rotacion
+- exportaciones CSV, Excel y PDF
+
+### 5.8. Bodegas y transferencias
+
+- gestion de bodegas o sucursales
+- transferencia de stock entre bodegas
+- detalle y seguimiento de transferencias
+- soporte para estadisticas por bodega
+
+### 5.9. Proveedores
+
+- CRUD de proveedores
+- asociacion de movimientos de inventario a proveedor
+- base lista para procesos de abastecimiento y conciliacion operativa
+
+### 5.10. Clientes y CRM basico
+
+- listado de clientes
+- creacion manual de clientes
+- detalle de cliente
+- historial de compras
+- gasto acumulado del cliente
+- informacion de contacto e identificacion
+- vinculacion con creditos, apartados y facturas
+
+### 5.11. Panel del cliente
+
+Cada cliente autenticado puede acceder a su propia area en /mi-panel con:
+
+- resumen de compras
+- historial de compras
+- productos mas comprados
+- actualizacion de perfil
+
+### 5.12. Facturacion y ventas administrativas
+
+- listado de facturas
+- creacion manual de facturas
+- actualizacion de facturas
+- items de factura
+- estados de factura
+- contacto asociado a factura
+- integracion con inventario
+- soporte para snapshots monetarios historicos
+- QR y seguimiento publico de pedido/factura
+
+### 5.13. Tienda, checkout y pagos
+
+El flujo de compra soporta:
+
+- carrito autenticado
+- checkout con validaciones de stock
+- descuentos por cupon cuando corresponde
+- pago manual con referencia
+- integracion con PayPal
+- integracion con Stripe
+- registro de transacciones de pasarela
+- confirmacion final de compra
+
+### 5.14. Creditos
+
+- cuentas de credito por cliente
+- detalle de cuenta
+- movimientos de credito
+- cargos y abonos
+- saldo y limite
+- reportes de credito
+- reporte de movimientos de credito
+
+### 5.15. Apartados
+
+- listado de apartados
+- creacion de apartados
+- detalle de apartado
+- actualizacion de apartado
+- items y totales
+- pagos acumulados
+- reporte administrativo de apartados
+
+### 5.16. RMA, devoluciones y garantias
+
+- listado de casos RMA
+- creacion de casos
+- detalle de RMA
+- actualizacion de estado o notas
+- items relacionados
+- soporte de criterio monetario documental en vistas administrativas
+
+### 5.17. Reportes gerenciales y operativos
+
+El sistema incluye superficies de reporteria para:
+
+- ventas
+- top de productos vendidos
+- ventas por categoria
+- inventario global
+- inventario por bodega
+- kardex
+- rotacion de inventario
+- creditos
+- movimientos de credito
+- apartados
+
+### 5.18. Exportaciones
+
+Se incluyen exportaciones administrativas para diferentes modulos:
+
+- CSV
+- Excel
+- PDF
+
+Actualmente las exportaciones mas completas y consolidadas estan en reportes de ventas e inventario, alineadas con el criterio monetario administrativo vigente.
+
+### 5.19. Notificaciones administrativas
+
+- centro de notificaciones en backoffice
+- marcado individual y masivo como leido
+- eliminacion de notificaciones
+- preferencias por canal
+- soporte para silencios por tipo de alerta
+
+### 5.20. Auditoria
+
+- registro de acciones administrativas
+- trazabilidad para cambios relevantes
+- consultas desde modulo de auditoria
+
+### 5.21. QR y utilidades publicas
+
+- QR para facturas
+- QR para productos
+- QR para canal de WhatsApp
+
+### 5.22. Procesamiento opcional de imagenes con IA
+
+El repositorio incluye una integracion opcional basada en Python para:
+
+- generar captions de imagenes
+- generar tags simples
+- procesar imagenes en background con colas
+
+En Docker esta deshabilitada por defecto para simplificar el arranque del sistema.
+
+### 5.23. Base de dominio adicional
+
+El codigo tambien incluye entidades como AccountsPayable para evolucion futura del producto. A la fecha, la superficie administrativa visible y consolidada se centra en los modulos listados arriba; por tanto, si se va a comercializar, conviene presentar cuentas por pagar como base preparada o fase posterior, no como flujo totalmente cerrado del backoffice actual.
+
+## 6. Estructura del proyecto
+
+Las carpetas mas relevantes del repositorio son:
+
+- [app](app): modelos, controladores, servicios, jobs y logica de dominio
+- [bootstrap](bootstrap): arranque de Laravel
+- [config](config): configuraciones del framework y del negocio
+- [database](database): migraciones, factories y seeders
+- [docs](docs): documentacion funcional y tecnica
+- [docker](docker): configuracion de nginx, php-fpm y supervisor
+- [public](public): punto de entrada web y assets publicados
+- [resources](resources): vistas, componentes React, traducciones y estilos
+- [routes](routes): rutas web, auth y consola
+- [storage](storage): logs, cache, archivos y framework storage
+- [tests](tests): pruebas unitarias y feature
+- [tools](tools): scripts auxiliares y servicio IA en Python
+
+## 7. Requisitos para instalacion
+
+### Opcion local
+
+- PHP 8.2
+- Composer
+- Node.js y npm
+- MySQL o MariaDB
+- extensiones PHP requeridas por Laravel
+
+### Opcion Docker
+
+- Docker Desktop
+- Docker Compose
+
+### Opcion IA local
+
+- Python 3.8 o superior
+- pip
+- entorno virtual recomendado
+
+## 8. Instalacion local paso a paso
+
+Los ejemplos siguientes estan pensados para Windows y PowerShell.
+
+### 8.1. Clonar e instalar dependencias
 
 ```powershell
-copy .env.example .env   # en PowerShell
-```
-
-Edita el archivo `.env` y ajusta, como mínimo:
-
-- Base de datos
-   - `DB_CONNECTION=mysql`
-   - `DB_HOST=127.0.0.1`
-   - `DB_PORT=3306` (o el puerto que uses: 3307 en algunos casos de Laragon)
-   - `DB_DATABASE=sistema_inventario`
-   - `DB_USERNAME=root`
-   - `DB_PASSWORD=` (vacío por defecto en Laragon)
-
-- Moneda y tasas (USD → BS)
-   - `BS_RATE=` tasa provisional en BS por 1 USD (fallback si la API no responde).
-   - `BS_API_URL=` URL del API para tasa BS (cuando se use integración externa).
-
-- Colas y servicio de IA (recomendado para producción / features avanzadas)
-   - `QUEUE_CONNECTION=database`
-   - `IMAGE_AI_URL=http://127.0.0.1:8001/process` (o la URL donde expongas tu servicio de IA).
-
-Genera la key de la aplicación:
-
-```powershell
-php artisan key:generate
-```
-
----
-
-## Instalación y arranque en desarrollo
-
----
-
-## 🚀 Arranque rápido con Docker
-
-El sistema puede ejecutarse completamente en contenedores Docker, incluyendo:
-
-- **App**: Laravel + PHP-FPM + Node + Vite + Supervisor (incluye worker de colas)
-- **DB**: MySQL 8
-- **Nginx**: proxy HTTP expuesto en el puerto 8080
-
-Actualmente el servicio de IA está deshabilitado para acelerar el build y estabilizar el stack.
-
-### 1. Requisitos previos
-
-- Docker y Docker Compose instalados
-
-### 2. Levantar todos los servicios
-
-Desde la raíz del proyecto:
-
-```bash
-docker-compose up --build
-```
-
-En Windows también puedes usar el helper del repo para levantar el stack y esperar a que quede saludable:
-
-```powershell
-./tools/docker-up.ps1
-```
-
-Si además quieres forzar rebuild de imágenes:
-
-```powershell
-./tools/docker-up.ps1 -Build
-```
-
-Esto levantará:
-- `app` (PHP-FPM + Laravel + worker de colas bajo Supervisor)
-- `db` (MySQL, datos persistentes en volumen `db_data`)
-- `nginx` (servidor HTTP)
-
-Accede a la app en: [http://localhost:8080](http://localhost:8080)
-
-Si ya construiste antes y quieres forzar recreación completa del contenedor principal:
-
-```bash
-docker-compose up -d --build --force-recreate app nginx
-```
-
-
-### 3. Primer uso y migraciones
-
-Las migraciones y seeders se ejecutan automáticamente al iniciar el contenedor `app`.
-No necesitas correr comandos manuales: al hacer `docker-compose up --build` el sistema estará listo para usar.
-
-Para validar que los procesos internos quedaron arriba:
-
-```bash
-docker-compose exec app supervisorctl -c /etc/supervisor/conf.d/supervisord.conf status
-```
-
-Deberías ver `php-fpm` y `queue-worker` en estado `RUNNING`.
-
-### 4. Variables de entorno
-
-El archivo `.env` ya está preparado para funcionar en Docker. Si necesitas personalizar credenciales, revisa `docker-compose.yml` y `.env`.
-
----
-
-### 1. Dependencias PHP y Node
-
-```powershell
+git clone <url-del-repositorio>
+cd C:\xampp\htdocs\sistema_inventario
 composer install
 npm install
 ```
 
-### 2. Migraciones, seeds y enlaces de almacenamiento
-
-Primero genera las tablas necesarias (incluyendo colas) y ejecuta los seeders base:
+### 8.2. Crear archivo de entorno
 
 ```powershell
-# (opcional pero recomendado antes de migrar si vas a usar colas)
-php artisan queue:table
+Copy-Item .env.example .env
+php artisan key:generate
+```
 
+### 8.3. Configurar base de datos
+
+La plantilla .env.example viene simple para desarrollo. Para una instalacion real local suele convenir MySQL o MariaDB. Ajusta al menos:
+
+```env
+APP_NAME="Sistema de Inventario"
+APP_URL=http://127.0.0.1:8000
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=sistema_inventario
+DB_USERNAME=root
+DB_PASSWORD=
+
+QUEUE_CONNECTION=database
+
+DEMO_ADMIN_NAME="Administrador"
+DEMO_ADMIN_EMAIL="admin@example.com"
+DEMO_ADMIN_PASSWORD="admin12345"
+DEMO_CLIENT_NAME="Cliente Demo"
+DEMO_CLIENT_EMAIL="cliente@example.com"
+DEMO_CLIENT_PASSWORD="cliente12345"
+```
+
+### 8.4. Migraciones, seeders y storage
+
+```powershell
+php artisan queue:table
 php artisan migrate
 php artisan db:seed --class=RoleSeeder
 php artisan db:seed --class=DemoSeeder
 php artisan storage:link
 ```
 
-Las cuentas demo quedan configurables desde variables de entorno:
+Si necesitas catalogos iniciales adicionales puedes ejecutar tambien los seeders disponibles en [database/seeders](database/seeders).
+
+### 8.5. Levantar entorno de desarrollo
+
+Opcion con varias terminales:
 
 ```powershell
-DEMO_ADMIN_EMAIL=admin@example.com
-DEMO_ADMIN_PASSWORD=admin12345
-DEMO_CLIENT_EMAIL=cliente@example.com
-DEMO_CLIENT_PASSWORD=cliente12345
-```
-
-Si necesitas regenerar solo las cuentas y datos demo después de cambiar esas variables, usa:
-
-```powershell
-php artisan db:seed --class=DemoSeeder
-```
-
-> Nota: si ya habías corrido `php artisan migrate` antes de `php artisan queue:table`, vuelve a ejecutar `php artisan migrate` para aplicar la migración de la cola.
-
-### 3. Servidor Laravel, Vite y cola de trabajos
-
-Tienes dos formas de levantar todo en desarrollo:
-
-#### Opción A – Comandos manuales (varias terminales)
-
-En distintas ventanas de terminal, desde la raíz del proyecto:
-
-```powershell
-# 1) Servidor HTTP de Laravel
 php artisan serve
-
-# 2) Cola de trabajos (jobs de facturación, IA, etc.)
 php artisan queue:work --tries=3 --sleep=3
-
-# 3) Frontend (Vite + React)
 npm run dev
 ```
 
-#### Opción B – Script de desarrollo con Composer
-
-El proyecto define un script `dev` en `composer.json` que usa `concurrently` para lanzar todo junto:
+Opcion unificada con Composer:
 
 ```powershell
 composer dev
 ```
 
-Este comando levanta:
-- `php artisan serve`
-- `php artisan queue:listen`
-- `php artisan pail` (visualización de logs en tiempo real)
-- `npm run dev`
-
-Mantén esta terminal abierta mientras desarrollas.
-
-### 4. Compilación para producción
-
-Para generar los assets listos para producción:
+### 8.6. Build de frontend para produccion
 
 ```powershell
 npm run build
 ```
 
----
+## 9. Instalacion con Docker
 
-## Servicio de IA local (opcional)
+El proyecto incluye un stack Docker listo con:
 
-El servicio que genera descripciones y tags de imágenes de productos está en `tools/image_service.py` y se ejecuta con **FastAPI + Uvicorn**.
+- app Laravel + php-fpm + Vite + Supervisor
+- MySQL 8
+- nginx
 
-1. Crear entorno virtual e instalar dependencias (desde la carpeta `tools`):
+### 9.1. Levantar contenedores
 
 ```powershell
-cd tools
+docker-compose up --build
+```
+
+O usando el helper del repositorio:
+
+```powershell
+.\tools\docker-up.ps1
+```
+
+### 9.2. Accesos y puertos principales
+
+- aplicacion HTTP: http://localhost:8080
+- Vite: http://localhost:5173
+- MySQL del contenedor: localhost:3307
+
+### 9.3. Notas de Docker
+
+- el contenedor app usa APP_AUTO_SEED=false por defecto
+- las migraciones se aplican durante el arranque del contenedor
+- la IA de imagenes esta deshabilitada por defecto en docker-compose.yml
+
+## 10. Acceso inicial y configuracion como administrador
+
+### 10.1. Credenciales demo por defecto
+
+Si ejecutaste DemoSeeder con los valores por defecto de .env:
+
+- admin: admin@example.com
+- clave admin: admin12345
+- cliente demo: cliente@example.com
+- clave cliente demo: cliente12345
+
+Estas credenciales se controlan desde [config/demo.php](config/demo.php) y las variables DEMO_ADMIN_* y DEMO_CLIENT_* del entorno.
+
+### 10.2. Primer inicio recomendado del admin
+
+Despues de entrar al sistema como administrador, revisa esta lista:
+
+1. Configurar datos de empresa, correo, telefono y marca.
+2. Ajustar prefijo y longitud de facturas.
+3. Revisar impuestos e IGTF si aplica.
+4. Configurar monedas activas, visibles y habilitadas para checkout.
+5. Crear o validar bodegas.
+6. Configurar reglas de inventario como stock minimo y stock negativo.
+7. Configurar cuentas bancarias y metodos de pago.
+8. Revisar URL base para QR y seguimiento de documentos.
+9. Crear usuarios internos y asignar roles o permisos.
+10. Cargar catalogo inicial de productos y categorias.
+
+### 10.3. Que puede configurar el admin desde ajustes
+
+El modulo de ajustes centraliza:
+
+- informacion fiscal y comercial de la empresa
+- ubicacion y contacto
+- branding del sistema
+- facturacion
+- tienda publica
+- multimoneda
+- inventario
+- seguridad basica
+- QR
+- correos transaccionales
+- metodos de pago manuales, PayPal y Stripe
+
+## 11. Operacion diaria sugerida
+
+Un flujo comun de uso administrativo seria:
+
+1. Configurar monedas, bodega por defecto, bancos y branding.
+2. Crear categorias, productos, proveedores y bodegas.
+3. Registrar inventario inicial o entradas por producto.
+4. Operar ventas desde tienda o facturacion manual.
+5. Controlar salidas de stock y transferencias.
+6. Gestionar clientes, creditos, apartados y RMA.
+7. Consultar dashboard y reportes.
+8. Exportar informacion administrativa cuando sea necesario.
+
+## 12. Scripts y comandos utiles
+
+### Composer
+
+- composer setup
+- composer dev
+- composer test
+
+### Node
+
+- npm run dev
+- npm run build
+
+### Laravel
+
+- php artisan migrate
+- php artisan db:seed --class=DemoSeeder
+- php artisan queue:work
+- php artisan storage:link
+
+### Smoke y validacion
+
+- powershell -ExecutionPolicy Bypass -File .\tools\run-backoffice-smoke.ps1
+- powershell -ExecutionPolicy Bypass -File .\tools\run-backoffice-smoke.ps1 -Cleanup
+
+## 13. Pruebas y calidad
+
+El proyecto ya incluye pruebas unitarias y feature en [tests](tests), incluyendo validaciones sobre:
+
+- autenticacion y perfil
+- checkout
+- dashboard del cliente
+- multimoneda administrativa
+- reportes de inventario
+- reporte de ventas documental
+
+Para ejecutar la suite principal:
+
+```powershell
+php artisan test
+```
+
+O mediante Composer:
+
+```powershell
+composer test
+```
+
+## 14. Servicio opcional de IA para imagenes
+
+Si deseas activar el procesamiento local de imagenes:
+
+1. Configura en .env:
+
+```env
+QUEUE_CONNECTION=database
+IMAGE_AI_URL=http://127.0.0.1:8001/process
+```
+
+2. Instala dependencias Python:
+
+```powershell
 python -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+.venv\Scripts\activate
+pip install --upgrade pip
+pip install -r tools\requirements.txt
 ```
 
-2. Iniciar el servicio (mantener esta terminal abierta):
+3. Levanta el servicio:
 
 ```powershell
-.venv\Scripts\python.exe -m uvicorn image_service:app --host 127.0.0.1 --port 8001
+uvicorn tools.image_service:app --host 127.0.0.1 --port 8001 --workers 1
 ```
 
-3. Probar el endpoint (ejemplo con `curl` en PowerShell):
+4. Levanta el worker de Laravel:
 
 ```powershell
-curl -X POST "http://127.0.0.1:8001/process" -F "file=@C:\ruta\imagen.jpg" -F "lang=es" -F "verbose=true" -F "tags_from_caption=true" -H "accept: application/json"
+php artisan queue:work
 ```
 
-Asegúrate de que en `.env` esté configurado `IMAGE_AI_URL` apuntando a este endpoint.
+Mas detalle en [tools/README_IMAGE_AI.md](tools/README_IMAGE_AI.md).
 
-Notas:
+## 15. Consideraciones para comercializacion
 
-- Si el worker de Laravel no procesa jobs, revisa que `QUEUE_CONNECTION=database` y que `php artisan queue:work` siga corriendo.
-- Si el servicio de Python falla al cargar modelos, revisa la terminal de `uvicorn` por dependencias faltantes (por ejemplo, `sentencepiece`) y vuelve a ejecutar `pip install -r requirements.txt`.
+Si el objetivo es vender o licenciar este sistema, el alcance que ya puede presentarse de forma explicita es:
 
----
+- plataforma web full stack para operacion comercial
+- tienda publica y backoffice en una sola base
+- inventario, ventas, clientes y postventa integrados
+- soporte para exportaciones administrativas
+- multi bodega
+- control de usuarios, roles y auditoria
+- configuracion operativa y visual desde admin
+- base multimoneda con criterio historico documental
+- integraciones opcionales de pago e IA
 
-## Módulos funcionales (resumen)
+### Lo que conviene aclarar comercialmente
 
-Este es un resumen operativo de lo que hace el sistema. Los detalles técnicos (modelos, servicios y flujos) están ampliados en [docs/documentacion-sistema-inventario.md](docs/documentacion-sistema-inventario.md).
+- el sistema es altamente personalizable por rubro y marca
+- algunas entidades del dominio ya existen como base de crecimiento aunque su flujo visible pueda requerir cierre adicional segun el cliente
+- la capa multimoneda principal ya esta implementada en ventas, inventario, dashboard y reportes clave, con deuda residual de limpieza legacy en superficies menores
 
-- **Productos y categorías**
-   - CRUD completo de productos, categorías e imágenes asociadas.
-   - Precio base en USD y cálculo automático en BS (`price_bs`) usando la tasa configurada.
+## 16. Documentacion complementaria
 
-- **Inventario y movimientos**
-   - Entradas y salidas de stock con motivos, notas y referencia.
-   - Servicio `InventoryService` que actualiza stock y registra el historial de movimientos.
+- [docs/documentacion-sistema-inventario.md](docs/documentacion-sistema-inventario.md): documentacion tecnica ampliada
+- [docs/plan-tecnico-multimoneda-admin.md](docs/plan-tecnico-multimoneda-admin.md): seguimiento del trabajo multimoneda en admin
+- [docs/transicion-legacy-multimoneda.md](docs/transicion-legacy-multimoneda.md): estrategia de convivencia y migracion monetaria
+- [docs/validacion-funcional-backoffice.md](docs/validacion-funcional-backoffice.md): validacion funcional del backoffice
 
-- **Multi‑bodega y transferencias**
-   - Definición de bodegas/sucursales.
-   - Transferencias de stock entre bodegas con sus propios movimientos de inventario.
+## 17. Estado actual del producto
 
-- **Ventas y facturación**
-   - Facturas con items, totales en USD/BS e integración con inventario.
-   - Estados de factura (pending, paid, cancelled).
+El sistema ya es una base robusta y funcional para operacion real. El core de negocio principal esta cubierto: catalogo, inventario, ventas, clientes, dashboard, reportes, exportaciones, creditos, apartados, RMA y configuracion administrativa.
 
-- **Clientes, proveedores y usuarios**
-   - Gestión de clientes con historial de compras.
-   - Gestión de proveedores para compras y reposición de stock.
-   - Usuarios internos con roles y permisos (admin, user, etc.).
-
-- **Créditos y apartados**
-   - Cuentas de crédito por cliente con movimientos de cargo y abono.
-   - Sistema de apartados (layaway) para reservar productos con pagos parciales.
-
-- **RMA (devoluciones y garantías)**
-   - Registro de casos de devolución/garantía asociados a facturas y productos.
-   - Control de estado y posibles ajustes de inventario.
-
-- **Tienda pública, carrito y checkout**
-   - Home y tienda pública con productos, precios en USD/BS y filtros.
-   - Carrito autenticado con endpoints de API para React.
-   - Flujo de checkout y página de confirmación.
-
-- **Dashboard y métricas**
-   - Dashboard avanzado con gráficos de ventas por día (Chart.js) comparando últimos 30 días vs período anterior.
-   - KPIs de ventas: total facturas, total USD, ticket promedio, margen estimado y distribución % de ventas a crédito vs contado.
-   - Tarjetas clásicas de resumen: ventas del día/mes, productos con bajo stock, stock total, facturas por estado, RMA, apartados y créditos.
-   - Filtro por bodega para ver estadísticas y métricas por sucursal.
-
-- **Reportes avanzados**
-   - Reportes de ventas (3.1): por rango de fechas, ranking de productos y ventas por categoría, con navegación unificada por pestañas.
-   - Reportes de inventario (3.2): existencias por bodega, kardex y rotación de productos, también con pestañas de navegación unificadas.
-   - Reportes de créditos (3.3): resumen de créditos por cliente (saldo actual, límite, morosidad) e historial de movimientos/pagos.
-   - Reporte de apartados: resumen de apartados activos y vencidos con métricas clave y filtros por cliente/fecha/estado.
-
----
-
-## Scripts útiles
-
-Además de los comandos anteriores, el proyecto define en `composer.json` y `package.json` los siguientes scripts de ayuda:
-
-- `composer setup` – instalación inicial (dependencias, `.env`, key, migraciones y build de frontend).
-- `composer dev` – entorno de desarrollo completo (servidor Laravel, cola, logs y Vite).
-- `composer test` – ejecuta el suite de tests de Laravel.
-- `npm run dev` – servidor de desarrollo de Vite + React.
-- `npm run build` – build de frontend para producción.
-
----
-
-## Historial de cambios reciente
-
-### 14-03-2026
-
-- Se unificó la navegación de los reportes de **ventas (3.1)** y **inventario (3.2)** usando pestañas entre las distintas vistas (facturas, ranking de productos, ventas por categoría, existencias, kardex y rotación de productos).
-- Se añadieron los reportes financieros del bloque **3.3**:
-   - Reporte de **créditos por cliente** con saldo actual, límite y morosidad.
-   - Historial detallado de **movimientos de crédito y pagos**.
-   - **Resumen de apartados activos y vencidos** con métricas, filtros y tabla detallada.
-- Se implementó un **dashboard avanzado** (3.4) con:
-   - Gráfico de ventas diarias (Chart.js) comparando los últimos 30 días frente al período anterior.
-   - KPIs de ventas (total facturas, monto total, ticket promedio, margen estimado) y distribución de ventas a crédito vs contado.
-   - Filtro global por **bodega/sucursal** aplicado a las métricas de ventas.
-   - Conservación de los cuadros clásicos del dashboard: tarjetas de ventas día/mes, stock, facturas por estado, RMA pendientes, apartados activos, créditos abiertos, módulos de acceso rápido y listas de productos con stock bajo y apartados vencidos.
-
----
-
-## Próximos pasos
-
-1. Seguir las secciones de instalación de este README para levantar el entorno local.
-2. Revisar la documentación ampliada en [docs/documentacion-sistema-inventario.md](docs/documentacion-sistema-inventario.md) para entender el dominio y la arquitectura interna.
-3. Personalizar textos, logos y estilos en los componentes React según la marca del proyecto.
+Como en cualquier producto vivo, todavia existen frentes de evolucion y afinacion, especialmente en cierre total de algunas superficies financieras complementarias y en limpieza final de compatibilidades legacy del modelo monetario. Eso no invalida el valor actual del sistema; simplemente conviene presentarlo con precision tecnica y comercial.
