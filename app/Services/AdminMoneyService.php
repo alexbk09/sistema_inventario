@@ -59,13 +59,18 @@ class AdminMoneyService
     public function convertFromBase(float $amount, string $targetCurrency, ?array $currencySettings = null): float
     {
         $context = $this->getAdminCurrencyContext($currencySettings);
+        return $this->convertFromBaseWithContext($amount, $targetCurrency, $context);
+    }
+
+    public function convertFromBaseWithContext(float $amount, string $targetCurrency, array $context): float
+    {
         $code = strtoupper(trim($targetCurrency));
 
         if ($code === '') {
             throw new InvalidArgumentException('Target currency code is required.');
         }
 
-        if ($code === $context['base_currency']) {
+        if ($code === ($context['base_currency'] ?? 'USD')) {
             return round($amount, 2);
         }
 
@@ -75,6 +80,23 @@ class AdminMoneyService
         }
 
         return round($amount * (float) $rate, 2);
+    }
+
+    public function buildTotalsWithContext(float $baseAmount, array $context): array
+    {
+        $codes = is_array($context['codes'] ?? null) ? $context['codes'] : [];
+        $totals = [];
+
+        foreach ($codes as $code) {
+            $totals[$code] = $this->convertFromBaseWithContext($baseAmount, $code, $context);
+        }
+
+        return [
+            'base_amount' => round($baseAmount, 2),
+            'base_currency' => (string) ($context['base_currency'] ?? ($context['default_display_currency'] ?? 'USD')),
+            'default_display_currency' => (string) ($context['default_display_currency'] ?? ($context['base_currency'] ?? 'USD')),
+            'totals' => $totals,
+        ];
     }
 
     public function convertUsingSnapshot(float $amount, string $targetCurrency, array $snapshot): float

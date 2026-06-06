@@ -9,6 +9,8 @@ interface SupportedCurrency {
   resolved_rate?: number | null
   manual_rate?: number | null
   last_rate?: number | null
+  rate_mode?: string | null
+  last_synced_at?: string | null
 }
 
 export function useConfiguredCurrencyRates() {
@@ -21,7 +23,45 @@ export function useConfiguredCurrencyRates() {
   const { formatCurrency } = useLocaleFormat()
   const [remoteRates, setRemoteRates] = useState<Record<string, number>>({ [baseCurrency]: 1 })
 
+  const hasFreshRate = (currency: SupportedCurrency): boolean => {
+    if (!currency || !currency.last_rate || !currency.last_synced_at) {
+      return false
+    }
+
+    const lastSynced = Date.parse(currency.last_synced_at)
+    if (Number.isNaN(lastSynced)) {
+      return false
+    }
+
+    const FOUR_HOURS_MS = 4 * 60 * 60 * 1000
+    return Date.now() - lastSynced <= FOUR_HOURS_MS
+  }
+
+  const shouldFetchRemoteRates = useMemo(() => {
+    if (baseCurrency === displayCurrency) {
+      return false
+    }
+
+    return supportedCurrencies.some((currency) => {
+      if (String(currency.code) === baseCurrency) {
+        return false
+      }
+      if (!currency.enabled) {
+        return false
+      }
+      if ((String(currency.rate_mode ?? 'auto')) !== 'auto') {
+        return false
+      }
+      return !hasFreshRate(currency)
+    })
+  }, [baseCurrency, displayCurrency, supportedCurrencies])
+
   useEffect(() => {
+    if (!shouldFetchRemoteRates) {
+      setRemoteRates({ [baseCurrency]: 1 })
+      return
+    }
+
     let active = true
 
     fetch('/api/currency/promedios', { cache: 'no-store' })
@@ -41,7 +81,7 @@ export function useConfiguredCurrencyRates() {
     return () => {
       active = false
     }
-  }, [baseCurrency])
+  }, [baseCurrency, shouldFetchRemoteRates])
 
   const fallbackRates = useMemo(() => {
     const entries = supportedCurrencies
@@ -107,6 +147,7 @@ export function useConfiguredCurrencyRates() {
     displayCurrency,
     baseCurrency,
     secondaryCurrency,
+    availableCurrencies,
     comparisonCurrency,
     ratesByCode,
     convertFromUsd,

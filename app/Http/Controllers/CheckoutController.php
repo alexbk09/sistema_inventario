@@ -118,7 +118,7 @@ class CheckoutController extends Controller
         $shippingUsd = 200.0;
         $taxRate = 0.15;
 
-        return DB::transaction(function () use ($payload, $currency, $inventory, $shippingUsd, $taxRate, $methodConfig, $selectedMethod) {
+        return DB::transaction(function () use ($payload, $currency, $inventory, $shippingUsd, $taxRate, $methodConfig, $selectedMethod, $adminMoneyService, $notificationService) {
             $rate = isset($payload['rateBs']) ? (float) $payload['rateBs'] : null;
             $verifiedGatewayTransaction = null;
             $checkoutCurrency = $this->resolveCheckoutCurrency((string) ($payload['checkoutCurrency'] ?? 'USD'));

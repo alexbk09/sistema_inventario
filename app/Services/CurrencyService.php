@@ -108,10 +108,12 @@ class CurrencyService
         $settings = CurrencySettings::normalize($currencySettings ?? Settings::get('currency', CurrencySettings::defaults()));
         $baseCurrency = (string) ($settings['base_currency'] ?? 'USD');
         $supportedCurrencies = is_array($settings['supported_currencies'] ?? null) ? $settings['supported_currencies'] : [];
+        $refreshIntervalMinutes = max(1, (int) ($settings['auto_refresh_interval_minutes'] ?? 240));
 
         $rates = [$baseCurrency => 1.0];
         $currencies = [];
         $providerGroups = [];
+        $needsUpdate = false;
 
         foreach ($supportedCurrencies as $currency) {
             if (! is_array($currency)) {
@@ -145,6 +147,17 @@ class CurrencyService
                 }
             }
 
+            $lastRate = isset($currency['last_rate']) && is_numeric($currency['last_rate']) ? (float) $currency['last_rate'] : null;
+            $lastSyncedAt = isset($currency['last_synced_at']) ? $currency['last_synced_at'] : null;
+            $hasFreshRate = $this->hasFreshRate($lastSyncedAt, $refreshIntervalMinutes);
+
+            if ($lastRate !== null && $hasFreshRate) {
+                $rates[$code] = $lastRate;
+                $currency['resolved_rate'] = $lastRate;
+                $currencies[] = $currency;
+                continue;
+            }
+
             $provider = strtolower((string) ($currency['rate_provider'] ?? $settings['rate_provider'] ?? 'manual'));
             $providerGroups[$provider][] = $code;
             $currencies[] = $currency;
@@ -153,11 +166,14 @@ class CurrencyService
         foreach ($providerGroups as $provider => $codes) {
             $providerRates = $this->fetchProviderRates($provider, $baseCurrency, array_values(array_unique($codes)));
             foreach ($providerRates as $code => $rate) {
-                $rates[$code] = $rate;
+                if ($rate > 0) {
+                    $rates[$code] = $rate;
+                }
             }
         }
 
-        $currencies = array_map(function (array $currency) use ($rates, $baseCurrency) {
+        $now = now()->toIso8601String();
+        $currencies = array_map(function (array $currency) use ($rates, $baseCurrency, $now, &$needsUpdate) {
             $code = strtoupper((string) ($currency['code'] ?? ''));
             $resolvedRate = $rates[$code] ?? null;
             if ($resolvedRate === null && $code === $baseCurrency) {
@@ -172,10 +188,29 @@ class CurrencyService
                 $resolvedRate = (float) $currency['manual_rate'];
             }
 
+            if ($resolvedRate !== null && $currency['rate_mode'] === 'auto' && $currency['code'] !== $baseCurrency) {
+                $lastRate = isset($currency['last_rate']) && is_numeric($currency['last_rate']) ? (float) $currency['last_rate'] : null;
+                if ($lastRate !== $resolvedRate) {
+                    $currency['last_rate'] = $resolvedRate;
+                    $currency['last_synced_at'] = $now;
+                    $needsUpdate = true;
+                } elseif (empty($currency['last_synced_at'])) {
+                    $currency['last_synced_at'] = $now;
+                    $needsUpdate = true;
+                }
+            }
+
             $currency['resolved_rate'] = $resolvedRate;
 
             return $currency;
         }, $currencies);
+
+        if ($needsUpdate && $currencySettings === null) {
+            Settings::set('currency', [
+                ...$settings,
+                'supported_currencies' => $currencies,
+            ]);
+        }
 
         return [
             'base_currency' => $baseCurrency,
@@ -184,6 +219,24 @@ class CurrencyService
             'rates' => $rates,
             'currencies' => $currencies,
         ];
+    }
+
+    protected function hasFreshRate(?string $timestamp, int $maxAgeMinutes = 240): bool
+    {
+        if (! $timestamp) {
+            return false;
+        }
+
+        try {
+            $lastSynced = strtotime($timestamp);
+            if ($lastSynced === false) {
+                return false;
+            }
+
+            return (time() - $lastSynced) <= ($maxAgeMinutes * 60);
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     protected function fetchProviderRates(string $provider, string $baseCurrency, array $targets): array

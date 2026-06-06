@@ -124,6 +124,7 @@ class InvoiceController extends Controller
             'payments.*.currency_code' => ['nullable','string','max:10'],
             'payments.*.amount_bs' => ['nullable','numeric','min:0'],
             'payments.*.reference' => ['nullable','string','max:255'],
+            'payments.*.payer' => ['nullable','string','max:255'],
             'payments.*.bank' => ['nullable','string','max:255'],
             'payments.*.notes' => ['nullable','string','max:500'],
         ]);
@@ -369,6 +370,7 @@ class InvoiceController extends Controller
             'payments.*.reference' => ['nullable','string','max:255'],
             'payments.*.bank' => ['nullable','string','max:255'],
             'payments.*.notes' => ['nullable','string','max:500'],
+            'payments.*.payer' => ['nullable','string','max:255'],
             'adjustments' => ['sometimes','array'],
             'adjustments.*.type' => ['required_with:adjustments','in:credit,debit'],
             'adjustments.*.amount_usd' => ['required_with:adjustments','numeric','min:0.01'],
@@ -602,6 +604,7 @@ class InvoiceController extends Controller
             'reference' => $payment['reference'] ?? null,
             'bank' => $payment['bank'] ?? null,
             'notes' => $payment['notes'] ?? null,
+            'payer' => $payment['payer'] ?? null,
         ];
     }
 

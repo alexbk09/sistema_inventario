@@ -219,56 +219,7 @@ Route::get('/', [HomeController::class, 'index'])->name('home');
 
 Route::get('/shop', [ShopController::class, 'index'])->name('shop.index');
 
-Route::get('/product/{product}', function (\App\Models\Product $product) {
-    $currency = app(\App\Services\CurrencyService::class);
-    $rate = $currency->getPromedio('oficial') ?? (float) config('currency.bs_rate', 0);
-
-    $product->load(['categories:id,name', 'images' => function ($q) { $q->orderBy('sort_order'); }]);
-
-    $data = [
-        'id' => $product->id,
-        'name' => $product->name,
-        'sku' => $product->sku,
-        'barcode' => $product->barcode,
-        'description' => $product->description,
-        'price' => (float) $product->price_usd,
-        'price_bs' => round((float) $product->price_usd * ($rate ?: 0), 2),
-        'images' => $product->images->map(fn ($img) => [
-            'id' => $img->id,
-            'url' => asset('storage/'.$img->path),
-        ]),
-        'image' => $product->image_url,
-        'category' => optional($product->categories->first())->name ?? null,
-        'categories' => $product->categories->pluck('name'),
-        'stock' => (int) $product->stock,
-        'rating' => 5,
-        'reviews' => 0,
-    ];
-
-    $relatedQuery = \App\Models\Product::where('id', '!=', $product->id)
-        ->when($product->categories->isNotEmpty(), function ($q) use ($product) {
-            $q->whereHas('categories', function ($q2) use ($product) {
-                $q2->whereIn('categories.id', $product->categories->pluck('id'));
-            });
-        })
-        ->with(['categories:id,name']);
-
-    $related = $relatedQuery->take(8)->get()->map(function ($p) use ($rate) {
-        return [
-            'id' => $p->id,
-            'name' => $p->name,
-            'price' => (float) $p->price_usd,
-            'image' => $p->image_url,
-            'category' => optional($p->categories->first())->name ?? null,
-        ];
-    });
-
-    return Inertia::render('Product/Show', [
-        'product' => $data,
-        'related' => $related,
-        'rate' => $rate,
-    ]);
-})->name('product.show');
+Route::get('/product/{product}', [ShopController::class, 'show'])->name('product.show');
 
 // Checkout protegido (requiere autenticación)
 Route::middleware('auth')->group(function () {

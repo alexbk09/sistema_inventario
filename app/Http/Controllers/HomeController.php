@@ -28,8 +28,6 @@ class HomeController extends Controller
             ->take(8)
             ->get()
             ->map(function ($p) use ($rate) {
-                $primaryImage = $p->images->sortBy('sort_order')->first();
-                $imageUrl = $primaryImage ? asset('storage/' . $primaryImage->path) : ($p->image_url ?: null);
                 return [
                     'id' => $p->id,
                     'name' => $p->name,
@@ -37,9 +35,9 @@ class HomeController extends Controller
                     'price_bs' => round((float) $p->price_usd * ($rate ?: 0), 2),
                     'images' => $p->images->map(fn ($img) => [
                         'id' => $img->id,
-                        'url' => asset('storage/'.$img->path),
+                        'url' => $img->url,
                     ]),
-                    'image' => $imageUrl,
+                    'image' => $p->image,
                     'category' => optional($p->categories->first())->name ?? null,
                     'categories' => $p->categories->pluck('name'),
                     'stock' => (int) $p->stock,

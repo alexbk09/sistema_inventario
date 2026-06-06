@@ -74,6 +74,12 @@ return [
                     'email' => 'Email',
                     'phone' => 'Telefone',
                     'address' => 'Endereço',
+                                'facebook_url' => 'URL do Facebook',
+                                'instagram_url' => 'URL do Instagram',
+                                'twitter_url' => 'URL do X / Twitter',
+                                'youtube_url' => 'URL do YouTube',
+                                'tiktok_url' => 'URL do TikTok',
+                                'linkedin_url' => 'URL do LinkedIn',
                 ],
             ],
         ],
@@ -275,6 +281,7 @@ return [
                 'submit' => 'Confirmar',
             ],
         ],
+    ],
     ],
     'admin' => [
         'pagination' => [
@@ -3420,7 +3427,9 @@ return [
         'social_facebook' => 'Facebook',
         'social_instagram' => 'Instagram',
         'social_twitter' => 'Twitter',
+        'social_youtube' => 'YouTube',
+        'social_tiktok' => 'TikTok',
+        'social_linkedin' => 'LinkedIn',
         'rights' => 'Todos os direitos reservados.',
-    ],
     ],
 ];

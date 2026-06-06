@@ -1,7 +1,16 @@
 import { Link, usePage } from '@inertiajs/react';
-import { Facebook, Instagram, Twitter } from 'lucide-react'
+import { Facebook, Instagram, Linkedin, Twitter, Youtube } from 'lucide-react'
 import { useI18n } from '@/Hooks/useI18n';
 import ApplicationLogo from '@/Components/ApplicationLogo';
+
+function TikTokIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
+      <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.12v13.18a2.67 2.67 0 1 1-2.67-2.67c.22 0 .43.03.63.08V9.44a5.8 5.8 0 0 0-.63-.03A5.79 5.79 0 1 0 15.82 15V8.34a7.93 7.93 0 0 0 4.63 1.49V6.69h-.86Z" />
+    </svg>
+  );
+}
+
 export default function FooterLayout() {
     const currentYear = new Date().getFullYear()
       const { props } = usePage();
@@ -10,6 +19,39 @@ export default function FooterLayout() {
       const store = settings.store || {};
         const brandName = general.trade_name || general.company_name || 'Inventario';
   const { t } = useI18n();
+  const socialLinks = [
+    {
+      href: general.facebook_url,
+      label: t('footer.social_facebook', 'Facebook'),
+      Icon: Facebook,
+    },
+    {
+      href: general.instagram_url,
+      label: t('footer.social_instagram', 'Instagram'),
+      Icon: Instagram,
+    },
+    {
+      href: general.twitter_url,
+      label: t('footer.social_twitter', 'Twitter'),
+      Icon: Twitter,
+    },
+    {
+      href: general.youtube_url,
+      label: t('footer.social_youtube', 'YouTube'),
+      Icon: Youtube,
+    },
+    {
+      href: general.tiktok_url,
+      label: t('footer.social_tiktok', 'TikTok'),
+      Icon: TikTokIcon,
+    },
+    {
+      href: general.linkedin_url,
+      label: t('footer.social_linkedin', 'LinkedIn'),
+      Icon: Linkedin,
+    },
+  ].filter((item) => Boolean(item.href));
+
     return (
    <footer className="bg-primary text-primary-foreground mt-16">
       <div className="max-w-7xl mx-auto px-4 py-12">
@@ -78,29 +120,22 @@ export default function FooterLayout() {
             <h4 className="font-semibold mb-4">
               {t('footer.follow_us_title', 'Síguenos')}
             </h4>
-            <div className="flex gap-3 mb-6">
-              <a
-                  href={general.facebook_url || '#'}
-                aria-label={t('footer.social_facebook', 'Facebook')}
-                className="w-10 h-10 bg-primary-foreground/20 rounded-lg flex items-center justify-center hover:bg-primary-foreground/30 transition"
-              >
-                <Facebook className="w-5 h-5" />
-              </a>
-              <a
-                  href={general.instagram_url || '#'}
-                aria-label={t('footer.social_instagram', 'Instagram')}
-                className="w-10 h-10 bg-primary-foreground/20 rounded-lg flex items-center justify-center hover:bg-primary-foreground/30 transition"
-              >
-                <Instagram className="w-5 h-5" />
-              </a>
-              <a
-                  href={general.twitter_url || '#'}
-                aria-label={t('footer.social_twitter', 'Twitter')}
-                className="w-10 h-10 bg-primary-foreground/20 rounded-lg flex items-center justify-center hover:bg-primary-foreground/30 transition"
-              >
-                <Twitter className="w-5 h-5" />
-              </a>
-            </div>
+            {socialLinks.length > 0 && (
+              <div className="flex flex-wrap gap-3 mb-6">
+                {socialLinks.map(({ href, label, Icon }) => (
+                  <a
+                    key={label}
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={label}
+                    className="w-10 h-10 bg-primary-foreground/20 rounded-lg flex items-center justify-center hover:bg-primary-foreground/30 transition"
+                  >
+                    <Icon className="w-5 h-5" />
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

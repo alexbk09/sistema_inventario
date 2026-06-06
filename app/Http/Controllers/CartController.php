@@ -111,20 +111,24 @@ class CartController extends Controller
             'status' => 'open',
         ]);
         $rate = $currency->getPromedio('paralelo') ?? (float) config('currency.bs_rate', 0);
-        $items = CartItem::with('product:id,name')
+        $items = CartItem::with(['product:id,name,image_url', 'product.images' => function ($query) {
+                $query->orderBy('sort_order');
+            }])
             ->where('cart_id', $cart->id)
             ->get()
             ->map(function ($item) use ($rate) {
+                $product = $item->product;
                 $priceUsd = (float) $item->price_usd;
                 $priceBs = round($priceUsd * ($rate ?: 0), 2);
                 return [
                     'product_id' => $item->product_id,
-                    'name' => optional($item->product)->name,
+                    'name' => optional($product)->name,
                     'quantity' => (int) $item->quantity,
                     'price_usd' => $priceUsd,
                     'price_bs' => $priceBs,
                     'subtotal_usd' => round($priceUsd * (int) $item->quantity, 2),
                     'subtotal_bs' => round($priceBs * (int) $item->quantity, 2),
+                    'image' => optional($product)->image ?? '',
                 ];
             });
         $totalUsd = $items->sum('subtotal_usd');

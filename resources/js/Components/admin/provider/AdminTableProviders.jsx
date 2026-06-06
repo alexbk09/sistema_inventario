@@ -1,10 +1,10 @@
-import React from "react"
+import React, { memo } from "react"
 
 import { ChevronLeft, ChevronRight, Edit, Trash2, Eye } from 'lucide-react'
 import AdminPagination from '@/Components/admin/AdminPagination.jsx'
 import { useI18n } from '@/Hooks/useI18n'
 
-export default function AdminTable({
+function AdminTable({
   columns = [],
   data = [],
   page = 1,
@@ -53,50 +53,17 @@ export default function AdminTable({
                 </td>
               </tr>
             ) : (
-              data.map((row) => (
-                <tr key={row.id} className="border-b border-border hover:bg-muted/50 transition">
-                  {columns.map((col) => (
-                    <td key={String(col.key)} className="px-4 py-3 text-sm text-foreground">
-                      {col.render
-                        ? col.render(row[col.key], row)
-                        : String(row[col.key] || t('admin.common.table.values.empty_dash', '—'))}
-                    </td>
-                  ))}
-                  {(onEdit || onDelete || onView) && (
-                    <td className="px-4 py-3 text-sm">
-                      <div className="flex items-center gap-2">
-                        {onView && (
-                          <button
-                            onClick={() => onView(row)}
-                            className="p-1 hover:bg-muted rounded transition text-foreground"
-                            title={t('admin.common.table.view', 'View')}
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                        )}
-                        {onEdit && (
-                          <button
-                            onClick={() => onEdit(row)}
-                            className="p-1 hover:bg-muted rounded transition text-accent"
-                            title={t('admin.common.table.edit', 'Edit')}
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                        )}
-                        {onDelete && (
-                          <button
-                            onClick={() => onDelete(row)}
-                            className="p-1 hover:bg-destructive/10 rounded transition text-destructive"
-                            title={t('admin.common.table.delete', 'Delete')}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  )}
-                </tr>
-              ))
+                data.map((row) => (
+                  <Row
+                    key={row.id}
+                    row={row}
+                    columns={columns}
+                    onEdit={onEdit}
+                    onDelete={onDelete}
+                    onView={onView}
+                    t={t}
+                  />
+                ))
             )}
           </tbody>
         </table>
@@ -106,3 +73,52 @@ export default function AdminTable({
     </div>
   )
 }
+
+  const Row = memo(function Row({ row, columns, onEdit, onDelete, onView, t }) {
+    return (
+      <tr key={row.id} className="border-b border-border hover:bg-muted/50 transition">
+        {columns.map((col) => (
+          <td key={String(col.key)} className="px-4 py-3 text-sm text-foreground">
+            {col.render
+              ? col.render(row[col.key], row)
+              : String(row[col.key] || t('admin.common.table.values.empty_dash', '—'))}
+          </td>
+        ))}
+        {(onEdit || onDelete || onView) && (
+          <td className="px-4 py-3 text-sm">
+            <div className="flex items-center gap-2">
+              {onView && (
+                <button
+                  onClick={() => onView(row)}
+                  className="p-1 hover:bg-muted rounded transition text-foreground"
+                  title={t('admin.common.table.view', 'View')}
+                >
+                  <Eye className="w-4 h-4" />
+                </button>
+              )}
+              {onEdit && (
+                <button
+                  onClick={() => onEdit(row)}
+                  className="p-1 hover:bg-muted rounded transition text-accent"
+                  title={t('admin.common.table.edit', 'Edit')}
+                >
+                  <Edit className="w-4 h-4" />
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  onClick={() => onDelete(row)}
+                  className="p-1 hover:bg-destructive/10 rounded transition text-destructive"
+                  title={t('admin.common.table.delete', 'Delete')}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </td>
+        )}
+      </tr>
+    )
+  })
+
+  export default memo(AdminTable)

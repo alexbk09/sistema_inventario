@@ -31,13 +31,18 @@ export default function InvoiceModal({
   onClose,
   invoice,
 }) {
+  if (!isOpen || !invoice) return null
+
   const { t } = useI18n()
-  const { formatDate, formatDateTime, formatNumber } = useLocaleFormat()
-  const { displayCurrency, comparisonCurrency, formatPriceFromUsd, hasRateForCurrency, availableCurrencies, baseCurrency, ratesByCode } = useConfiguredCurrencyRates()
+  const { formatDate, formatDateTime, formatNumber, formatCurrency } = useLocaleFormat()
+  const { displayCurrency, comparisonCurrency, formatPriceFromUsd, hasRateForCurrency, baseCurrency, ratesByCode } = useConfiguredCurrencyRates()
+  const availableCurrencies = Object.keys(ratesByCode || {})
   const secondaryCurrency = comparisonCurrency && comparisonCurrency !== displayCurrency && hasRateForCurrency(comparisonCurrency)
     ? comparisonCurrency
     : null
   const formatDisplayCurrency = (value, currency = displayCurrency) => formatPriceFromUsd(Number(value || 0), currency)
+  const formatAmountInCurrency = (value, currency = displayCurrency) => formatCurrency(Number(value || 0), currency)
+
   const toBaseAmount = (value, currency = displayCurrency) => {
     const numericValue = Number(value || 0)
     if (currency === baseCurrency) {
@@ -51,8 +56,6 @@ export default function InvoiceModal({
 
     return numericValue / rate
   }
-
-  if (!isOpen || !invoice) return null
 
   const fallbackText = t('admin.invoices.modal.not_available', 'N/A')
   const statusLabels = {
@@ -85,20 +88,23 @@ export default function InvoiceModal({
       amount_bs: p.amount_bs,
       currency_code: p.payment_currency_code ?? 'USD',
       reference: p.reference ?? '',
-      bank: p.bank ?? '',
+      bank: p.bank ?? p.bank_name ?? p.bank_account ?? '',
       notes: p.notes ?? '',
+      payer: p.payer ?? p.paid_by ?? p.created_by ?? (p.user && p.user.name) ?? '',
     }))
   ))
-    const [cancellationReason, setCancellationReason] = useState(invoice.cancellation_reason || '')
-    const [adjustments, setAdjustments] = useState(() => (
-      (invoice.adjustments || []).map((a) => ({
-        id: a.id,
-        type: a.type,
-        amount_usd: a.amount_original ?? a.amount_usd,
-        currency_code: a.currency_code ?? 'USD',
-        description: a.description ?? '',
-      }))
-    ))
+  const [cancellationReason, setCancellationReason] = useState(invoice.cancellation_reason || '')
+  const [adjustments, setAdjustments] = useState(() => (
+    (invoice.adjustments || []).map((a) => ({
+      id: a.id,
+      type: a.type,
+      amount_usd: a.amount_original ?? a.amount_usd,
+      currency_code: a.currency_code ?? 'USD',
+      description: a.description ?? '',
+    }))
+  ))
+  const [internalNotes, setInternalNotes] = useState(invoice.internal_notes || '')
+  const [publicNotes, setPublicNotes] = useState(invoice.public_notes || '')
 
   useEffect(() => {
     setStatus(invoice.status)
@@ -117,8 +123,9 @@ export default function InvoiceModal({
       amount_bs: p.amount_bs,
       currency_code: p.payment_currency_code ?? 'USD',
       reference: p.reference ?? '',
-      bank: p.bank ?? '',
+      bank: p.bank ?? p.bank_name ?? p.bank_account ?? '',
       notes: p.notes ?? '',
+      payer: p.payer ?? p.paid_by ?? p.created_by ?? (p.user && p.user.name) ?? '',
     })))
       setInternalNotes(invoice.internal_notes || '')
       setPublicNotes(invoice.public_notes || '')
@@ -130,7 +137,7 @@ export default function InvoiceModal({
         currency_code: a.currency_code ?? 'USD',
         description: a.description ?? '',
       })))
-  }, [invoice, t])
+  }, [invoice])
 
   const currentStatus = statusLabels[status] || {
     label: status,
@@ -142,10 +149,6 @@ export default function InvoiceModal({
   const gatewayTransactions = Array.isArray(invoice.gateway_transactions)
     ? invoice.gateway_transactions
     : (Array.isArray(invoice.gatewayTransactions) ? invoice.gatewayTransactions : [])
-
-  const [internalNotes, setInternalNotes] = useState(invoice.internal_notes || '')
-  const [publicNotes, setPublicNotes] = useState(invoice.public_notes || '')
-
   const itemsSubtotal = items.reduce((sum, it) => sum + (it.total || 0), 0)
   const paymentsTotalUsd = payments.reduce((sum, p) => sum + toBaseAmount(p.amount_usd, p.currency_code || displayCurrency), 0)
   const invoiceDocumentTotals = invoice.document_totals ?? invoice.monetary_totals_json?.totals ?? null
@@ -169,22 +172,22 @@ export default function InvoiceModal({
   const getSummaryAmount = (type, currency = displayCurrency) => {
     if (hasDocumentSummary) {
       if (type === 'subtotal') {
-        return formatDisplayCurrency(itemsDocumentSubtotalByCurrency[currency] ?? 0, currency)
+        return formatAmountInCurrency(itemsDocumentSubtotalByCurrency[currency] ?? 0, currency)
       }
 
       if (type === 'shipping') {
-        return formatDisplayCurrency(0, currency)
+        return formatAmountInCurrency(0, currency)
       }
 
       if (type === 'tax') {
         const totalAmount = Number(invoiceDocumentTotals?.[currency] ?? 0)
         const subtotalAmount = Number(itemsDocumentSubtotalByCurrency[currency] ?? 0)
 
-        return formatDisplayCurrency(Math.max(0, totalAmount - subtotalAmount), currency)
+        return formatAmountInCurrency(Math.max(0, totalAmount - subtotalAmount), currency)
       }
 
       if (type === 'total') {
-        return formatDisplayCurrency(invoiceDocumentTotals?.[currency] ?? 0, currency)
+        return formatAmountInCurrency(invoiceDocumentTotals?.[currency] ?? 0, currency)
       }
     }
 
@@ -203,7 +206,7 @@ export default function InvoiceModal({
     return formatDisplayCurrency(total, currency)
   }
   const getDocumentAmount = (totals, fallback, currency = displayCurrency) => totals?.[currency] !== undefined
-    ? formatDisplayCurrency(totals[currency], currency)
+    ? formatAmountInCurrency(totals[currency], currency)
     : formatDisplayCurrency(fallback, currency)
 
   const whatsappUrl = (() => {
@@ -219,7 +222,7 @@ export default function InvoiceModal({
     <Modal
       show={isOpen}
       onClose={onClose}
-      maxWidth="xl"
+      maxWidth="2xl"
     >
       <div className="space-y-6 p-6">
         {/* Header */}
@@ -435,7 +438,7 @@ export default function InvoiceModal({
             {isEditable && (
               <button
                 type="button"
-                onClick={() => setPayments((prev) => [...prev, { method: 'efectivo', amount_usd: '', amount_bs: '', currency_code: displayCurrency, reference: '', bank: '', notes: '' }])}
+                onClick={() => setPayments((prev) => [...prev, { method: 'efectivo', amount_usd: '', amount_bs: '', currency_code: displayCurrency, reference: '', bank: '', notes: '', payer: '' }])}
                 className="px-3 py-1.5 text-xs rounded bg-orange-600 text-white hover:bg-orange-700"
               >
                 {t('admin.invoices.modal.add_payment', 'Añadir pago')}
@@ -448,104 +451,137 @@ export default function InvoiceModal({
           ) : (
             <div className="space-y-2 max-h-40 overflow-y-auto">
               {payments.map((p, idx) => (
-                <div key={p.id ?? idx} className="grid grid-cols-1 md:grid-cols-6 gap-2 items-center bg-white/60 border border-orange-100 rounded p-2 text-xs">
-                  <select
-                    className="md:col-span-1 border border-border rounded px-2 py-1 bg-background"
-                    value={p.method}
-                    disabled={!isEditable}
-                    onChange={(e) => {
-                      const value = e.target.value
-                      setPayments((prev) => prev.map((pay, i) => i === idx ? { ...pay, method: value } : pay))
-                    }}
-                  >
-                    <option value="efectivo">{t('admin.invoices.create.payment_methods.cash', 'Efectivo')}</option>
-                    <option value="tarjeta">{t('admin.invoices.create.payment_methods.card', 'Tarjeta')}</option>
-                    <option value="transferencia">{t('admin.invoices.create.payment_methods.transfer', 'Transferencia')}</option>
-                    <option value="zelle">{t('admin.invoices.create.payment_methods.zelle', 'Zelle')}</option>
-                    <option value="otro">{t('admin.invoices.create.payment_methods.other', 'Otro')}</option>
-                  </select>
-                  <select
-                    className="md:col-span-1 border border-border rounded px-2 py-1 bg-background"
-                    value={p.currency_code || 'USD'}
-                    disabled={!isEditable}
-                    onChange={(e) => {
-                      const value = e.target.value
-                      setPayments((prev) => prev.map((pay, i) => i === idx ? { ...pay, currency_code: value } : pay))
-                    }}
-                  >
-                    {availableCurrencies.map((currency) => (
-                      <option key={currency} value={currency}>{currency}</option>
-                    ))}
-                  </select>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder={`${t('admin.invoices.modal.amount_usd', 'Monto')} ${p.currency_code || displayCurrency}`}
-                    className="md:col-span-1 border border-border rounded px-2 py-1 bg-background"
-                    disabled={!isEditable}
-                    value={p.amount_usd}
-                    onChange={(e) => {
-                      const value = e.target.value
-                      setPayments((prev) => prev.map((pay, i) => i === idx ? { ...pay, amount_usd: value } : pay))
-                    }}
-                  />
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder={secondaryCurrency ? `${t('admin.invoices.modal.amount_bs', 'Monto')} ${secondaryCurrency}` : t('admin.invoices.modal.amount_bs', 'Referencia')}
-                    className="md:col-span-1 border border-border rounded px-2 py-1 bg-background"
-                    disabled={!isEditable}
-                    value={p.amount_bs}
-                    onChange={(e) => {
-                      const value = e.target.value
-                      setPayments((prev) => prev.map((pay, i) => i === idx ? { ...pay, amount_bs: value } : pay))
-                    }}
-                  />
-                  <input
-                    type="text"
-                    placeholder={t('admin.invoices.modal.bank_account', 'Banco / Cuenta')}
-                    className="md:col-span-1 border border-border rounded px-2 py-1 bg-background"
-                    disabled={!isEditable}
-                    value={p.bank}
-                    onChange={(e) => {
-                      const value = e.target.value
-                      setPayments((prev) => prev.map((pay, i) => i === idx ? { ...pay, bank: value } : pay))
-                    }}
-                  />
-                  <input
-                    type="text"
-                    placeholder={t('admin.invoices.modal.reference', 'Referencia')}
-                    className="md:col-span-1 border border-border rounded px-2 py-1 bg-background"
-                    disabled={!isEditable}
-                    value={p.reference}
-                    onChange={(e) => {
-                      const value = e.target.value
-                      setPayments((prev) => prev.map((pay, i) => i === idx ? { ...pay, reference: value } : pay))
-                    }}
-                  />
-                  <div className="md:col-span-1 flex items-center gap-2">
-                    <input
-                      type="text"
-                      placeholder={t('admin.invoices.modal.notes', 'Notas')}
-                      className="flex-1 border border-border rounded px-2 py-1 bg-background"
+                <div key={p.id ?? idx} className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-white/60 border border-orange-100 rounded p-3 text-xs">
+                  <div className="flex flex-col">
+                    <label className="text-[11px] text-muted-foreground mb-1">{t('admin.invoices.modal.field.method', 'Método')}</label>
+                    <select
+                      className="border border-border rounded px-2 py-2 bg-background w-full"
+                      value={p.method}
                       disabled={!isEditable}
-                      value={p.notes}
                       onChange={(e) => {
                         const value = e.target.value
-                        setPayments((prev) => prev.map((pay, i) => i === idx ? { ...pay, notes: value } : pay))
+                        setPayments((prev) => prev.map((pay, i) => i === idx ? { ...pay, method: value } : pay))
+                      }}
+                    >
+                      <option value="efectivo">{t('admin.invoices.create.payment_methods.cash', 'Efectivo')}</option>
+                      <option value="tarjeta">{t('admin.invoices.create.payment_methods.card', 'Tarjeta')}</option>
+                      <option value="transferencia">{t('admin.invoices.create.payment_methods.transfer', 'Transferencia')}</option>
+                      <option value="zelle">{t('admin.invoices.create.payment_methods.zelle', 'Zelle')}</option>
+                      <option value="otro">{t('admin.invoices.create.payment_methods.other', 'Otro')}</option>
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col">
+                    <label className="text-[11px] text-muted-foreground mb-1">{t('admin.invoices.modal.field.currency', 'Moneda')}</label>
+                    <select
+                      className="border border-border rounded px-2 py-2 bg-background w-full"
+                      value={p.currency_code || 'USD'}
+                      disabled={!isEditable}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        setPayments((prev) => prev.map((pay, i) => i === idx ? { ...pay, currency_code: value } : pay))
+                      }}
+                    >
+                      {availableCurrencies.map((currency) => (
+                        <option key={currency} value={currency}>{currency}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col">
+                    <label className="text-[11px] text-muted-foreground mb-1">{t('admin.invoices.modal.field.amount', 'Monto')}</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder={`${t('admin.invoices.modal.amount_usd', 'Monto')} ${p.currency_code || displayCurrency}`}
+                      className="border border-border rounded px-2 py-2 bg-background w-full"
+                      disabled={!isEditable}
+                      value={p.amount_usd}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        setPayments((prev) => prev.map((pay, i) => i === idx ? { ...pay, amount_usd: value } : pay))
                       }}
                     />
-                    {isEditable && (
-                      <button
-                        type="button"
-                        onClick={() => setPayments((prev) => prev.filter((_, i) => i !== idx))}
-                        className="text-red-500 hover:text-red-600"
-                      >
-                        ×
-                      </button>
-                    )}
+                  </div>
+
+                  <div className="flex flex-col">
+                    <label className="text-[11px] text-muted-foreground mb-1">{secondaryCurrency ? `${t('admin.invoices.modal.amount_bs', 'Referencia')} ${secondaryCurrency}` : t('admin.invoices.modal.amount_bs', 'Referencia')}</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className="border border-border rounded px-2 py-2 bg-background w-full"
+                      disabled={!isEditable}
+                      value={p.amount_bs}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        setPayments((prev) => prev.map((pay, i) => i === idx ? { ...pay, amount_bs: value } : pay))
+                      }}
+                    />
+                  </div>
+
+                  <div className="flex flex-col">
+                    <label className="text-[11px] text-muted-foreground mb-1">{t('admin.invoices.modal.bank_account', 'Banco / Cuenta')}</label>
+                    <input
+                      type="text"
+                      placeholder={t('admin.invoices.modal.bank_account', 'Banco / Cuenta')}
+                      className="border border-border rounded px-2 py-2 bg-background w-full"
+                      disabled={!isEditable}
+                      value={p.bank}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        setPayments((prev) => prev.map((pay, i) => i === idx ? { ...pay, bank: value } : pay))
+                      }}
+                    />
+                  </div>
+
+                  <div className="flex flex-col md:col-span-3">
+                    <div className="flex gap-2">
+                      <div className="flex-1">
+                        <label className="text-[11px] text-muted-foreground mb-1">{t('admin.invoices.modal.paid_by', 'Pagado por')}</label>
+                        <input
+                          type="text"
+                          placeholder={t('admin.invoices.modal.paid_by', 'Nombre')}
+                          className="border border-border rounded px-2 py-2 bg-background w-full"
+                          disabled={!isEditable}
+                          value={p.payer}
+                          onChange={(e) => {
+                            const value = e.target.value
+                            setPayments((prev) => prev.map((pay, i) => i === idx ? { ...pay, payer: value } : pay))
+                          }}
+                        />
+                      </div>
+
+                      <div className="w-48">
+                        <label className="text-[11px] text-muted-foreground mb-1">{t('admin.invoices.modal.notes', 'Notas')}</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            placeholder={t('admin.invoices.modal.notes', 'Notas')}
+                            className="flex-1 border border-border rounded px-2 py-2 bg-background w-full"
+                            disabled={!isEditable}
+                            value={p.notes}
+                            onChange={(e) => {
+                              const value = e.target.value
+                              setPayments((prev) => prev.map((pay, i) => i === idx ? { ...pay, notes: value } : pay))
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {isEditable && (
+                        <div className="flex items-end">
+                          <button
+                            type="button"
+                            onClick={() => setPayments((prev) => prev.filter((_, i) => i !== idx))}
+                            className="text-red-500 hover:text-red-600 self-end"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -714,6 +750,7 @@ export default function InvoiceModal({
                     reference: p.reference || null,
                     bank: p.bank || null,
                     notes: p.notes || null,
+                    payer: p.payer || null,
                   })),
                   adjustments: adjustments.map((a) => ({
                     type: a.type,

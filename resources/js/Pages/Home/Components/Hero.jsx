@@ -46,11 +46,15 @@ export default function Hero({ banners = [], systemName = 'Inventario' }) {
             }`}
           >
             <div
-              className={`relative flex h-full w-full flex-col justify-end bg-gradient-to-br ${gradients[index % gradients.length]} p-6 text-white md:p-8`}
+              className={`relative flex h-full w-full flex-col justify-end p-6 md:p-8 ${banner.image_url || banner.background_color ? '' : `bg-gradient-to-br ${gradients[index % gradients.length]}`} ${banner.image_url ? 'text-white' : banner.background_color ? '' : 'text-white'}`}
               style={banner.image_url ? {
                 backgroundImage: `linear-gradient(135deg, rgba(15,23,42,0.72), rgba(15,23,42,0.42)), url(${banner.image_url})`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
+                color: banner.text_color || undefined,
+              } : banner.background_color ? {
+                backgroundColor: banner.background_color,
+                color: banner.text_color || undefined,
               } : undefined}
             >
               <div className="absolute left-6 top-6 inline-flex rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/90 backdrop-blur md:left-8 md:top-8">

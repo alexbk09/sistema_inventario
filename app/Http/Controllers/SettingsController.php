@@ -25,6 +25,12 @@ class SettingsController extends Controller
             'email' => null,
             'phone' => null,
             'whatsapp' => null,
+            'facebook_url' => null,
+            'instagram_url' => null,
+            'twitter_url' => null,
+            'youtube_url' => null,
+            'tiktok_url' => null,
+            'linkedin_url' => null,
         ]);
 
         $location = Settings::get('location', [
@@ -146,6 +152,12 @@ class SettingsController extends Controller
             'general.email' => ['nullable', 'email', 'max:255'],
             'general.phone' => ['nullable', 'string', 'max:50'],
             'general.whatsapp' => ['nullable', 'string', 'max:50'],
+            'general.facebook_url' => ['nullable', 'url', 'max:500'],
+            'general.instagram_url' => ['nullable', 'url', 'max:500'],
+            'general.twitter_url' => ['nullable', 'url', 'max:500'],
+            'general.youtube_url' => ['nullable', 'url', 'max:500'],
+            'general.tiktok_url' => ['nullable', 'url', 'max:500'],
+            'general.linkedin_url' => ['nullable', 'url', 'max:500'],
 
             'location.address' => ['nullable', 'string', 'max:500'],
             'location.city' => ['nullable', 'string', 'max:255'],
@@ -203,12 +215,17 @@ class SettingsController extends Controller
             'store.hero_banners.*.title' => ['required', 'string', 'max:160'],
             'store.hero_banners.*.description' => ['nullable', 'string', 'max:280'],
             'store.hero_banners.*.image_url' => ['nullable', 'string', 'max:500'],
+            'store.hero_banners.*.background_color' => ['nullable', 'string', 'max:20'],
+            'store.hero_banners.*.text_color' => ['nullable', 'string', 'max:20'],
             'store.hero_banner_files' => ['nullable', 'array'],
             'store.hero_banner_files.*' => ['nullable', 'file', 'image', 'max:5120'],
             'store.home_highlights' => ['nullable', 'array'],
             'store.home_highlights.*.eyebrow' => ['nullable', 'string', 'max:80'],
             'store.home_highlights.*.title' => ['required', 'string', 'max:120'],
             'store.home_highlights.*.description' => ['nullable', 'string', 'max:220'],
+            'store.home_highlights.*.background_color' => ['nullable', 'string', 'max:20'],
+            'store.home_highlights.*.text_color' => ['nullable', 'string', 'max:20'],
+            'store.home_highlights.*.image_url' => ['nullable', 'string', 'max:500'],
 
             'inventory.allow_negative_stock' => ['required', 'boolean'],
             'inventory.default_min_stock' => ['required', 'integer', 'min:0'],
@@ -288,7 +305,7 @@ class SettingsController extends Controller
         \App\Support\Settings::set('mail', $validated['mail']);
         \App\Support\Settings::set('payments', $validated['payments']);
 
-        return back()->with('success', __('app.admin.settings.notifications.updated'));
+        return back()->with('success', TranslationKeySanitizer::translate('app.admin.settings.notifications.updated'));
     }
 
     public function syncCurrencyRates(CurrencyService $currencyService): RedirectResponse
@@ -296,53 +313,65 @@ class SettingsController extends Controller
         $synced = $currencyService->syncConfiguredRates();
         Settings::set('currency', $synced);
 
-        return back()->with('success', __('app.admin.settings.notifications.currency_synced'));
+        return back()->with('success', TranslationKeySanitizer::translate('app.admin.settings.notifications.currency_synced'));
     }
 
     private function defaultStoreSettings(): array
     {
         return [
-            'home_title' => __('app.admin.settings.commerce.store.defaults.home_title'),
+            'home_title' => TranslationKeySanitizer::translate('app.admin.settings.commerce.store.defaults.home_title'),
             'home_subtitle' => null,
-            'hero_badge' => __('app.admin.settings.commerce.store.defaults.hero_badge'),
+            'hero_badge' => TranslationKeySanitizer::translate('app.admin.settings.commerce.store.defaults.hero_badge'),
             'hero_description' => null,
-            'hero_primary_cta_label' => __('app.admin.settings.commerce.store.defaults.hero_primary_cta_label'),
+            'hero_primary_cta_label' => TranslationKeySanitizer::translate('app.admin.settings.commerce.store.defaults.hero_primary_cta_label'),
             'hero_primary_cta_url' => '/shop',
-            'hero_secondary_cta_label' => __('app.admin.settings.commerce.store.defaults.hero_secondary_cta_label'),
+            'hero_secondary_cta_label' => TranslationKeySanitizer::translate('app.admin.settings.commerce.store.defaults.hero_secondary_cta_label'),
             'hero_secondary_cta_url' => '#contacto',
             'contact_text' => null,
             'hero_banners' => [
                 [
-                    'title' => __('app.admin.settings.commerce.store.defaults.banner_one_title'),
-                    'description' => __('app.admin.settings.commerce.store.defaults.banner_one_description'),
+                    'title' => TranslationKeySanitizer::translate('app.admin.settings.commerce.store.defaults.banner_one_title'),
+                    'description' => TranslationKeySanitizer::translate('app.admin.settings.commerce.store.defaults.banner_one_description'),
                     'image_url' => null,
+                    'background_color' => null,
+                    'text_color' => null,
                 ],
                 [
-                    'title' => __('app.admin.settings.commerce.store.defaults.banner_two_title'),
-                    'description' => __('app.admin.settings.commerce.store.defaults.banner_two_description'),
+                    'title' => TranslationKeySanitizer::translate('app.admin.settings.commerce.store.defaults.banner_two_title'),
+                    'description' => TranslationKeySanitizer::translate('app.admin.settings.commerce.store.defaults.banner_two_description'),
                     'image_url' => null,
+                    'background_color' => null,
+                    'text_color' => null,
                 ],
                 [
-                    'title' => __('app.admin.settings.commerce.store.defaults.banner_three_title'),
-                    'description' => __('app.admin.settings.commerce.store.defaults.banner_three_description'),
+                    'title' => TranslationKeySanitizer::translate('app.admin.settings.commerce.store.defaults.banner_three_title'),
+                    'description' => TranslationKeySanitizer::translate('app.admin.settings.commerce.store.defaults.banner_three_description'),
                     'image_url' => null,
+                    'background_color' => null,
+                    'text_color' => null,
                 ],
             ],
             'home_highlights' => [
                 [
-                    'eyebrow' => __('app.admin.settings.commerce.store.defaults.highlight_one_eyebrow'),
-                    'title' => __('app.admin.settings.commerce.store.defaults.highlight_one_title'),
-                    'description' => __('app.admin.settings.commerce.store.defaults.highlight_one_description'),
+                    'eyebrow' => TranslationKeySanitizer::translate('app.admin.settings.commerce.store.defaults.highlight_one_eyebrow'),
+                    'title' => TranslationKeySanitizer::translate('app.admin.settings.commerce.store.defaults.highlight_one_title'),
+                    'description' => TranslationKeySanitizer::translate('app.admin.settings.commerce.store.defaults.highlight_one_description'),
                 ],
                 [
-                    'eyebrow' => __('app.admin.settings.commerce.store.defaults.highlight_two_eyebrow'),
-                    'title' => __('app.admin.settings.commerce.store.defaults.highlight_two_title'),
-                    'description' => __('app.admin.settings.commerce.store.defaults.highlight_two_description'),
+                    'eyebrow' => TranslationKeySanitizer::translate('app.admin.settings.commerce.store.defaults.highlight_two_eyebrow'),
+                    'title' => TranslationKeySanitizer::translate('app.admin.settings.commerce.store.defaults.highlight_two_title'),
+                    'description' => TranslationKeySanitizer::translate('app.admin.settings.commerce.store.defaults.highlight_two_description'),
+                    'image_url' => null,
+                    'background_color' => null,
+                    'text_color' => null,
                 ],
                 [
-                    'eyebrow' => __('app.admin.settings.commerce.store.defaults.highlight_three_eyebrow'),
-                    'title' => __('app.admin.settings.commerce.store.defaults.highlight_three_title'),
-                    'description' => __('app.admin.settings.commerce.store.defaults.highlight_three_description'),
+                    'eyebrow' => TranslationKeySanitizer::translate('app.admin.settings.commerce.store.defaults.highlight_three_eyebrow'),
+                    'title' => TranslationKeySanitizer::translate('app.admin.settings.commerce.store.defaults.highlight_three_title'),
+                    'description' => TranslationKeySanitizer::translate('app.admin.settings.commerce.store.defaults.highlight_three_description'),
+                    'image_url' => null,
+                    'background_color' => null,
+                    'text_color' => null,
                 ],
             ],
         ];
@@ -362,6 +391,8 @@ class SettingsController extends Controller
                     'title' => $this->normalizeStoredTranslationValue($banner['title'] ?? $fallback['title'] ?? ''),
                     'description' => $this->normalizeStoredTranslationValue($banner['description'] ?? $fallback['description'] ?? ''),
                     'image_url' => trim((string) ($banner['image_url'] ?? $fallback['image_url'] ?? '')) ?: null,
+                    'background_color' => trim((string) ($banner['background_color'] ?? $fallback['background_color'] ?? '')) ?: null,
+                    'text_color' => trim((string) ($banner['text_color'] ?? $fallback['text_color'] ?? '')) ?: null,
                 ];
             })
             ->filter(fn ($banner) => $banner['title'] !== '')
@@ -381,6 +412,9 @@ class SettingsController extends Controller
                     'eyebrow' => $this->normalizeStoredTranslationValue($item['eyebrow'] ?? $fallback['eyebrow'] ?? '', true),
                     'title' => $this->normalizeStoredTranslationValue($item['title'] ?? $fallback['title'] ?? ''),
                     'description' => $this->normalizeStoredTranslationValue($item['description'] ?? $fallback['description'] ?? '', true),
+                    'image_url' => trim((string) ($item['image_url'] ?? $fallback['image_url'] ?? '')) ?: null,
+                    'background_color' => trim((string) ($item['background_color'] ?? $fallback['background_color'] ?? '')) ?: null,
+                    'text_color' => trim((string) ($item['text_color'] ?? $fallback['text_color'] ?? '')) ?: null,
                 ];
             })
             ->filter(fn ($item) => $item['title'] !== '')

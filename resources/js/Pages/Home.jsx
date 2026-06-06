@@ -117,7 +117,17 @@ export default function Home({ products = [], store = null, company = null }) {
 
                             <div className="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                               {homeHighlights.slice(0, 3).map((item, index) => (
-                                <article key={`highlight-${index}`} className="rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm backdrop-blur">
+                                <article
+                                  key={`highlight-${index}`}
+                                  className="rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm backdrop-blur"
+                                  style={{
+                                    backgroundColor: item.background_color || undefined,
+                                    color: item.text_color || undefined,
+                                    backgroundImage: item.image_url ? `linear-gradient(rgba(255,255,255,0.82), rgba(255,255,255,0.82)), url(${item.image_url})` : undefined,
+                                    backgroundSize: item.image_url ? 'cover' : undefined,
+                                    backgroundPosition: item.image_url ? 'center' : undefined,
+                                  }}
+                                >
                                   <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{item.eyebrow || t('home.highlight_eyebrow_fallback', 'Detalle')}</p>
                                   <h2 className="mt-2 text-lg font-semibold text-slate-900">{item.title}</h2>
                                   {item.description && (

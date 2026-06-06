@@ -22,6 +22,7 @@ class InvoicePayment extends Model
         'exchange_rate_source',
         'reference',
         'bank',
+        'payer',
         'notes',
     ];
 

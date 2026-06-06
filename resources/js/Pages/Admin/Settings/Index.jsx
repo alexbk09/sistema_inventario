@@ -53,16 +53,22 @@ const buildDefaultStore = (t) => ({
             title: t('admin.settings.commerce.store.defaults.banner_one_title', 'Productos destacados'),
             description: t('admin.settings.commerce.store.defaults.banner_one_description', 'Presenta promociones, categorias o nuevas llegadas desde el panel.'),
             image_url: '',
+            background_color: '',
+            text_color: '',
         },
         {
             title: t('admin.settings.commerce.store.defaults.banner_two_title', 'Tu catalogo siempre visible'),
             description: t('admin.settings.commerce.store.defaults.banner_two_description', 'Muestra beneficios, disponibilidad y ofertas desde la portada.'),
             image_url: '',
+            background_color: '',
+            text_color: '',
         },
         {
             title: t('admin.settings.commerce.store.defaults.banner_three_title', 'Informacion clara desde el inicio'),
             description: t('admin.settings.commerce.store.defaults.banner_three_description', 'Refuerza confianza con mensajes utiles y llamados a la accion concretos.'),
             image_url: '',
+            background_color: '',
+            text_color: '',
         },
     ],
     home_highlights: [
@@ -70,16 +76,25 @@ const buildDefaultStore = (t) => ({
             eyebrow: t('admin.settings.commerce.store.defaults.highlight_one_eyebrow', 'Catalogo'),
             title: t('admin.settings.commerce.store.defaults.highlight_one_title', 'Productos organizados'),
             description: t('admin.settings.commerce.store.defaults.highlight_one_description', 'Expone lo mejor de tu inventario con categorias claras y acceso directo.'),
+            image_url: '',
+            background_color: '',
+            text_color: '',
         },
         {
             eyebrow: t('admin.settings.commerce.store.defaults.highlight_two_eyebrow', 'Confianza'),
             title: t('admin.settings.commerce.store.defaults.highlight_two_title', 'Informacion y contacto visibles'),
             description: t('admin.settings.commerce.store.defaults.highlight_two_description', 'Facilita la decision de compra mostrando marca, ubicacion y canales de atencion.'),
+            image_url: '',
+            background_color: '',
+            text_color: '',
         },
         {
             eyebrow: t('admin.settings.commerce.store.defaults.highlight_three_eyebrow', 'Accion'),
             title: t('admin.settings.commerce.store.defaults.highlight_three_title', 'Llamados a la accion utiles'),
             description: t('admin.settings.commerce.store.defaults.highlight_three_description', 'Lleva al cliente rapido a la tienda, ofertas o medios de contacto.'),
+            image_url: '',
+            background_color: '',
+            text_color: '',
         },
     ],
 });
@@ -337,7 +352,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
             return;
         }
 
-        banners.push({ title: '', description: '', image_url: '' });
+        banners.push({ title: '', description: '', image_url: '', background_color: '', text_color: '' });
 
         setData('store', {
             ...data.store,
@@ -372,7 +387,7 @@ export default function SettingsIndex({ general, location, branding, billing, cu
             return;
         }
 
-        highlights.push({ eyebrow: '', title: '', description: '' });
+        highlights.push({ eyebrow: '', title: '', description: '', image_url: '', background_color: '', text_color: '' });
 
         setData('store', {
             ...data.store,
@@ -619,6 +634,84 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                     onChange={handleChange('general', 'whatsapp')}
                                 />
                             </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.facebook_url', 'URL de Facebook')}</label>
+                                <input
+                                    type="url"
+                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                    value={data.general.facebook_url || ''}
+                                    onChange={handleChange('general', 'facebook_url')}
+                                    placeholder="https://facebook.com/tu-marca"
+                                />
+                                {errors['general.facebook_url'] && (
+                                    <p className="mt-1 text-xs text-red-600">{errors['general.facebook_url']}</p>
+                                )}
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.instagram_url', 'URL de Instagram')}</label>
+                                <input
+                                    type="url"
+                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                    value={data.general.instagram_url || ''}
+                                    onChange={handleChange('general', 'instagram_url')}
+                                    placeholder="https://instagram.com/tu-marca"
+                                />
+                                {errors['general.instagram_url'] && (
+                                    <p className="mt-1 text-xs text-red-600">{errors['general.instagram_url']}</p>
+                                )}
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.twitter_url', 'URL de X / Twitter')}</label>
+                                <input
+                                    type="url"
+                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                    value={data.general.twitter_url || ''}
+                                    onChange={handleChange('general', 'twitter_url')}
+                                    placeholder="https://x.com/tu-marca"
+                                />
+                                {errors['general.twitter_url'] && (
+                                    <p className="mt-1 text-xs text-red-600">{errors['general.twitter_url']}</p>
+                                )}
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.youtube_url', 'URL de YouTube')}</label>
+                                <input
+                                    type="url"
+                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                    value={data.general.youtube_url || ''}
+                                    onChange={handleChange('general', 'youtube_url')}
+                                    placeholder="https://youtube.com/@tu-marca"
+                                />
+                                {errors['general.youtube_url'] && (
+                                    <p className="mt-1 text-xs text-red-600">{errors['general.youtube_url']}</p>
+                                )}
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.tiktok_url', 'URL de TikTok')}</label>
+                                <input
+                                    type="url"
+                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                    value={data.general.tiktok_url || ''}
+                                    onChange={handleChange('general', 'tiktok_url')}
+                                    placeholder="https://tiktok.com/@tu-marca"
+                                />
+                                {errors['general.tiktok_url'] && (
+                                    <p className="mt-1 text-xs text-red-600">{errors['general.tiktok_url']}</p>
+                                )}
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.linkedin_url', 'URL de LinkedIn')}</label>
+                                <input
+                                    type="url"
+                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                    value={data.general.linkedin_url || ''}
+                                    onChange={handleChange('general', 'linkedin_url')}
+                                    placeholder="https://linkedin.com/company/tu-marca"
+                                />
+                                {errors['general.linkedin_url'] && (
+                                    <p className="mt-1 text-xs text-red-600">{errors['general.linkedin_url']}</p>
+                                )}
+                            </div>
                         </div>
                                     </SettingsSection>
 
@@ -751,6 +844,277 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                         value={data.branding.secondary_color || ''}
                                         onChange={handleChange('branding', 'secondary_color')}
                                     />
+                                </div>
+                            </div>
+                        </div>
+                                    </SettingsSection>
+
+                                    <SettingsSection
+                                        eyebrow={t('admin.settings.commerce.store.eyebrow', 'Escaparate')}
+                                        title={t('admin.settings.commerce.store.title', 'Tienda publica')}
+                                        description={t('admin.settings.commerce.store.description', 'Edita titulo, descripciones, llamados a la accion, banners y bloques informativos del inicio desde el panel administrativo.')}
+                                    >
+                        <div className="grid grid-cols-1 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.home_title', 'Título de inicio')}</label>
+                                    <input
+                                        type="text"
+                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                        value={data.store.home_title || ''}
+                                        onChange={handleChange('store', 'home_title')}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.home_subtitle', 'Subtítulo')}</label>
+                                    <input
+                                        type="text"
+                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                        value={data.store.home_subtitle || ''}
+                                        onChange={handleChange('store', 'home_subtitle')}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.hero_badge', 'Etiqueta superior')}</label>
+                                    <input
+                                        type="text"
+                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                        value={data.store.hero_badge || ''}
+                                        onChange={handleChange('store', 'hero_badge')}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.hero_description', 'Descripción del home')}</label>
+                                    <input
+                                        type="text"
+                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                        value={data.store.hero_description || ''}
+                                        onChange={handleChange('store', 'hero_description')}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.hero_primary_cta_label', 'Texto CTA primaria')}</label>
+                                    <input
+                                        type="text"
+                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                        value={data.store.hero_primary_cta_label || ''}
+                                        onChange={handleChange('store', 'hero_primary_cta_label')}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.hero_primary_cta_url', 'URL CTA primaria')}</label>
+                                    <input
+                                        type="text"
+                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                        value={data.store.hero_primary_cta_url || ''}
+                                        onChange={handleChange('store', 'hero_primary_cta_url')}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.hero_secondary_cta_label', 'Texto CTA secundaria')}</label>
+                                    <input
+                                        type="text"
+                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                        value={data.store.hero_secondary_cta_label || ''}
+                                        onChange={handleChange('store', 'hero_secondary_cta_label')}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.hero_secondary_cta_url', 'URL CTA secundaria')}</label>
+                                    <input
+                                        type="text"
+                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                        value={data.store.hero_secondary_cta_url || ''}
+                                        onChange={handleChange('store', 'hero_secondary_cta_url')}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
+                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <div>
+                                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t('admin.settings.commerce.store.hero_banners.eyebrow', 'Carrusel principal')}</p>
+                                        <h3 className="mt-1 text-lg font-semibold text-slate-900">{t('admin.settings.commerce.store.hero_banners.title', 'Banners del inicio')}</h3>
+                                        <p className="mt-1 text-sm text-slate-600">{t('admin.settings.commerce.store.hero_banners.description', 'Configura hasta cinco slides con título, descripción e imagen opcional.')}</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={addStoreBanner}
+                                        className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                                    >
+                                        {t('admin.settings.commerce.store.hero_banners.add', 'Agregar banner')}
+                                    </button>
+                                </div>
+                                <div className="mt-5 grid gap-4">
+                                    {heroBanners.map((banner, index) => (
+                                        <div key={`banner-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4">
+                                            <div className="flex items-center justify-between gap-3">
+                                                <p className="text-sm font-semibold text-slate-900">{t('admin.settings.commerce.store.hero_banners.item_title', 'Banner')} {index + 1}</p>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeStoreBanner(index)}
+                                                    className="text-sm font-medium text-rose-600 transition hover:text-rose-700"
+                                                >
+                                                    {t('admin.settings.commerce.store.hero_banners.remove', 'Eliminar')}
+                                                </button>
+                                            </div>
+                                            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.hero_banners.fields.title', 'Título')}</label>
+                                                    <input
+                                                        type="text"
+                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                        value={banner.title || ''}
+                                                        onChange={(e) => updateStoreBanner(index, 'title', e.target.value)}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.hero_banners.fields.image_url', 'Imagen o fondo (URL)')}</label>
+                                                    <input
+                                                        type="text"
+                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                        value={banner.image_url || ''}
+                                                        onChange={(e) => updateStoreBanner(index, 'image_url', e.target.value)}
+                                                    />
+                                                    <label className="mt-3 block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.hero_banners.fields.image_file', 'o subir imagen')}</label>
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*"
+                                                        className="mt-1 block w-full text-sm text-slate-600"
+                                                        onChange={(e) => updateStoreBannerFile(index, e.target.files?.[0] ?? null)}
+                                                    />
+                                                    {banner.image_url && (
+                                                        <img src={banner.image_url} alt={banner.title || `Banner ${index + 1}`} className="mt-3 h-24 w-full rounded-xl border border-slate-200 object-cover" />
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.hero_banners.fields.background_color', 'Color de fondo')}</label>
+                                                    <input
+                                                        type="text"
+                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                        value={banner.background_color || ''}
+                                                        onChange={(e) => updateStoreBanner(index, 'background_color', e.target.value)}
+                                                        placeholder="#1f2937"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.hero_banners.fields.text_color', 'Color de texto')}</label>
+                                                    <input
+                                                        type="text"
+                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                        value={banner.text_color || ''}
+                                                        onChange={(e) => updateStoreBanner(index, 'text_color', e.target.value)}
+                                                        placeholder="#ffffff"
+                                                    />
+                                                </div>
+                                                <div className="md:col-span-2">
+                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.hero_banners.fields.description', 'Descripción')}</label>
+                                                    <textarea
+                                                        rows={2}
+                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                        value={banner.description || ''}
+                                                        onChange={(e) => updateStoreBanner(index, 'description', e.target.value)}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
+                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <div>
+                                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t('admin.settings.commerce.store.highlights.eyebrow', 'Bloques informativos')}</p>
+                                        <h3 className="mt-1 text-lg font-semibold text-slate-900">{t('admin.settings.commerce.store.highlights.title', 'Tarjetas de valor')}</h3>
+                                        <p className="mt-1 text-sm text-slate-600">{t('admin.settings.commerce.store.highlights.description', 'Agrega mensajes cortos para explicar beneficios, soporte, entregas, medios de pago o diferenciales de la tienda.')}</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={addStoreHighlight}
+                                        className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                                    >
+                                        {t('admin.settings.commerce.store.highlights.add', 'Agregar bloque')}
+                                    </button>
+                                </div>
+                                <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                                    {homeHighlights.map((item, index) => (
+                                        <div key={`highlight-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4">
+                                            <div className="flex items-center justify-between gap-3">
+                                                <p className="text-sm font-semibold text-slate-900">{t('admin.settings.commerce.store.highlights.item_title', 'Bloque')} {index + 1}</p>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeStoreHighlight(index)}
+                                                    className="text-sm font-medium text-rose-600 transition hover:text-rose-700"
+                                                >
+                                                    {t('admin.settings.commerce.store.highlights.remove', 'Eliminar')}
+                                                </button>
+                                            </div>
+                                            <div className="mt-4 space-y-3">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.highlights.fields.eyebrow', 'Etiqueta')}</label>
+                                                    <input
+                                                        type="text"
+                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                        value={item.eyebrow || ''}
+                                                        onChange={(e) => updateStoreHighlight(index, 'eyebrow', e.target.value)}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.highlights.fields.title', 'Título')}</label>
+                                                    <input
+                                                        type="text"
+                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                        value={item.title || ''}
+                                                        onChange={(e) => updateStoreHighlight(index, 'title', e.target.value)}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.highlights.fields.description', 'Descripción')}</label>
+                                                    <textarea
+                                                        rows={3}
+                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                        value={item.description || ''}
+                                                        onChange={(e) => updateStoreHighlight(index, 'description', e.target.value)}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.highlights.fields.image_url', 'Imagen de fondo (URL)')}</label>
+                                                    <input
+                                                        type="text"
+                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                        value={item.image_url || ''}
+                                                        onChange={(e) => updateStoreHighlight(index, 'image_url', e.target.value)}
+                                                    />
+                                                    {item.image_url && (
+                                                        <img src={item.image_url} alt={item.title || `Bloque ${index + 1}`} className="mt-3 h-24 w-full rounded-xl border border-slate-200 object-cover" />
+                                                    )}
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.highlights.fields.background_color', 'Color de fondo')}</label>
+                                                        <input
+                                                            type="text"
+                                                            className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                            value={item.background_color || ''}
+                                                            onChange={(e) => updateStoreHighlight(index, 'background_color', e.target.value)}
+                                                            placeholder="#ffffff"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.highlights.fields.text_color', 'Color de texto')}</label>
+                                                        <input
+                                                            type="text"
+                                                            className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                            value={item.text_color || ''}
+                                                            onChange={(e) => updateStoreHighlight(index, 'text_color', e.target.value)}
+                                                            placeholder="#0f172a"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         </div>
@@ -1857,233 +2221,6 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                         </div>
                     </section>
 
-                                    <SettingsSection
-                                        eyebrow={t('admin.settings.commerce.store.eyebrow', 'Escaparate')}
-                                        title={t('admin.settings.commerce.store.title', 'Tienda publica')}
-                                        description={t('admin.settings.commerce.store.description', 'Edita titulo, descripciones, llamados a la accion, banners y bloques informativos del inicio desde el panel administrativo.')}
-                                    >
-                        <div className="grid grid-cols-1 gap-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.home_title', 'Título de inicio')}</label>
-                                <input
-                                    type="text"
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    value={data.store.home_title || ''}
-                                    onChange={handleChange('store', 'home_title')}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.home_subtitle', 'Subtítulo')}</label>
-                                <input
-                                    type="text"
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    value={data.store.home_subtitle || ''}
-                                    onChange={handleChange('store', 'home_subtitle')}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.hero_badge', 'Etiqueta superior')}</label>
-                                <input
-                                    type="text"
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    value={data.store.hero_badge || ''}
-                                    onChange={handleChange('store', 'hero_badge')}
-                                />
-                            </div>
-                            <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.hero_description', 'Descripción principal')}</label>
-                                <textarea
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    rows={3}
-                                    value={data.store.hero_description || ''}
-                                    onChange={handleChange('store', 'hero_description')}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.hero_primary_cta_label', 'Texto del botón principal')}</label>
-                                <input
-                                    type="text"
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    value={data.store.hero_primary_cta_label || ''}
-                                    onChange={handleChange('store', 'hero_primary_cta_label')}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.hero_primary_cta_url', 'URL del botón principal')}</label>
-                                <input
-                                    type="text"
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    value={data.store.hero_primary_cta_url || ''}
-                                    onChange={handleChange('store', 'hero_primary_cta_url')}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.hero_secondary_cta_label', 'Texto del botón secundario')}</label>
-                                <input
-                                    type="text"
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    value={data.store.hero_secondary_cta_label || ''}
-                                    onChange={handleChange('store', 'hero_secondary_cta_label')}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.hero_secondary_cta_url', 'URL del botón secundario')}</label>
-                                <input
-                                    type="text"
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    value={data.store.hero_secondary_cta_url || ''}
-                                    onChange={handleChange('store', 'hero_secondary_cta_url')}
-                                />
-                            </div>
-                            <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.contact_text', 'Texto de contacto')}</label>
-                                <textarea
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    rows={2}
-                                    value={data.store.contact_text || ''}
-                                    onChange={handleChange('store', 'contact_text')}
-                                />
-                            </div>
-                            </div>
-
-                            <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
-                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                    <div>
-                                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t('admin.settings.commerce.store.hero_banners.eyebrow', 'Carrusel principal')}</p>
-                                        <h3 className="mt-1 text-lg font-semibold text-slate-900">{t('admin.settings.commerce.store.hero_banners.title', 'Banners del inicio')}</h3>
-                                        <p className="mt-1 text-sm text-slate-600">{t('admin.settings.commerce.store.hero_banners.description', 'Configura hasta cinco slides con título, descripción e imagen opcional.')}</p>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={addStoreBanner}
-                                        className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-                                    >
-                                        {t('admin.settings.commerce.store.hero_banners.add', 'Agregar banner')}
-                                    </button>
-                                </div>
-                                <div className="mt-5 grid gap-4">
-                                    {heroBanners.map((banner, index) => (
-                                        <div key={`banner-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4">
-                                            <div className="flex items-center justify-between gap-3">
-                                                <p className="text-sm font-semibold text-slate-900">{t('admin.settings.commerce.store.hero_banners.item_title', 'Banner')} {index + 1}</p>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => removeStoreBanner(index)}
-                                                    className="text-sm font-medium text-rose-600 transition hover:text-rose-700"
-                                                >
-                                                    {t('admin.settings.commerce.store.hero_banners.remove', 'Eliminar')}
-                                                </button>
-                                            </div>
-                                            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-                                                <div>
-                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.hero_banners.fields.title', 'Título')}</label>
-                                                    <input
-                                                        type="text"
-                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                                        value={banner.title || ''}
-                                                        onChange={(e) => updateStoreBanner(index, 'title', e.target.value)}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.hero_banners.fields.image_url', 'Imagen o fondo (URL)')}</label>
-                                                    <input
-                                                        type="text"
-                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                                        value={banner.image_url || ''}
-                                                        onChange={(e) => updateStoreBanner(index, 'image_url', e.target.value)}
-                                                    />
-                                                    <label className="mt-3 block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.hero_banners.fields.image_file', 'o subir imagen')}</label>
-                                                    <input
-                                                        type="file"
-                                                        accept="image/*"
-                                                        className="mt-1 block w-full text-sm text-slate-600"
-                                                        onChange={(e) => updateStoreBannerFile(index, e.target.files?.[0] ?? null)}
-                                                    />
-                                                    {banner.image_url && (
-                                                        <img src={banner.image_url} alt={banner.title || `Banner ${index + 1}`} className="mt-3 h-24 w-full rounded-xl border border-slate-200 object-cover" />
-                                                    )}
-                                                </div>
-                                                <div className="md:col-span-2">
-                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.hero_banners.fields.description', 'Descripción')}</label>
-                                                    <textarea
-                                                        rows={2}
-                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                                        value={banner.description || ''}
-                                                        onChange={(e) => updateStoreBanner(index, 'description', e.target.value)}
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
-                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                    <div>
-                                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t('admin.settings.commerce.store.highlights.eyebrow', 'Bloques informativos')}</p>
-                                        <h3 className="mt-1 text-lg font-semibold text-slate-900">{t('admin.settings.commerce.store.highlights.title', 'Tarjetas de valor')}</h3>
-                                        <p className="mt-1 text-sm text-slate-600">{t('admin.settings.commerce.store.highlights.description', 'Agrega mensajes cortos para explicar beneficios, soporte, entregas, medios de pago o diferenciales de la tienda.')}</p>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={addStoreHighlight}
-                                        className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-                                    >
-                                        {t('admin.settings.commerce.store.highlights.add', 'Agregar bloque')}
-                                    </button>
-                                </div>
-                                <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                                    {homeHighlights.map((item, index) => (
-                                        <div key={`highlight-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4">
-                                            <div className="flex items-center justify-between gap-3">
-                                                <p className="text-sm font-semibold text-slate-900">{t('admin.settings.commerce.store.highlights.item_title', 'Bloque')} {index + 1}</p>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => removeStoreHighlight(index)}
-                                                    className="text-sm font-medium text-rose-600 transition hover:text-rose-700"
-                                                >
-                                                    {t('admin.settings.commerce.store.highlights.remove', 'Eliminar')}
-                                                </button>
-                                            </div>
-                                            <div className="mt-4 space-y-3">
-                                                <div>
-                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.highlights.fields.eyebrow', 'Etiqueta')}</label>
-                                                    <input
-                                                        type="text"
-                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                                        value={item.eyebrow || ''}
-                                                        onChange={(e) => updateStoreHighlight(index, 'eyebrow', e.target.value)}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.highlights.fields.title', 'Título')}</label>
-                                                    <input
-                                                        type="text"
-                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                                        value={item.title || ''}
-                                                        onChange={(e) => updateStoreHighlight(index, 'title', e.target.value)}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.highlights.fields.description', 'Descripción')}</label>
-                                                    <textarea
-                                                        rows={3}
-                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                                        value={item.description || ''}
-                                                        onChange={(e) => updateStoreHighlight(index, 'description', e.target.value)}
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                                    </SettingsSection>
-                                </>
-                            )}
                         </div>
                     </div>
 

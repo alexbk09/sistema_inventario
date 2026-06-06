@@ -96,6 +96,7 @@ export default function CheckoutPage() {
   const taxRate = 0.15
   const selectedPaymentMethod = paymentMethods.find((method) => method.key === formData.paymentMethod) || paymentMethods[0] || null
   const selectedCheckoutCurrency = checkoutCurrencies.find((currency) => currency.code === formData.checkoutCurrency) || checkoutCurrencies[0] || { code: defaultCheckoutCurrency }
+  const checkoutCurrency = formData.checkoutCurrency || displayCurrency
   const subtotal = cart.total
   const paymentFeeRate = Number(selectedPaymentMethod?.fee_percent || 0) / 100
   const tax = Math.round(subtotal * taxRate)
@@ -103,6 +104,7 @@ export default function CheckoutPage() {
   const total = subtotal + tax + shippingCost + paymentFee
   const formatAmount = (value, options = {}) => formatNumber(value || 0, { minimumFractionDigits: 2, maximumFractionDigits: 2, ...options })
   const formatDisplayCurrency = (value, currency = displayCurrency) => formatPriceFromUsd(value || 0, currency)
+  const formatCheckoutCurrency = (value) => formatPriceFromUsd(value || 0, checkoutCurrency)
 
   useEffect(() => {
     if (paymentMethods.length === 0) {
@@ -475,7 +477,7 @@ export default function CheckoutPage() {
               <div className="rounded-2xl border border-white/10 bg-white/10 p-4">
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-300">{t('checkout.hero_total', 'Total')}</p>
                 <p className="mt-2 text-2xl font-bold text-white">
-                  {formatDisplayCurrency(total, formData.checkoutCurrency)}
+                  {formatCheckoutCurrency(total)}
                 </p>
               </div>
             </div>
@@ -989,7 +991,7 @@ export default function CheckoutPage() {
                         ? t('checkout.paypal_complete_before_submit', 'Completa primero el pago con PayPal')
                         : formData.paymentMethod === 'stripe' && !stripeState.approved
                           ? t('checkout.stripe_complete_before_submit', 'Completa primero el pago con Stripe')
-                      : `${t('checkout.pay_button_prefix', 'Pagar')} ${formatDisplayCurrency(total, formData.checkoutCurrency)}`}
+                      : `${t('checkout.pay_button_prefix', 'Pagar')} ${formatCheckoutCurrency(total)}`}
                   </button>
                 </form>
               </div>
@@ -1023,7 +1025,7 @@ export default function CheckoutPage() {
                       {t('checkout.summary_subtotal', 'Subtotal:')}
                     </span>
                     <span className="shrink-0 text-right text-foreground">
-                      {formatDisplayCurrency(subtotal)}
+                      {formatCheckoutCurrency(subtotal)}
                     </span>
                   </div>
                   <div className="flex items-start justify-between gap-4 text-sm">
@@ -1031,7 +1033,7 @@ export default function CheckoutPage() {
                       {t('checkout.summary_shipping', 'Envío:')}
                     </span>
                     <span className="shrink-0 text-right text-foreground">
-                      {formatDisplayCurrency(shippingCost)}
+                      {formatCheckoutCurrency(shippingCost)}
                     </span>
                   </div>
                   <div className="flex items-start justify-between gap-4 text-sm">
@@ -1039,7 +1041,7 @@ export default function CheckoutPage() {
                       {t('checkout.summary_payment_fee', 'Recargo por método de pago:')}
                     </span>
                     <span className="shrink-0 text-right text-foreground">
-                      {formatDisplayCurrency(paymentFee)}
+                      {formatCheckoutCurrency(paymentFee)}
                     </span>
                   </div>
                   <div className="flex items-start justify-between gap-4 text-sm">
@@ -1047,7 +1049,7 @@ export default function CheckoutPage() {
                       {t('checkout.summary_tax', 'Impuestos (15%):')}
                     </span>
                     <span className="shrink-0 text-right text-foreground">
-                      {formatDisplayCurrency(tax)}
+                      {formatCheckoutCurrency(tax)}
                     </span>
                   </div>
                   <div className="mb-4 flex items-start justify-between gap-4 border-t border-border pt-3">
@@ -1055,7 +1057,7 @@ export default function CheckoutPage() {
                       {`${t('checkout.summary_total_usd', 'Total')}: ${selectedCheckoutCurrency.code}`}
                     </span>
                     <span className="text-right text-2xl font-bold text-primary">
-                      {formatDisplayCurrency(total, formData.checkoutCurrency)}
+                      {formatCheckoutCurrency(total)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-4 rounded-2xl border border-sky-200 bg-sky-50 p-4">

@@ -54,9 +54,9 @@ class ShopController extends Controller
         $products->getCollection()->transform(function ($p) use ($rate, $salesByProduct) {
             $images = $p->images->map(fn ($img) => [
                 'id' => $img->id,
-                'url' => asset('storage/'.$img->path),
+                'url' => $img->url,
             ]);
-            $mainImage = $images->first()['url'] ?? $p->image_url;
+            $mainImage = $images->first()['url'] ?? $p->image;
             return [
                 'id' => $p->id,
                 'name' => $p->name,
@@ -111,9 +111,9 @@ class ShopController extends Controller
             'price_bs' => round((float) $product->price_usd * ($rate ?: 0), 2),
             'images' => $product->images->map(fn ($img) => [
                 'id' => $img->id,
-                'url' => asset('storage/'.$img->path),
+                'url' => $img->url,
             ]),
-            'image' => $product->image_url,
+            'image' => $product->image,
             'category' => optional($product->categories->first())->name ?? null,
             'categories' => $product->categories->pluck('name'),
             'stock' => (int) $product->stock,
@@ -134,7 +134,7 @@ class ShopController extends Controller
                 'id' => $p->id,
                 'name' => $p->name,
                 'price' => (float) $p->price_usd,
-                'image' => $p->image_url,
+                'image' => $p->image,
                 'category' => optional($p->categories->first())->name ?? null,
             ];
         });

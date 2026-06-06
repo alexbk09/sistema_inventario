@@ -24,7 +24,9 @@
 
 namespace App\Models;
 
+use App\Services\ImageStorageService;
 use App\Support\Settings;
+use Illuminate\Support\Str;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -59,7 +61,38 @@ class Product extends Model
     protected $appends = [
         'effective_min_stock',
         'is_low_stock',
+        'image',
     ];
+
+    public function getImageUrlAttribute(?string $value): ?string
+    {
+        if (! $value) {
+            return null;
+        }
+
+        if (Str::startsWith($value, ['http://', 'https://', '//'])) {
+            return $value;
+        }
+
+        return app(ImageStorageService::class)->getUrl($value);
+    }
+
+    public function getImageAttribute(): ?string
+    {
+        $primaryImage = null;
+
+        if ($this->relationLoaded('images')) {
+            $primaryImage = $this->images->sortBy('sort_order')->first();
+        } else {
+            $primaryImage = $this->images()->orderBy('sort_order')->first();
+        }
+
+        if ($primaryImage?->url) {
+            return $primaryImage->url;
+        }
+
+        return $this->image_url;
+    }
 
     public function category(): BelongsTo
     {

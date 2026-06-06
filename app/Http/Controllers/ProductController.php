@@ -8,6 +8,7 @@ use App\Models\InventoryMovement;
 use App\Models\ProductImage;
 use App\Jobs\ProcessProductImage;
 use App\Services\AdminMoneyService;
+use App\Services\ImageStorageService;
 use App\Support\Settings;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -29,13 +30,16 @@ class ProductController extends Controller
                         ->orWhere('description', 'like', "%{$search}%");
                 });
             })
+            ->with(['images' => function ($q) {
+                $q->orderBy('sort_order');
+            }])
             ->latest()
-            ->with(['categories:id,name', 'images'])
+            ->select(['id', 'name', 'sku', 'barcode', 'price_usd', 'stock', 'min_stock', 'description', 'is_featured', 'image_url'])
             ->paginate(12)
             ->withQueryString();
 
-        $products->getCollection()->transform(function (Product $product) use ($adminMoneyService, $currencySettings) {
-            $product->price_admin_totals = $adminMoneyService->buildAdminTotals((float) ($product->price_usd ?? 0), $currencySettings)['totals'];
+        $products->getCollection()->transform(function (Product $product) use ($adminMoneyService, $adminCurrencyContext) {
+            $product->price_admin_totals = $adminMoneyService->buildTotalsWithContext((float) ($product->price_usd ?? 0), $adminCurrencyContext)['totals'];
 
             return $product;
         });
@@ -47,7 +51,7 @@ class ProductController extends Controller
         $summary = [
             'total_products' => (int) Product::count(),
             'total_products_value_usd' => $totalProductsValueUsd,
-            'total_products_value_admin_totals' => $adminMoneyService->buildAdminTotals($totalProductsValueUsd, $currencySettings)['totals'],
+            'total_products_value_admin_totals' => $adminMoneyService->buildTotalsWithContext($totalProductsValueUsd, $adminCurrencyContext)['totals'],
             'last_30_days_exits' => (int) InventoryMovement::where('type', 'exit')
                 ->where('created_at', '>=', now()->subDays(30))
                 ->sum('quantity'),
@@ -62,7 +66,7 @@ class ProductController extends Controller
         ]);
     }
 
-    public function import(Request $request, \App\Services\InventoryService $inventory)
+    public function import(Request $request, \App\Services\InventoryService $inventory, ImageStorageService $imageStorageService)
     {
         $data = $request->validate([
             'file' => ['required','file','mimes:xlsx,xls,csv'],
@@ -83,7 +87,7 @@ class ProductController extends Controller
         // Expect header in first row: name,sku,price_usd,stock,description,category_names,image_url
         $header = array_map('strtolower', array_map('trim', $rows[0] ?? []));
         $created = 0;
-        DB::transaction(function () use ($rows, $header, &$created, $data, $inventory) {
+        DB::transaction(function () use ($rows, $header, &$created, $data, $inventory, $imageStorageService) {
             for ($i = 1; $i < count($rows); $i++) {
                 $row = $rows[$i];
                 if (!isset($row[0]) || trim($row[0]) === '') continue;
@@ -110,28 +114,21 @@ class ProductController extends Controller
 
                 // Handle image_url: try download
                 if (!empty($map['image_url'])) {
-                    try {
-                        $resp = \Illuminate\Support\Facades\Http::withOptions(['verify' => false])->get($map['image_url']);
-                        if ($resp->ok()) {
-                            $ext = pathinfo(parse_url($map['image_url'], PHP_URL_PATH), PATHINFO_EXTENSION) ?: 'jpg';
-                            $filename = 'products/' . uniqid() . '.' . $ext;
-                            \Illuminate\Support\Facades\Storage::disk('public')->put($filename, $resp->body());
-                            $image = \App\Models\ProductImage::create([
-                                'product_id' => $product->id,
-                                'path' => $filename,
-                                'is_primary' => true,
-                                'sort_order' => 0,
-                            ]);
-                            try {
-                                \App\Jobs\ProcessProductImage::dispatch($image->id);
-                            } catch (\Throwable $e) {
-                                // ignore dispatch errors for imports
-                            }
-                            $product->image_url = $filename;
-                            $product->save();
+                    $stored = $imageStorageService->storeRemoteImage($map['image_url'], 'products');
+                    if ($stored) {
+                        $image = \App\Models\ProductImage::create([
+                            'product_id' => $product->id,
+                            'path' => $stored['path'],
+                            'is_primary' => true,
+                            'sort_order' => 0,
+                        ]);
+                        try {
+                            \App\Jobs\ProcessProductImage::dispatch($image->id);
+                        } catch (\Throwable $e) {
+                            // ignore dispatch errors for imports
                         }
-                    } catch (\Throwable $e) {
-                        // ignore image errors
+                        $product->image_url = $stored['path'];
+                        $product->save();
                     }
                 }
 
@@ -154,7 +151,7 @@ class ProductController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request, ImageStorageService $imageStorageService)
     {
         $data = $request->validate([
             'name' => ['required','string','max:255'],
@@ -201,11 +198,11 @@ class ProductController extends Controller
             }
             Log::info('ProductController: found files to upload', ['product_id'=>$product->id,'count'=>count($files)]);
             foreach ($files as $index => $file) {
-                $path = $file->store('products', 'public');
+                $stored = $imageStorageService->storeUploadedFile($file, 'products');
 
                 $image = ProductImage::create([
                     'product_id' => $product->id,
-                    'path' => $path,
+                    'path' => $stored['path'],
                     'is_primary' => $index === 0,
                     'sort_order' => $index,
                 ]);
@@ -219,7 +216,7 @@ class ProductController extends Controller
                 // }
 
                 if ($index === 0) {
-                    $product->image_url = $path;
+                    $product->image_url = $stored['path'];
                     $product->save();
                 }
             }
@@ -236,7 +233,7 @@ class ProductController extends Controller
         ]);
     }
 
-    public function update(Request $request, Product $product)
+    public function update(Request $request, Product $product, ImageStorageService $imageStorageService)
     {
         $data = $request->validate([
             'name' => ['required','string','max:255'],
@@ -281,11 +278,11 @@ class ProductController extends Controller
             }
             Log::info('ProductController:update found files to upload', ['product_id'=>$product->id,'count'=>count($files)]);
             foreach ($files as $index => $file) {
-                $path = $file->store('products', 'public');
+                $stored = $imageStorageService->storeUploadedFile($file, 'products');
 
                 $image = ProductImage::create([
                     'product_id' => $product->id,
-                    'path' => $path,
+                    'path' => $stored['path'],
                     'is_primary' => $product->images()->count() === 0 && $index === 0,
                     'sort_order' => $product->images()->count() + $index,
                 ]);
@@ -298,7 +295,7 @@ class ProductController extends Controller
                     Log::error('ProductController:update failed to dispatch ProcessProductImage', ['error'=>$e->getMessage()]);
                 }
                 if ($image->is_primary) {
-                    $product->image_url = $path;
+                    $product->image_url = $stored['path'];
                     $product->save();
                 }
             }

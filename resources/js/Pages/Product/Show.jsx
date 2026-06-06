@@ -1,7 +1,8 @@
 import GuestLayout from '@/Layouts/GuestLayout.jsx'
 import { Head, Link, usePage } from '@inertiajs/react'
 import { useCart } from '@/Hooks/useCart'
-import { ShoppingCart, ArrowLeft, Star } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ShoppingCart, ArrowLeft, ChevronLeft, ChevronRight, Star } from 'lucide-react'
 import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates'
 import { useI18n } from '@/Hooks/useI18n'
 
@@ -40,6 +41,15 @@ export default function ProductShow({ product, related = [], rate }) {
     : product.image
       ? [{ id: 'single', url: product.image }]
       : []
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0)
+  const [zoomState, setZoomState] = useState({ active: false, x: 50, y: 50 })
+  const [touchStartX, setTouchStartX] = useState(null)
+  const selectedImage = images[selectedImageIndex] ?? images[0] ?? null
+
+  useEffect(() => {
+    setSelectedImageIndex(0)
+    setZoomState({ active: false, x: 50, y: 50 })
+  }, [product?.id])
 
   const priceUsd = Number(product.price ?? product.price_usd ?? 0)
   const effectiveRate = pageRate ?? settings.currency?.bs_rate ?? 0
@@ -69,9 +79,60 @@ export default function ProductShow({ product, related = [], rate }) {
       id: String(product.id),
       name: product.name,
       price: priceUsd,
-      image: images[0]?.url ?? product.image ?? '',
+      image: selectedImage?.url ?? images[0]?.url ?? product.image ?? '',
       category: product.category ?? (Array.isArray(product.categories) ? (product.categories[0]?.name ?? product.categories[0]) : undefined),
     })
+  }
+
+  const handleMainImageMouseMove = (event) => {
+    const bounds = event.currentTarget.getBoundingClientRect()
+    const x = ((event.clientX - bounds.left) / bounds.width) * 100
+    const y = ((event.clientY - bounds.top) / bounds.height) * 100
+
+    setZoomState({ active: true, x, y })
+  }
+
+  const handleSelectImage = (index) => {
+    setSelectedImageIndex(index)
+    setZoomState({ active: false, x: 50, y: 50 })
+  }
+
+  const goToPreviousImage = () => {
+    if (images.length <= 1) return
+
+    setSelectedImageIndex((currentIndex) => (currentIndex === 0 ? images.length - 1 : currentIndex - 1))
+    setZoomState({ active: false, x: 50, y: 50 })
+  }
+
+  const goToNextImage = () => {
+    if (images.length <= 1) return
+
+    setSelectedImageIndex((currentIndex) => (currentIndex === images.length - 1 ? 0 : currentIndex + 1))
+    setZoomState({ active: false, x: 50, y: 50 })
+  }
+
+  const handleTouchStart = (event) => {
+    setTouchStartX(event.touches[0]?.clientX ?? null)
+  }
+
+  const handleTouchEnd = (event) => {
+    if (touchStartX === null || images.length <= 1) {
+      setTouchStartX(null)
+      return
+    }
+
+    const touchEndX = event.changedTouches[0]?.clientX ?? touchStartX
+    const deltaX = touchStartX - touchEndX
+
+    if (Math.abs(deltaX) > 40) {
+      if (deltaX > 0) {
+        goToNextImage()
+      } else {
+        goToPreviousImage()
+      }
+    }
+
+    setTouchStartX(null)
   }
 
   return (
@@ -92,12 +153,24 @@ export default function ProductShow({ product, related = [], rate }) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {/* Galería */}
               <div>
-                <div className="w-full aspect-square bg-muted rounded-lg overflow-hidden mb-4">
-                  {images[0] ? (
+                <div
+                  className="group relative w-full aspect-square bg-muted rounded-lg overflow-hidden mb-4"
+                  onMouseMove={handleMainImageMouseMove}
+                  onMouseEnter={() => setZoomState((current) => ({ ...current, active: true }))}
+                  onMouseLeave={() => setZoomState({ active: false, x: 50, y: 50 })}
+                  onTouchStart={handleTouchStart}
+                  onTouchEnd={handleTouchEnd}
+                >
+                  {selectedImage ? (
                     <img
-                      src={images[0].url}
+                      src={selectedImage.url}
                       alt={t('product.image_alt', 'Imagen de :name', { name: product.name })}
-                      className="object-cover w-full h-full"
+                      className="h-full w-full object-cover transition duration-200 ease-out"
+                      style={{
+                        transform: zoomState.active ? 'scale(2)' : 'scale(1)',
+                        transformOrigin: `${zoomState.x}% ${zoomState.y}%`,
+                        cursor: zoomState.active ? 'zoom-in' : 'default',
+                      }}
                     />
                   ) : (
                     <img
@@ -106,17 +179,47 @@ export default function ProductShow({ product, related = [], rate }) {
                       className="object-cover w-full h-full"
                     />
                   )}
+                  {images.length > 1 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={goToPreviousImage}
+                        className="absolute left-3 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-slate-950/70 text-white shadow-sm transition hover:bg-slate-950"
+                        aria-label={t('product.previous_image', 'Imagen anterior')}
+                      >
+                        <ChevronLeft className="h-5 w-5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={goToNextImage}
+                        className="absolute right-3 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-slate-950/70 text-white shadow-sm transition hover:bg-slate-950"
+                        aria-label={t('product.next_image', 'Imagen siguiente')}
+                      >
+                        <ChevronRight className="h-5 w-5" />
+                      </button>
+                      <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-slate-950/60 px-3 py-1 text-xs text-white">
+                        <span>{selectedImageIndex + 1}</span>
+                        <span>/</span>
+                        <span>{images.length}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
                 {images.length > 1 && (
                   <div className="grid grid-cols-4 gap-2">
-                    {images.map((img) => (
-                      <div key={img.id} className="aspect-square rounded border border-border overflow-hidden">
+                    {images.map((img, index) => (
+                      <button
+                        key={img.id}
+                        type="button"
+                        onClick={() => handleSelectImage(index)}
+                        className={`aspect-square overflow-hidden rounded border transition ${selectedImageIndex === index ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/60'}`}
+                      >
                         <img
                           src={img.url}
                           alt={t('product.image_alt', 'Imagen de :name', { name: product.name })}
-                          className="object-cover w-full h-full"
+                          className="h-full w-full object-cover"
                         />
-                      </div>
+                      </button>
                     ))}
                   </div>
                 )}

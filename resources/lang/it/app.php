@@ -2655,6 +2655,12 @@ return [
                             'email' => 'Email',
                             'phone' => 'Telefono',
                             'whatsapp' => 'WhatsApp',
+                                'facebook_url' => 'URL Facebook',
+                                'instagram_url' => 'URL Instagram',
+                                'twitter_url' => 'URL X / Twitter',
+                                'youtube_url' => 'URL YouTube',
+                                'tiktok_url' => 'URL TikTok',
+                                'linkedin_url' => 'URL LinkedIn',
                         ],
                     ],
                     'location' => [
@@ -3375,6 +3381,9 @@ return [
         'social_facebook' => 'Facebook',
         'social_instagram' => 'Instagram',
         'social_twitter' => 'Twitter',
+        'social_youtube' => 'YouTube',
+        'social_tiktok' => 'TikTok',
+        'social_linkedin' => 'LinkedIn',
         'rights' => 'Tutti i diritti riservati.',
     ],
 ];

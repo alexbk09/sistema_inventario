@@ -3,16 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\ProductImage;
-use Illuminate\Support\Facades\Storage;
+use App\Services\ImageStorageService;
 
 class ProductImageController extends Controller
 {
-    public function destroy(ProductImage $image)
+    public function destroy(ProductImage $image, ImageStorageService $imageStorageService)
     {
         $product = $image->product;
 
-        if ($image->path && Storage::disk('public')->exists($image->path)) {
-            Storage::disk('public')->delete($image->path);
+        if ($image->path) {
+            $imageStorageService->delete($image->path);
         }
 
         $wasPrimary = (bool) $image->is_primary;

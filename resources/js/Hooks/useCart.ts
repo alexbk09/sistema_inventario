@@ -38,6 +38,19 @@ export function useCart() {
 
     // Si el usuario está autenticado, sincronizar con el carrito persistido en el backend
     if (user) {
+      const savedCartItems: CartItem[] = []
+      try {
+        const savedCart = localStorage.getItem('cart')
+        if (savedCart) {
+          const parsed = JSON.parse(savedCart)
+          if (Array.isArray(parsed?.items)) {
+            savedCartItems.push(...parsed.items)
+          }
+        }
+      } catch (e) {
+        // ignore malformed local cart
+      }
+
       fetch('/api/cart', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then((res) => {
           if (!res.ok) return null
@@ -46,15 +59,19 @@ export function useCart() {
         .then((data) => {
           if (!data || data.ok !== true || !Array.isArray(data.items)) return
 
+          const existingItemsById = new Map<string, CartItem>(savedCartItems.map((item) => [item.id, item]))
           const serverItems: CartItem[] = data.items
-            .map((it: any) => ({
-              id: String(it.product_id),
-              name: String(it.name ?? ''),
-              price: Number(it.price_usd ?? 0),
-              quantity: Number(it.quantity ?? 0),
-              image: '',
-              category: '',
-            }))
+            .map((it: any) => {
+              const existing = existingItemsById.get(String(it.product_id))
+              return {
+                id: String(it.product_id),
+                name: String(it.name ?? ''),
+                price: Number(it.price_usd ?? 0),
+                quantity: Number(it.quantity ?? 0),
+                image: String(it.image ?? existing?.image ?? ''),
+                category: String(it.category ?? existing?.category ?? ''),
+              }
+            })
             .filter((it: CartItem) => it.quantity > 0)
 
           if (serverItems.length === 0) return
