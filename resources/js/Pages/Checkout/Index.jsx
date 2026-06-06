@@ -29,6 +29,8 @@ const PAYMENT_ICONS = {
   stripe: CreditCard,
 }
 
+const isEnabledValue = (value) => value === true || value === 1 || value === '1' || value === 'true'
+
 export default function CheckoutPage() {
   const { cart, clearCart, itemCount, updateQuantity, updatePrice, addToCart } = useCart()
   const { props } = usePage();
@@ -39,13 +41,13 @@ export default function CheckoutPage() {
   const paypalConfig = payments?.methods?.paypal || null;
   const stripeConfig = payments?.methods?.stripe || null;
   const paymentMethods = Object.entries(payments?.methods || {})
-    .filter(([, method]) => method?.enabled)
+    .filter(([, method]) => isEnabledValue(method?.enabled))
     .map(([key, method]) => ({ key, ...method }));
   const bankAccounts = Array.isArray(payments?.bank_accounts)
-    ? payments.bank_accounts.filter((account) => account?.enabled !== false)
+    ? payments.bank_accounts.filter((account) => isEnabledValue(account?.enabled))
     : [];
   const originBanks = Array.isArray(payments?.origin_banks)
-    ? payments.origin_banks.filter((bank) => bank?.enabled !== false)
+    ? payments.origin_banks.filter((bank) => isEnabledValue(bank?.enabled))
     : [];
   const defaultPaymentMethod = paymentMethods[0]?.key || 'manual';
   const [formData, setFormData] = useState(() => ({
@@ -92,7 +94,7 @@ export default function CheckoutPage() {
   const { formatNumber } = useLocaleFormat()
   const rateBs = Number(ratesByCode.VES ?? 0) || null
 
-  const shippingCost = 200
+  const shippingCost = 0
   const taxRate = 0.15
   const selectedPaymentMethod = paymentMethods.find((method) => method.key === formData.paymentMethod) || paymentMethods[0] || null
   const selectedCheckoutCurrency = checkoutCurrencies.find((currency) => currency.code === formData.checkoutCurrency) || checkoutCurrencies[0] || { code: defaultCheckoutCurrency }
@@ -132,10 +134,18 @@ export default function CheckoutPage() {
       return
     }
 
+    const updates = {}
     if (!formData.bank && bankAccounts[0]?.bank_name) {
-      setFormData((prev) => ({ ...prev, bank: bankAccounts[0].bank_name }))
+      updates.bank = bankAccounts[0].bank_name
     }
-  }, [bankAccounts, formData.bank, formData.paymentMethod])
+    if (!formData.originBank && originBanks[0]?.name) {
+      updates.originBank = originBanks[0].name
+    }
+
+    if (Object.keys(updates).length > 0) {
+      setFormData((prev) => ({ ...prev, ...updates }))
+    }
+  }, [bankAccounts, formData.bank, formData.originBank, formData.paymentMethod, originBanks])
 
   useEffect(() => {
     if (formData.paymentMethod !== 'paypal') {
@@ -262,7 +272,7 @@ export default function CheckoutPage() {
   const createPayPalOrder = async () => {
     setError('')
 
-    if (!validateCheckout('paypal')) {
+    if (!validateCheckout('paypal', { skipGatewayConfirmation: true })) {
       throw new Error(t('checkout.error_incomplete_form', 'Formulario incompleto'))
     }
 
@@ -703,7 +713,11 @@ export default function CheckoutPage() {
                           </div>
                           <div>
                             <p className="text-sm font-semibold text-foreground">{selectedPaymentMethod.label}</p>
-                            <p className="text-sm text-muted-foreground">{selectedPaymentMethod.instructions || selectedPaymentMethod.description}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {formData.paymentMethod === 'paypal' && paypalConfig?.client_id
+                                ? t('checkout.paypal_ready_description', 'PayPal está configurado y listo para usar.')
+                                : selectedPaymentMethod.instructions || selectedPaymentMethod.description}
+                            </p>
                           </div>
                         </div>
                       </div>
@@ -774,15 +788,35 @@ export default function CheckoutPage() {
                             <label className="mb-2 block text-sm font-semibold text-foreground">
                               {t('checkout.receiver_bank_label', 'Banco receptor *')}
                             </label>
-                            <input
-                              type="text"
-                              name="bank"
-                              value={formData.bank}
-                              onChange={handleInputChange}
-                              placeholder={t('checkout.receiver_bank_placeholder', 'Ej: Banesco')}
-                              className="w-full rounded-lg border border-border bg-background px-4 py-2 text-foreground transition focus:border-primary focus:outline-none"
-                              required
-                            />
+                            {bankAccounts.length > 0 ? (
+                              <select
+                                name="bank"
+                                value={formData.bank}
+                                onChange={handleInputChange}
+                                className="w-full rounded-lg border border-border bg-background px-4 py-2 text-foreground transition focus:border-primary focus:outline-none"
+                                required
+                              >
+                                <option value="">{t('checkout.receiver_bank_placeholder_select', 'Selecciona una cuenta bancaria')}</option>
+                                {bankAccounts.map((account) => (
+                                  <option
+                                    key={`${account.bank_name}-${account.account_number}`}
+                                    value={account.bank_name}
+                                  >
+                                    {account.bank_name} · {account.account_number} {account.account_name ? `(${account.account_name})` : ''}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <input
+                                type="text"
+                                name="bank"
+                                value={formData.bank}
+                                onChange={handleInputChange}
+                                placeholder={t('checkout.receiver_bank_placeholder', 'Ej: Banesco')}
+                                className="w-full rounded-lg border border-border bg-background px-4 py-2 text-foreground transition focus:border-primary focus:outline-none"
+                                required
+                              />
+                            )}
                           </div>
 
                           <div>
@@ -856,20 +890,23 @@ export default function CheckoutPage() {
                             <p className="mt-1 text-sm leading-6 text-emerald-900/80">
                               {t('checkout.gateway_ready_description', 'Este metodo fue habilitado desde configuracion. El cliente puede seleccionarlo y el pedido quedara registrado con esta preferencia de pago.')}
                             </p>
-                            {selectedPaymentMethod?.instructions && (
+                            {selectedPaymentMethod?.instructions && !(formData.paymentMethod === 'paypal' && paypalConfig?.client_id) && (
                               <p className="mt-3 rounded-2xl bg-white/70 p-3 text-sm text-emerald-950">
                                 {selectedPaymentMethod.instructions}
                               </p>
                             )}
                             {formData.paymentMethod === 'paypal' && (paypalConfig?.client_id ? (
                               <div className="mt-4 space-y-4">
+                                <div className="rounded-2xl border p-3 text-sm border-emerald-200 bg-white/70 text-emerald-950">
+                                  {t('checkout.paypal_ready_message', 'PayPal está configurado. Completa el pago con PayPal y luego registra el pedido.')}
+                                </div>
                                 <div className={`rounded-2xl border p-3 text-sm ${paypalState.approved ? 'border-emerald-300 bg-white text-emerald-900' : 'border-emerald-200 bg-white/70 text-emerald-950'}`}>
                                   {paypalState.approved
                                     ? t('checkout.paypal_capture_confirmed', 'Pago confirmado con captura :id.').replace(':id', paypalState.captureID)
                                     : t('checkout.paypal_complete_then_submit', 'Completa el pago con PayPal y luego registra el pedido.')}
                                 </div>
                                 <PayPalScriptProvider options={{
-                                  clientId: paypalConfig.client_id,
+                                  'client-id': paypalConfig.client_id,
                                   currency: formData.checkoutCurrency,
                                   intent: 'capture',
                                   components: 'buttons',

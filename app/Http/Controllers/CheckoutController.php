@@ -115,7 +115,7 @@ class CheckoutController extends Controller
         }
 
         // Costos/Impuestos (deben coincidir con el frontend)
-        $shippingUsd = 200.0;
+        $shippingUsd = 0.0;
         $taxRate = 0.15;
 
         return DB::transaction(function () use ($payload, $currency, $inventory, $shippingUsd, $taxRate, $methodConfig, $selectedMethod, $adminMoneyService, $notificationService) {
@@ -658,24 +658,32 @@ class CheckoutController extends Controller
         $methods = collect($payments['methods'] ?? [])->map(function (array $method, string $key) {
             if ($key === 'paypal') {
                 unset($method['client_secret']);
+
+                if (! empty($method['client_id'])) {
+                    $method['instructions'] = $method['description'] ?? $method['instructions'] ?? null;
+                }
             }
 
             if ($key === 'stripe') {
                 unset($method['secret_key']);
             }
 
+            $method['enabled'] = filter_var($method['enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
             return $method;
         })->all();
+
+        $normalizeEnabled = fn ($value) => filter_var($value ?? true, FILTER_VALIDATE_BOOLEAN);
 
         return [
             'methods' => $methods,
             'bank_accounts' => array_values(array_filter(
                 $payments['bank_accounts'] ?? [],
-                fn ($account) => ($account['enabled'] ?? true) === true
+                fn ($account) => $normalizeEnabled($account['enabled'] ?? true)
             )),
             'origin_banks' => array_values(array_filter(
                 $payments['origin_banks'] ?? [],
-                fn ($bank) => ($bank['enabled'] ?? true) === true
+                fn ($bank) => $normalizeEnabled($bank['enabled'] ?? true)
             )),
         ];
     }

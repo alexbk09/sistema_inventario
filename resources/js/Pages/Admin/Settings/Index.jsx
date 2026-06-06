@@ -576,143 +576,143 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                         title={t('admin.settings.identity.company.title', 'Datos de empresa')}
                                         description={t('admin.settings.identity.company.description', 'Define la identidad principal del negocio y los datos que se reutilizan en panel, documentos y contacto.')}
                                     >
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.company_name', 'Nombre de la empresa')} *</label>
-                                <input
-                                    type="text"
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    value={data.general.company_name || ''}
-                                    onChange={handleChange('general', 'company_name')}
-                                />
-                                {errors['general.company_name'] && (
-                                    <p className="mt-1 text-xs text-red-600">{errors['general.company_name']}</p>
-                                )}
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.trade_name', 'Nombre comercial')}</label>
-                                <input
-                                    type="text"
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    value={data.general.trade_name || ''}
-                                    onChange={handleChange('general', 'trade_name')}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.tax_id', 'RIF / NIT')}</label>
-                                <input
-                                    type="text"
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    value={data.general.tax_id || ''}
-                                    onChange={handleChange('general', 'tax_id')}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.email', 'Email')}</label>
-                                <input
-                                    type="email"
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    value={data.general.email || ''}
-                                    onChange={handleChange('general', 'email')}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.phone', 'Teléfono')}</label>
-                                <input
-                                    type="text"
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    value={data.general.phone || ''}
-                                    onChange={handleChange('general', 'phone')}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.whatsapp', 'WhatsApp')}</label>
-                                <input
-                                    type="text"
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    value={data.general.whatsapp || ''}
-                                    onChange={handleChange('general', 'whatsapp')}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.facebook_url', 'URL de Facebook')}</label>
-                                <input
-                                    type="url"
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    value={data.general.facebook_url || ''}
-                                    onChange={handleChange('general', 'facebook_url')}
-                                    placeholder="https://facebook.com/tu-marca"
-                                />
-                                {errors['general.facebook_url'] && (
-                                    <p className="mt-1 text-xs text-red-600">{errors['general.facebook_url']}</p>
-                                )}
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.instagram_url', 'URL de Instagram')}</label>
-                                <input
-                                    type="url"
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    value={data.general.instagram_url || ''}
-                                    onChange={handleChange('general', 'instagram_url')}
-                                    placeholder="https://instagram.com/tu-marca"
-                                />
-                                {errors['general.instagram_url'] && (
-                                    <p className="mt-1 text-xs text-red-600">{errors['general.instagram_url']}</p>
-                                )}
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.twitter_url', 'URL de X / Twitter')}</label>
-                                <input
-                                    type="url"
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    value={data.general.twitter_url || ''}
-                                    onChange={handleChange('general', 'twitter_url')}
-                                    placeholder="https://x.com/tu-marca"
-                                />
-                                {errors['general.twitter_url'] && (
-                                    <p className="mt-1 text-xs text-red-600">{errors['general.twitter_url']}</p>
-                                )}
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.youtube_url', 'URL de YouTube')}</label>
-                                <input
-                                    type="url"
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    value={data.general.youtube_url || ''}
-                                    onChange={handleChange('general', 'youtube_url')}
-                                    placeholder="https://youtube.com/@tu-marca"
-                                />
-                                {errors['general.youtube_url'] && (
-                                    <p className="mt-1 text-xs text-red-600">{errors['general.youtube_url']}</p>
-                                )}
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.tiktok_url', 'URL de TikTok')}</label>
-                                <input
-                                    type="url"
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    value={data.general.tiktok_url || ''}
-                                    onChange={handleChange('general', 'tiktok_url')}
-                                    placeholder="https://tiktok.com/@tu-marca"
-                                />
-                                {errors['general.tiktok_url'] && (
-                                    <p className="mt-1 text-xs text-red-600">{errors['general.tiktok_url']}</p>
-                                )}
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.linkedin_url', 'URL de LinkedIn')}</label>
-                                <input
-                                    type="url"
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    value={data.general.linkedin_url || ''}
-                                    onChange={handleChange('general', 'linkedin_url')}
-                                    placeholder="https://linkedin.com/company/tu-marca"
-                                />
-                                {errors['general.linkedin_url'] && (
-                                    <p className="mt-1 text-xs text-red-600">{errors['general.linkedin_url']}</p>
-                                )}
-                            </div>
-                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.company_name', 'Nombre de la empresa')} *</label>
+                                                <input
+                                                    type="text"
+                                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                    value={data.general.company_name || ''}
+                                                    onChange={handleChange('general', 'company_name')}
+                                                />
+                                                {errors['general.company_name'] && (
+                                                    <p className="mt-1 text-xs text-red-600">{errors['general.company_name']}</p>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.trade_name', 'Nombre comercial')}</label>
+                                                <input
+                                                    type="text"
+                                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                    value={data.general.trade_name || ''}
+                                                    onChange={handleChange('general', 'trade_name')}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.tax_id', 'RIF / NIT')}</label>
+                                                <input
+                                                    type="text"
+                                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                    value={data.general.tax_id || ''}
+                                                    onChange={handleChange('general', 'tax_id')}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.email', 'Email')}</label>
+                                                <input
+                                                    type="email"
+                                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                    value={data.general.email || ''}
+                                                    onChange={handleChange('general', 'email')}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.phone', 'Teléfono')}</label>
+                                                <input
+                                                    type="text"
+                                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                    value={data.general.phone || ''}
+                                                    onChange={handleChange('general', 'phone')}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.whatsapp', 'WhatsApp')}</label>
+                                                <input
+                                                    type="text"
+                                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                    value={data.general.whatsapp || ''}
+                                                    onChange={handleChange('general', 'whatsapp')}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.facebook_url', 'URL de Facebook')}</label>
+                                                <input
+                                                    type="url"
+                                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                    value={data.general.facebook_url || ''}
+                                                    onChange={handleChange('general', 'facebook_url')}
+                                                    placeholder="https://facebook.com/tu-marca"
+                                                />
+                                                {errors['general.facebook_url'] && (
+                                                    <p className="mt-1 text-xs text-red-600">{errors['general.facebook_url']}</p>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.instagram_url', 'URL de Instagram')}</label>
+                                                <input
+                                                    type="url"
+                                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                    value={data.general.instagram_url || ''}
+                                                    onChange={handleChange('general', 'instagram_url')}
+                                                    placeholder="https://instagram.com/tu-marca"
+                                                />
+                                                {errors['general.instagram_url'] && (
+                                                    <p className="mt-1 text-xs text-red-600">{errors['general.instagram_url']}</p>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.twitter_url', 'URL de X / Twitter')}</label>
+                                                <input
+                                                    type="url"
+                                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                    value={data.general.twitter_url || ''}
+                                                    onChange={handleChange('general', 'twitter_url')}
+                                                    placeholder="https://x.com/tu-marca"
+                                                />
+                                                {errors['general.twitter_url'] && (
+                                                    <p className="mt-1 text-xs text-red-600">{errors['general.twitter_url']}</p>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.youtube_url', 'URL de YouTube')}</label>
+                                                <input
+                                                    type="url"
+                                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                    value={data.general.youtube_url || ''}
+                                                    onChange={handleChange('general', 'youtube_url')}
+                                                    placeholder="https://youtube.com/@tu-marca"
+                                                />
+                                                {errors['general.youtube_url'] && (
+                                                    <p className="mt-1 text-xs text-red-600">{errors['general.youtube_url']}</p>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.tiktok_url', 'URL de TikTok')}</label>
+                                                <input
+                                                    type="url"
+                                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                    value={data.general.tiktok_url || ''}
+                                                    onChange={handleChange('general', 'tiktok_url')}
+                                                    placeholder="https://tiktok.com/@tu-marca"
+                                                />
+                                                {errors['general.tiktok_url'] && (
+                                                    <p className="mt-1 text-xs text-red-600">{errors['general.tiktok_url']}</p>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.company.fields.linkedin_url', 'URL de LinkedIn')}</label>
+                                                <input
+                                                    type="url"
+                                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                    value={data.general.linkedin_url || ''}
+                                                    onChange={handleChange('general', 'linkedin_url')}
+                                                    placeholder="https://linkedin.com/company/tu-marca"
+                                                />
+                                                {errors['general.linkedin_url'] && (
+                                                    <p className="mt-1 text-xs text-red-600">{errors['general.linkedin_url']}</p>
+                                                )}
+                                            </div>
+                                        </div>
                                     </SettingsSection>
 
                                     <SettingsSection
@@ -720,53 +720,53 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                         title={t('admin.settings.identity.location.title', 'Ubicacion')}
                                         description={t('admin.settings.identity.location.description', 'Organiza la informacion geografica del negocio y los enlaces de referencia para contacto y mapa.')}
                                     >
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.location.fields.address', 'Dirección')}</label>
-                                <textarea
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    rows={2}
-                                    value={data.location.address || ''}
-                                    onChange={handleChange('location', 'address')}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.location.fields.city', 'Ciudad')}</label>
-                                <input
-                                    type="text"
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    value={data.location.city || ''}
-                                    onChange={handleChange('location', 'city')}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.location.fields.state', 'Estado / Región')}</label>
-                                <input
-                                    type="text"
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    value={data.location.state || ''}
-                                    onChange={handleChange('location', 'state')}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.location.fields.country', 'País')}</label>
-                                <input
-                                    type="text"
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    value={data.location.country || ''}
-                                    onChange={handleChange('location', 'country')}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.location.fields.google_maps_url', 'URL de Google Maps')}</label>
-                                <input
-                                    type="url"
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    value={data.location.google_maps_url || ''}
-                                    onChange={handleChange('location', 'google_maps_url')}
-                                />
-                            </div>
-                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="md:col-span-2">
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.location.fields.address', 'Dirección')}</label>
+                                                <textarea
+                                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                    rows={2}
+                                                    value={data.location.address || ''}
+                                                    onChange={handleChange('location', 'address')}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.location.fields.city', 'Ciudad')}</label>
+                                                <input
+                                                    type="text"
+                                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                    value={data.location.city || ''}
+                                                    onChange={handleChange('location', 'city')}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.location.fields.state', 'Estado / Región')}</label>
+                                                <input
+                                                    type="text"
+                                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                    value={data.location.state || ''}
+                                                    onChange={handleChange('location', 'state')}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.location.fields.country', 'País')}</label>
+                                                <input
+                                                    type="text"
+                                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                    value={data.location.country || ''}
+                                                    onChange={handleChange('location', 'country')}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.location.fields.google_maps_url', 'URL de Google Maps')}</label>
+                                                <input
+                                                    type="url"
+                                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                    value={data.location.google_maps_url || ''}
+                                                    onChange={handleChange('location', 'google_maps_url')}
+                                                />
+                                            </div>
+                                        </div>
                                     </SettingsSection>
 
                                     <SettingsSection
@@ -774,79 +774,79 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                         title={t('admin.settings.identity.branding.title', 'Branding')}
                                         description={t('admin.settings.identity.branding.description', 'Concentra logos, favicon y colores clave para mantener una identidad consistente en toda la experiencia.')}
                                     >
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.branding.fields.logo_url', 'Logo (URL)')}</label>
-                                <input
-                                    type="text"
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    value={data.branding.logo_url || ''}
-                                    onChange={handleChange('branding', 'logo_url')}
-                                />
-                                <label className="mt-3 block text-sm font-medium text-slate-700">{t('admin.settings.identity.branding.fields.logo_file', 'o subir logo')}</label>
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    className="mt-1 block w-full text-sm text-slate-600"
-                                    onChange={(e) => updateBrandingFile('logo_file', e.target.files?.[0] ?? null)}
-                                />
-                                {data.branding.logo_url && (
-                                    <img src={data.branding.logo_url} alt="Logo" className="mt-3 h-12 w-auto max-w-[180px] rounded-lg border border-slate-200 bg-slate-50 p-2 object-contain" />
-                                )}
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.branding.fields.logo_dark_url', 'Logo oscuro (URL)')}</label>
-                                <input
-                                    type="text"
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    value={data.branding.logo_dark_url || ''}
-                                    onChange={handleChange('branding', 'logo_dark_url')}
-                                />
-                                <label className="mt-3 block text-sm font-medium text-slate-700">{t('admin.settings.identity.branding.fields.logo_dark_file', 'o subir logo oscuro')}</label>
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    className="mt-1 block w-full text-sm text-slate-600"
-                                    onChange={(e) => updateBrandingFile('logo_dark_file', e.target.files?.[0] ?? null)}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.branding.fields.favicon_url', 'Favicon (URL)')}</label>
-                                <input
-                                    type="text"
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    value={data.branding.favicon_url || ''}
-                                    onChange={handleChange('branding', 'favicon_url')}
-                                />
-                                <label className="mt-3 block text-sm font-medium text-slate-700">{t('admin.settings.identity.branding.fields.favicon_file', 'o subir favicon')}</label>
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    className="mt-1 block w-full text-sm text-slate-600"
-                                    onChange={(e) => updateBrandingFile('favicon_file', e.target.files?.[0] ?? null)}
-                                />
-                            </div>
-                            <div className="flex gap-4 items-end">
-                                <div className="flex-1">
-                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.branding.fields.primary_color', 'Color primario')}</label>
-                                    <input
-                                        type="text"
-                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                        value={data.branding.primary_color || ''}
-                                        onChange={handleChange('branding', 'primary_color')}
-                                    />
-                                </div>
-                                <div className="flex-1">
-                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.branding.fields.secondary_color', 'Color secundario')}</label>
-                                    <input
-                                        type="text"
-                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                        value={data.branding.secondary_color || ''}
-                                        onChange={handleChange('branding', 'secondary_color')}
-                                    />
-                                </div>
-                            </div>
-                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.branding.fields.logo_url', 'Logo (URL)')}</label>
+                                                <input
+                                                    type="text"
+                                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                    value={data.branding.logo_url || ''}
+                                                    onChange={handleChange('branding', 'logo_url')}
+                                                />
+                                                <label className="mt-3 block text-sm font-medium text-slate-700">{t('admin.settings.identity.branding.fields.logo_file', 'o subir logo')}</label>
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    className="mt-1 block w-full text-sm text-slate-600"
+                                                    onChange={(e) => updateBrandingFile('logo_file', e.target.files?.[0] ?? null)}
+                                                />
+                                                {data.branding.logo_url && (
+                                                    <img src={data.branding.logo_url} alt="Logo" className="mt-3 h-12 w-auto max-w-[180px] rounded-lg border border-slate-200 bg-slate-50 p-2 object-contain" />
+                                                )}
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.branding.fields.logo_dark_url', 'Logo oscuro (URL)')}</label>
+                                                <input
+                                                    type="text"
+                                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                    value={data.branding.logo_dark_url || ''}
+                                                    onChange={handleChange('branding', 'logo_dark_url')}
+                                                />
+                                                <label className="mt-3 block text-sm font-medium text-slate-700">{t('admin.settings.identity.branding.fields.logo_dark_file', 'o subir logo oscuro')}</label>
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    className="mt-1 block w-full text-sm text-slate-600"
+                                                    onChange={(e) => updateBrandingFile('logo_dark_file', e.target.files?.[0] ?? null)}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.branding.fields.favicon_url', 'Favicon (URL)')}</label>
+                                                <input
+                                                    type="text"
+                                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                    value={data.branding.favicon_url || ''}
+                                                    onChange={handleChange('branding', 'favicon_url')}
+                                                />
+                                                <label className="mt-3 block text-sm font-medium text-slate-700">{t('admin.settings.identity.branding.fields.favicon_file', 'o subir favicon')}</label>
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    className="mt-1 block w-full text-sm text-slate-600"
+                                                    onChange={(e) => updateBrandingFile('favicon_file', e.target.files?.[0] ?? null)}
+                                                />
+                                            </div>
+                                            <div className="flex gap-4 items-end">
+                                                <div className="flex-1">
+                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.branding.fields.primary_color', 'Color primario')}</label>
+                                                    <input
+                                                        type="text"
+                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                        value={data.branding.primary_color || ''}
+                                                        onChange={handleChange('branding', 'primary_color')}
+                                                    />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.identity.branding.fields.secondary_color', 'Color secundario')}</label>
+                                                    <input
+                                                        type="text"
+                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                        value={data.branding.secondary_color || ''}
+                                                        onChange={handleChange('branding', 'secondary_color')}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
                                     </SettingsSection>
 
                                     <SettingsSection
@@ -854,270 +854,270 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                         title={t('admin.settings.commerce.store.title', 'Tienda publica')}
                                         description={t('admin.settings.commerce.store.description', 'Edita titulo, descripciones, llamados a la accion, banners y bloques informativos del inicio desde el panel administrativo.')}
                                     >
-                        <div className="grid grid-cols-1 gap-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.home_title', 'Título de inicio')}</label>
-                                    <input
-                                        type="text"
-                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                        value={data.store.home_title || ''}
-                                        onChange={handleChange('store', 'home_title')}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.home_subtitle', 'Subtítulo')}</label>
-                                    <input
-                                        type="text"
-                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                        value={data.store.home_subtitle || ''}
-                                        onChange={handleChange('store', 'home_subtitle')}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.hero_badge', 'Etiqueta superior')}</label>
-                                    <input
-                                        type="text"
-                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                        value={data.store.hero_badge || ''}
-                                        onChange={handleChange('store', 'hero_badge')}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.hero_description', 'Descripción del home')}</label>
-                                    <input
-                                        type="text"
-                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                        value={data.store.hero_description || ''}
-                                        onChange={handleChange('store', 'hero_description')}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.hero_primary_cta_label', 'Texto CTA primaria')}</label>
-                                    <input
-                                        type="text"
-                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                        value={data.store.hero_primary_cta_label || ''}
-                                        onChange={handleChange('store', 'hero_primary_cta_label')}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.hero_primary_cta_url', 'URL CTA primaria')}</label>
-                                    <input
-                                        type="text"
-                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                        value={data.store.hero_primary_cta_url || ''}
-                                        onChange={handleChange('store', 'hero_primary_cta_url')}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.hero_secondary_cta_label', 'Texto CTA secundaria')}</label>
-                                    <input
-                                        type="text"
-                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                        value={data.store.hero_secondary_cta_label || ''}
-                                        onChange={handleChange('store', 'hero_secondary_cta_label')}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.hero_secondary_cta_url', 'URL CTA secundaria')}</label>
-                                    <input
-                                        type="text"
-                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                        value={data.store.hero_secondary_cta_url || ''}
-                                        onChange={handleChange('store', 'hero_secondary_cta_url')}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
-                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                    <div>
-                                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t('admin.settings.commerce.store.hero_banners.eyebrow', 'Carrusel principal')}</p>
-                                        <h3 className="mt-1 text-lg font-semibold text-slate-900">{t('admin.settings.commerce.store.hero_banners.title', 'Banners del inicio')}</h3>
-                                        <p className="mt-1 text-sm text-slate-600">{t('admin.settings.commerce.store.hero_banners.description', 'Configura hasta cinco slides con título, descripción e imagen opcional.')}</p>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={addStoreBanner}
-                                        className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-                                    >
-                                        {t('admin.settings.commerce.store.hero_banners.add', 'Agregar banner')}
-                                    </button>
-                                </div>
-                                <div className="mt-5 grid gap-4">
-                                    {heroBanners.map((banner, index) => (
-                                        <div key={`banner-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4">
-                                            <div className="flex items-center justify-between gap-3">
-                                                <p className="text-sm font-semibold text-slate-900">{t('admin.settings.commerce.store.hero_banners.item_title', 'Banner')} {index + 1}</p>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => removeStoreBanner(index)}
-                                                    className="text-sm font-medium text-rose-600 transition hover:text-rose-700"
-                                                >
-                                                    {t('admin.settings.commerce.store.hero_banners.remove', 'Eliminar')}
-                                                </button>
+                                        <div className="grid grid-cols-1 gap-6">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.home_title', 'Título de inicio')}</label>
+                                                    <input
+                                                        type="text"
+                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                        value={data.store.home_title || ''}
+                                                        onChange={handleChange('store', 'home_title')}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.home_subtitle', 'Subtítulo')}</label>
+                                                    <input
+                                                        type="text"
+                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                        value={data.store.home_subtitle || ''}
+                                                        onChange={handleChange('store', 'home_subtitle')}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.hero_badge', 'Etiqueta superior')}</label>
+                                                    <input
+                                                        type="text"
+                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                        value={data.store.hero_badge || ''}
+                                                        onChange={handleChange('store', 'hero_badge')}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.hero_description', 'Descripción del home')}</label>
+                                                    <input
+                                                        type="text"
+                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                        value={data.store.hero_description || ''}
+                                                        onChange={handleChange('store', 'hero_description')}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.hero_primary_cta_label', 'Texto CTA primaria')}</label>
+                                                    <input
+                                                        type="text"
+                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                        value={data.store.hero_primary_cta_label || ''}
+                                                        onChange={handleChange('store', 'hero_primary_cta_label')}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.hero_primary_cta_url', 'URL CTA primaria')}</label>
+                                                    <input
+                                                        type="text"
+                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                        value={data.store.hero_primary_cta_url || ''}
+                                                        onChange={handleChange('store', 'hero_primary_cta_url')}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.hero_secondary_cta_label', 'Texto CTA secundaria')}</label>
+                                                    <input
+                                                        type="text"
+                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                        value={data.store.hero_secondary_cta_label || ''}
+                                                        onChange={handleChange('store', 'hero_secondary_cta_label')}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.fields.hero_secondary_cta_url', 'URL CTA secundaria')}</label>
+                                                    <input
+                                                        type="text"
+                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                        value={data.store.hero_secondary_cta_url || ''}
+                                                        onChange={handleChange('store', 'hero_secondary_cta_url')}
+                                                    />
+                                                </div>
                                             </div>
-                                            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-                                                <div>
-                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.hero_banners.fields.title', 'Título')}</label>
-                                                    <input
-                                                        type="text"
-                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                                        value={banner.title || ''}
-                                                        onChange={(e) => updateStoreBanner(index, 'title', e.target.value)}
-                                                    />
+
+                                            <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
+                                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                                    <div>
+                                                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t('admin.settings.commerce.store.hero_banners.eyebrow', 'Carrusel principal')}</p>
+                                                        <h3 className="mt-1 text-lg font-semibold text-slate-900">{t('admin.settings.commerce.store.hero_banners.title', 'Banners del inicio')}</h3>
+                                                        <p className="mt-1 text-sm text-slate-600">{t('admin.settings.commerce.store.hero_banners.description', 'Configura hasta cinco slides con título, descripción e imagen opcional.')}</p>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={addStoreBanner}
+                                                        className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                                                    >
+                                                        {t('admin.settings.commerce.store.hero_banners.add', 'Agregar banner')}
+                                                    </button>
                                                 </div>
-                                                <div>
-                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.hero_banners.fields.image_url', 'Imagen o fondo (URL)')}</label>
-                                                    <input
-                                                        type="text"
-                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                                        value={banner.image_url || ''}
-                                                        onChange={(e) => updateStoreBanner(index, 'image_url', e.target.value)}
-                                                    />
-                                                    <label className="mt-3 block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.hero_banners.fields.image_file', 'o subir imagen')}</label>
-                                                    <input
-                                                        type="file"
-                                                        accept="image/*"
-                                                        className="mt-1 block w-full text-sm text-slate-600"
-                                                        onChange={(e) => updateStoreBannerFile(index, e.target.files?.[0] ?? null)}
-                                                    />
-                                                    {banner.image_url && (
-                                                        <img src={banner.image_url} alt={banner.title || `Banner ${index + 1}`} className="mt-3 h-24 w-full rounded-xl border border-slate-200 object-cover" />
-                                                    )}
+                                                <div className="mt-5 grid gap-4">
+                                                    {heroBanners.map((banner, index) => (
+                                                        <div key={`banner-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4">
+                                                            <div className="flex items-center justify-between gap-3">
+                                                                <p className="text-sm font-semibold text-slate-900">{t('admin.settings.commerce.store.hero_banners.item_title', 'Banner')} {index + 1}</p>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => removeStoreBanner(index)}
+                                                                    className="text-sm font-medium text-rose-600 transition hover:text-rose-700"
+                                                                >
+                                                                    {t('admin.settings.commerce.store.hero_banners.remove', 'Eliminar')}
+                                                                </button>
+                                                            </div>
+                                                            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                                                                <div>
+                                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.hero_banners.fields.title', 'Título')}</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                                        value={banner.title || ''}
+                                                                        onChange={(e) => updateStoreBanner(index, 'title', e.target.value)}
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.hero_banners.fields.image_url', 'Imagen o fondo (URL)')}</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                                        value={banner.image_url || ''}
+                                                                        onChange={(e) => updateStoreBanner(index, 'image_url', e.target.value)}
+                                                                    />
+                                                                    <label className="mt-3 block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.hero_banners.fields.image_file', 'o subir imagen')}</label>
+                                                                    <input
+                                                                        type="file"
+                                                                        accept="image/*"
+                                                                        className="mt-1 block w-full text-sm text-slate-600"
+                                                                        onChange={(e) => updateStoreBannerFile(index, e.target.files?.[0] ?? null)}
+                                                                    />
+                                                                    {banner.image_url && (
+                                                                        <img src={banner.image_url} alt={banner.title || `Banner ${index + 1}`} className="mt-3 h-24 w-full rounded-xl border border-slate-200 object-cover" />
+                                                                    )}
+                                                                </div>
+                                                                <div>
+                                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.hero_banners.fields.background_color', 'Color de fondo')}</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                                        value={banner.background_color || ''}
+                                                                        onChange={(e) => updateStoreBanner(index, 'background_color', e.target.value)}
+                                                                        placeholder="#1f2937"
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.hero_banners.fields.text_color', 'Color de texto')}</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                                        value={banner.text_color || ''}
+                                                                        onChange={(e) => updateStoreBanner(index, 'text_color', e.target.value)}
+                                                                        placeholder="#ffffff"
+                                                                    />
+                                                                </div>
+                                                                <div className="md:col-span-2">
+                                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.hero_banners.fields.description', 'Descripción')}</label>
+                                                                    <textarea
+                                                                        rows={2}
+                                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                                        value={banner.description || ''}
+                                                                        onChange={(e) => updateStoreBanner(index, 'description', e.target.value)}
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
                                                 </div>
-                                                <div>
-                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.hero_banners.fields.background_color', 'Color de fondo')}</label>
-                                                    <input
-                                                        type="text"
-                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                                        value={banner.background_color || ''}
-                                                        onChange={(e) => updateStoreBanner(index, 'background_color', e.target.value)}
-                                                        placeholder="#1f2937"
-                                                    />
+                                            </div>
+
+                                            <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
+                                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                                    <div>
+                                                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t('admin.settings.commerce.store.highlights.eyebrow', 'Bloques informativos')}</p>
+                                                        <h3 className="mt-1 text-lg font-semibold text-slate-900">{t('admin.settings.commerce.store.highlights.title', 'Tarjetas de valor')}</h3>
+                                                        <p className="mt-1 text-sm text-slate-600">{t('admin.settings.commerce.store.highlights.description', 'Agrega mensajes cortos para explicar beneficios, soporte, entregas, medios de pago o diferenciales de la tienda.')}</p>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={addStoreHighlight}
+                                                        className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                                                    >
+                                                        {t('admin.settings.commerce.store.highlights.add', 'Agregar bloque')}
+                                                    </button>
                                                 </div>
-                                                <div>
-                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.hero_banners.fields.text_color', 'Color de texto')}</label>
-                                                    <input
-                                                        type="text"
-                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                                        value={banner.text_color || ''}
-                                                        onChange={(e) => updateStoreBanner(index, 'text_color', e.target.value)}
-                                                        placeholder="#ffffff"
-                                                    />
-                                                </div>
-                                                <div className="md:col-span-2">
-                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.hero_banners.fields.description', 'Descripción')}</label>
-                                                    <textarea
-                                                        rows={2}
-                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                                        value={banner.description || ''}
-                                                        onChange={(e) => updateStoreBanner(index, 'description', e.target.value)}
-                                                    />
+                                                <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                                                    {homeHighlights.map((item, index) => (
+                                                        <div key={`highlight-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4">
+                                                            <div className="flex items-center justify-between gap-3">
+                                                                <p className="text-sm font-semibold text-slate-900">{t('admin.settings.commerce.store.highlights.item_title', 'Bloque')} {index + 1}</p>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => removeStoreHighlight(index)}
+                                                                    className="text-sm font-medium text-rose-600 transition hover:text-rose-700"
+                                                                >
+                                                                    {t('admin.settings.commerce.store.highlights.remove', 'Eliminar')}
+                                                                </button>
+                                                            </div>
+                                                            <div className="mt-4 space-y-3">
+                                                                <div>
+                                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.highlights.fields.eyebrow', 'Etiqueta')}</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                                        value={item.eyebrow || ''}
+                                                                        onChange={(e) => updateStoreHighlight(index, 'eyebrow', e.target.value)}
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.highlights.fields.title', 'Título')}</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                                        value={item.title || ''}
+                                                                        onChange={(e) => updateStoreHighlight(index, 'title', e.target.value)}
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.highlights.fields.description', 'Descripción')}</label>
+                                                                    <textarea
+                                                                        rows={3}
+                                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                                        value={item.description || ''}
+                                                                        onChange={(e) => updateStoreHighlight(index, 'description', e.target.value)}
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.highlights.fields.image_url', 'Imagen de fondo (URL)')}</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                                        value={item.image_url || ''}
+                                                                        onChange={(e) => updateStoreHighlight(index, 'image_url', e.target.value)}
+                                                                    />
+                                                                    {item.image_url && (
+                                                                        <img src={item.image_url} alt={item.title || `Bloque ${index + 1}`} className="mt-3 h-24 w-full rounded-xl border border-slate-200 object-cover" />
+                                                                    )}
+                                                                </div>
+                                                                <div className="grid grid-cols-2 gap-3">
+                                                                    <div>
+                                                                        <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.highlights.fields.background_color', 'Color de fondo')}</label>
+                                                                        <input
+                                                                            type="text"
+                                                                            className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                                            value={item.background_color || ''}
+                                                                            onChange={(e) => updateStoreHighlight(index, 'background_color', e.target.value)}
+                                                                            placeholder="#ffffff"
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.highlights.fields.text_color', 'Color de texto')}</label>
+                                                                        <input
+                                                                            type="text"
+                                                                            className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                                            value={item.text_color || ''}
+                                                                            onChange={(e) => updateStoreHighlight(index, 'text_color', e.target.value)}
+                                                                            placeholder="#0f172a"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
                                                 </div>
                                             </div>
                                         </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
-                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                    <div>
-                                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t('admin.settings.commerce.store.highlights.eyebrow', 'Bloques informativos')}</p>
-                                        <h3 className="mt-1 text-lg font-semibold text-slate-900">{t('admin.settings.commerce.store.highlights.title', 'Tarjetas de valor')}</h3>
-                                        <p className="mt-1 text-sm text-slate-600">{t('admin.settings.commerce.store.highlights.description', 'Agrega mensajes cortos para explicar beneficios, soporte, entregas, medios de pago o diferenciales de la tienda.')}</p>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={addStoreHighlight}
-                                        className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-                                    >
-                                        {t('admin.settings.commerce.store.highlights.add', 'Agregar bloque')}
-                                    </button>
-                                </div>
-                                <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                                    {homeHighlights.map((item, index) => (
-                                        <div key={`highlight-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4">
-                                            <div className="flex items-center justify-between gap-3">
-                                                <p className="text-sm font-semibold text-slate-900">{t('admin.settings.commerce.store.highlights.item_title', 'Bloque')} {index + 1}</p>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => removeStoreHighlight(index)}
-                                                    className="text-sm font-medium text-rose-600 transition hover:text-rose-700"
-                                                >
-                                                    {t('admin.settings.commerce.store.highlights.remove', 'Eliminar')}
-                                                </button>
-                                            </div>
-                                            <div className="mt-4 space-y-3">
-                                                <div>
-                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.highlights.fields.eyebrow', 'Etiqueta')}</label>
-                                                    <input
-                                                        type="text"
-                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                                        value={item.eyebrow || ''}
-                                                        onChange={(e) => updateStoreHighlight(index, 'eyebrow', e.target.value)}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.highlights.fields.title', 'Título')}</label>
-                                                    <input
-                                                        type="text"
-                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                                        value={item.title || ''}
-                                                        onChange={(e) => updateStoreHighlight(index, 'title', e.target.value)}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.highlights.fields.description', 'Descripción')}</label>
-                                                    <textarea
-                                                        rows={3}
-                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                                        value={item.description || ''}
-                                                        onChange={(e) => updateStoreHighlight(index, 'description', e.target.value)}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.highlights.fields.image_url', 'Imagen de fondo (URL)')}</label>
-                                                    <input
-                                                        type="text"
-                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                                        value={item.image_url || ''}
-                                                        onChange={(e) => updateStoreHighlight(index, 'image_url', e.target.value)}
-                                                    />
-                                                    {item.image_url && (
-                                                        <img src={item.image_url} alt={item.title || `Bloque ${index + 1}`} className="mt-3 h-24 w-full rounded-xl border border-slate-200 object-cover" />
-                                                    )}
-                                                </div>
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    <div>
-                                                        <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.highlights.fields.background_color', 'Color de fondo')}</label>
-                                                        <input
-                                                            type="text"
-                                                            className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                                            value={item.background_color || ''}
-                                                            onChange={(e) => updateStoreHighlight(index, 'background_color', e.target.value)}
-                                                            placeholder="#ffffff"
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.store.highlights.fields.text_color', 'Color de texto')}</label>
-                                                        <input
-                                                            type="text"
-                                                            className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                                            value={item.text_color || ''}
-                                                            onChange={(e) => updateStoreHighlight(index, 'text_color', e.target.value)}
-                                                            placeholder="#0f172a"
-                                                        />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
                                     </SettingsSection>
                                 </>
                             )}
@@ -1129,118 +1129,118 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                         title={t('admin.settings.operations.inventory.title', 'Inventario')}
                                         description={t('admin.settings.operations.inventory.description', 'Configura reglas base de stock para evitar ajustes repetitivos y mantener el comportamiento esperado del sistema.')}
                                     >
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="flex items-center gap-2 mt-2">
-                                <input
-                                    id="allow_negative_stock"
-                                    type="checkbox"
-                                    className="rounded border-slate-300 text-sky-600 shadow-sm focus:border-sky-500 focus:ring-sky-500"
-                                    checked={!!data.inventory.allow_negative_stock}
-                                    onChange={handleChange('inventory', 'allow_negative_stock')}
-                                />
-                                <label htmlFor="allow_negative_stock" className="text-sm text-slate-700">
-                                    {t('admin.settings.operations.inventory.fields.allow_negative_stock', 'Permitir stock negativo')}
-                                </label>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.operations.inventory.fields.default_min_stock', 'Stock mínimo por defecto')}</label>
-                                <input
-                                    type="number"
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    value={data.inventory.default_min_stock ?? 0}
-                                    onChange={handleChange('inventory', 'default_min_stock')}
-                                />
-                                {errors['inventory.default_min_stock'] && (
-                                    <p className="mt-1 text-xs text-red-600">{errors['inventory.default_min_stock']}</p>
-                                )}
-                            </div>
-                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="flex items-center gap-2 mt-2">
+                                                <input
+                                                    id="allow_negative_stock"
+                                                    type="checkbox"
+                                                    className="rounded border-slate-300 text-sky-600 shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                                    checked={!!data.inventory.allow_negative_stock}
+                                                    onChange={handleChange('inventory', 'allow_negative_stock')}
+                                                />
+                                                <label htmlFor="allow_negative_stock" className="text-sm text-slate-700">
+                                                    {t('admin.settings.operations.inventory.fields.allow_negative_stock', 'Permitir stock negativo')}
+                                                </label>
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.operations.inventory.fields.default_min_stock', 'Stock mínimo por defecto')}</label>
+                                                <input
+                                                    type="number"
+                                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                    value={data.inventory.default_min_stock ?? 0}
+                                                    onChange={handleChange('inventory', 'default_min_stock')}
+                                                />
+                                                {errors['inventory.default_min_stock'] && (
+                                                    <p className="mt-1 text-xs text-red-600">{errors['inventory.default_min_stock']}</p>
+                                                )}
+                                            </div>
+                                        </div>
                                     </SettingsSection>
 
-                                    <SettingsSection
-                                        eyebrow={t('admin.settings.operations.warehouses.eyebrow', 'Sucursal')}
-                                        title={t('admin.settings.operations.warehouses.title', 'Multi-bodega y ventas')}
-                                        description={t('admin.settings.operations.warehouses.description', 'Define como se comportan las facturas respecto a la seleccion de bodegas y la operacion diaria de ventas.')}
-                                    >
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-2 mt-2">
-                                <input
-                                    id="require_warehouse_on_invoice"
-                                    type="checkbox"
-                                    className="rounded border-slate-300 text-sky-600 shadow-sm focus:border-sky-500 focus:ring-sky-500"
-                                    checked={!!data.warehouses.require_warehouse_on_invoice}
-                                    onChange={handleChange('warehouses', 'require_warehouse_on_invoice')}
-                                />
-                                <label htmlFor="require_warehouse_on_invoice" className="text-sm text-slate-700">
-                                    {t('admin.settings.operations.warehouses.fields.require_warehouse_on_invoice', 'Requerir seleccionar bodega/sucursal en las facturas')}
-                                </label>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.operations.warehouses.fields.default_warehouse_id', 'Bodega por defecto para ventas')}</label>
-                                <select
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    value={data.warehouses.default_warehouse_id ?? ''}
-                                    onChange={handleChange('warehouses', 'default_warehouse_id')}
-                                >
-                                    <option value="">{t('admin.settings.operations.warehouses.fields.default_warehouse_empty', 'Sin bodega por defecto')}</option>
-                                    {(warehouseOptions || []).map((w) => (
-                                        <option key={w.id} value={w.id}>
-                                            {w.name} ({w.code})
-                                        </option>
-                                    ))}
-                                </select>
-                                {errors['warehouses.default_warehouse_id'] && (
-                                    <p className="mt-1 text-xs text-red-600">{errors['warehouses.default_warehouse_id']}</p>
-                                )}
-                            </div>
-                        </div>
-                                    </SettingsSection>
+                                        <SettingsSection
+                                                        eyebrow={t('admin.settings.operations.warehouses.eyebrow', 'Sucursal')}
+                                                        title={t('admin.settings.operations.warehouses.title', 'Multi-bodega y ventas')}
+                                                        description={t('admin.settings.operations.warehouses.description', 'Define como se comportan las facturas respecto a la seleccion de bodegas y la operacion diaria de ventas.')}
+                                                    >
+                                                    <div className="space-y-4">
+                                                        <div className="flex items-center gap-2 mt-2">
+                                                            <input
+                                                                id="require_warehouse_on_invoice"
+                                                                type="checkbox"
+                                                                className="rounded border-slate-300 text-sky-600 shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                                                checked={!!data.warehouses.require_warehouse_on_invoice}
+                                                                onChange={handleChange('warehouses', 'require_warehouse_on_invoice')}
+                                                            />
+                                                            <label htmlFor="require_warehouse_on_invoice" className="text-sm text-slate-700">
+                                                                {t('admin.settings.operations.warehouses.fields.require_warehouse_on_invoice', 'Requerir seleccionar bodega/sucursal en las facturas')}
+                                                            </label>
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-slate-700">{t('admin.settings.operations.warehouses.fields.default_warehouse_id', 'Bodega por defecto para ventas')}</label>
+                                                            <select
+                                                                className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                                value={data.warehouses.default_warehouse_id ?? ''}
+                                                                onChange={handleChange('warehouses', 'default_warehouse_id')}
+                                                            >
+                                                                <option value="">{t('admin.settings.operations.warehouses.fields.default_warehouse_empty', 'Sin bodega por defecto')}</option>
+                                                                {(warehouseOptions || []).map((w) => (
+                                                                    <option key={w.id} value={w.id}>
+                                                                        {w.name} ({w.code})
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                            {errors['warehouses.default_warehouse_id'] && (
+                                                                <p className="mt-1 text-xs text-red-600">{errors['warehouses.default_warehouse_id']}</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                        </SettingsSection>
 
                                     <SettingsSection
                                         eyebrow={t('admin.settings.operations.billing.eyebrow', 'Documentos')}
                                         title={t('admin.settings.operations.billing.title', 'Facturacion')}
                                         description={t('admin.settings.operations.billing.description', 'Agrupa numeracion, impuestos y reglas contables generales para las facturas emitidas.')}
                                     >
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.operations.billing.fields.invoice_prefix', 'Prefijo de factura')}</label>
-                                <input
-                                    type="text"
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    value={data.billing.invoice_prefix || ''}
-                                    onChange={handleChange('billing', 'invoice_prefix')}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.operations.billing.fields.invoice_length', 'Longitud del número')}</label>
-                                <input
-                                    type="number"
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    value={data.billing.invoice_length || ''}
-                                    onChange={handleChange('billing', 'invoice_length')}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.operations.billing.fields.default_tax_percent', 'Impuesto por defecto (%)')}</label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                    value={data.billing.default_tax_percent || 0}
-                                    onChange={handleChange('billing', 'default_tax_percent')}
-                                />
-                            </div>
-                            <div className="flex items-center gap-2 mt-2">
-                                <input
-                                    id="enable_igtf"
-                                    type="checkbox"
-                                    className="rounded border-slate-300 text-sky-600 shadow-sm focus:border-sky-500 focus:ring-sky-500"
-                                    checked={!!data.billing.enable_igtf}
-                                    onChange={handleChange('billing', 'enable_igtf')}
-                                />
-                                <label htmlFor="enable_igtf" className="text-sm text-slate-700">{t('admin.settings.operations.billing.fields.enable_igtf', 'Habilitar IGTF')}</label>
-                            </div>
-                        </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.operations.billing.fields.invoice_prefix', 'Prefijo de factura')}</label>
+                                                    <input
+                                                        type="text"
+                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                        value={data.billing.invoice_prefix || ''}
+                                                        onChange={handleChange('billing', 'invoice_prefix')}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.operations.billing.fields.invoice_length', 'Longitud del número')}</label>
+                                                    <input
+                                                        type="number"
+                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                        value={data.billing.invoice_length || ''}
+                                                        onChange={handleChange('billing', 'invoice_length')}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.operations.billing.fields.default_tax_percent', 'Impuesto por defecto (%)')}</label>
+                                                    <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                        value={data.billing.default_tax_percent || 0}
+                                                        onChange={handleChange('billing', 'default_tax_percent')}
+                                                    />
+                                                </div>
+                                                <div className="flex items-center gap-2 mt-2">
+                                                    <input
+                                                        id="enable_igtf"
+                                                        type="checkbox"
+                                                        className="rounded border-slate-300 text-sky-600 shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                                        checked={!!data.billing.enable_igtf}
+                                                        onChange={handleChange('billing', 'enable_igtf')}
+                                                    />
+                                                    <label htmlFor="enable_igtf" className="text-sm text-slate-700">{t('admin.settings.operations.billing.fields.enable_igtf', 'Habilitar IGTF')}</label>
+                                                </div>
+                                            </div>
                                     </SettingsSection>
 
                                     <SettingsSection
@@ -1248,213 +1248,213 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                         title={t('admin.settings.operations.currency.title', 'Moneda')}
                                         description={t('admin.settings.operations.currency.description', 'Centraliza la configuracion monetaria usada en toda la aplicacion y su fuente de tasa.')}
                                     >
-                        <div className="space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.operations.currency.fields.base_currency', 'Moneda base')}</label>
-                                    <input
-                                        type="text"
-                                        className="mt-1 block w-full rounded-md border-slate-300 bg-slate-50 shadow-sm text-sm"
-                                        value={data.currency.base_currency || 'USD'}
-                                        readOnly
-                                    />
-                                    <p className="mt-1 text-xs text-slate-500">{t('admin.settings.operations.currency.helpers.base_currency_fixed', 'USD permanece como moneda canónica interna del sistema.')}</p>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.operations.currency.fields.default_display_currency', 'Moneda por defecto')}</label>
-                                    <select
-                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                        value={data.currency.default_display_currency || data.currency.base_currency || 'USD'}
-                                        onChange={handleChange('currency', 'default_display_currency')}
-                                    >
-                                        {enabledCurrencies.map((item) => (
-                                            <option key={item.code} value={item.code}>{item.code}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.operations.currency.fields.rate_provider', 'Proveedor principal')}</label>
-                                    <select
-                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                        value={data.currency.rate_provider || data.currency.rate_source || 'dolarapi'}
-                                        onChange={(e) => setData('currency', {
-                                            ...data.currency,
-                                            rate_provider: e.target.value,
-                                            rate_source: e.target.value,
-                                        })}
-                                    >
-                                        {currencyProviderOptions.map((provider) => (
-                                            <option key={provider.value} value={provider.value}>{provider.labelKey ? t(provider.labelKey, provider.defaultLabel) : provider.label}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700">{t('admin.settings.operations.currency.fields.auto_refresh_interval_minutes', 'Actualización automática (min)')}</label>
-                                    <input
-                                        type="number"
-                                        min={5}
-                                        max={1440}
-                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                        value={data.currency.auto_refresh_interval_minutes ?? 60}
-                                        onChange={handleChange('currency', 'auto_refresh_interval_minutes')}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="flex flex-col gap-3 rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-4 md:flex-row md:items-center md:justify-between">
-                                <div>
-                                    <p className="text-sm font-semibold text-slate-900">{t('admin.settings.operations.currency.actions.sync_title', 'Sincronización de tasas')}</p>
-                                    <p className="mt-1 text-xs text-slate-500">{t('admin.settings.operations.currency.actions.sync_description', 'Actualiza las tasas automáticas guardadas y conserva la última tasa válida para cada moneda activa.')}</p>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={syncCurrencyRates}
-                                    disabled={syncingCurrencyRates}
-                                    className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-                                >
-                                    {syncingCurrencyRates
-                                        ? t('admin.settings.operations.currency.actions.syncing', 'Sincronizando...')
-                                        : t('admin.settings.operations.currency.actions.sync_now', 'Actualizar ahora')}
-                                </button>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                                <input
-                                    id="currency-auto-refresh"
-                                    type="checkbox"
-                                    className="rounded border-slate-300 text-sky-600 shadow-sm focus:border-sky-500 focus:ring-sky-500"
-                                    checked={!!data.currency.auto_refresh_enabled}
-                                    onChange={handleChange('currency', 'auto_refresh_enabled')}
-                                />
-                                <label htmlFor="currency-auto-refresh" className="text-sm text-slate-700">
-                                    {t('admin.settings.operations.currency.fields.auto_refresh_enabled', 'Actualizar tasas automáticamente')}
-                                </label>
-                            </div>
-
-                            <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
-                                <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-                                    <div>
-                                        <h3 className="text-sm font-semibold text-slate-900">{t('admin.settings.operations.currency.fields.supported_currencies', 'Monedas disponibles')}</h3>
-                                        <p className="text-xs text-slate-500">{t('admin.settings.operations.currency.helpers.enabled_currencies_count', 'Activa las monedas que el usuario podrá ver sin tener que programar.')}</p>
-                                    </div>
-                                    <span className="inline-flex w-fit rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600">
-                                        {enabledCurrencies.length} activas
-                                    </span>
-                                </div>
-
-                                <div className="mt-4 grid grid-cols-1 xl:grid-cols-2 gap-4">
-                                    {supportedCurrencies.map((item, index) => (
-                                        <div key={item.code || index} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                                            <div className="flex items-start justify-between gap-3">
-                                                <div>
-                                                    <p className="text-sm font-semibold text-slate-900">{item.code}</p>
-                                                    <p className="text-xs text-slate-500">{item.name}</p>
+                                            <div className="space-y-6">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-slate-700">{t('admin.settings.operations.currency.fields.base_currency', 'Moneda base')}</label>
+                                                        <input
+                                                            type="text"
+                                                            className="mt-1 block w-full rounded-md border-slate-300 bg-slate-50 shadow-sm text-sm"
+                                                            value={data.currency.base_currency || 'USD'}
+                                                            readOnly
+                                                        />
+                                                        <p className="mt-1 text-xs text-slate-500">{t('admin.settings.operations.currency.helpers.base_currency_fixed', 'USD permanece como moneda canónica interna del sistema.')}</p>
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-slate-700">{t('admin.settings.operations.currency.fields.default_display_currency', 'Moneda por defecto')}</label>
+                                                        <select
+                                                            className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                            value={data.currency.default_display_currency || data.currency.base_currency || 'USD'}
+                                                            onChange={handleChange('currency', 'default_display_currency')}
+                                                        >
+                                                            {enabledCurrencies.map((item) => (
+                                                                <option key={item.code} value={item.code}>{item.code}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-slate-700">{t('admin.settings.operations.currency.fields.rate_provider', 'Proveedor principal')}</label>
+                                                        <select
+                                                            className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                            value={data.currency.rate_provider || data.currency.rate_source || 'dolarapi'}
+                                                            onChange={(e) => setData('currency', {
+                                                                ...data.currency,
+                                                                rate_provider: e.target.value,
+                                                                rate_source: e.target.value,
+                                                            })}
+                                                        >
+                                                            {currencyProviderOptions.map((provider) => (
+                                                                <option key={provider.value} value={provider.value}>{provider.labelKey ? t(provider.labelKey, provider.defaultLabel) : provider.label}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-slate-700">{t('admin.settings.operations.currency.fields.auto_refresh_interval_minutes', 'Actualización automática (min)')}</label>
+                                                        <input
+                                                            type="number"
+                                                            min={5}
+                                                            max={1440}
+                                                            className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                            value={data.currency.auto_refresh_interval_minutes ?? 60}
+                                                            onChange={handleChange('currency', 'auto_refresh_interval_minutes')}
+                                                        />
+                                                    </div>
                                                 </div>
-                                                <label className="inline-flex items-center gap-2 text-xs text-slate-600">
+
+                                                <div className="flex flex-col gap-3 rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-4 md:flex-row md:items-center md:justify-between">
+                                                    <div>
+                                                        <p className="text-sm font-semibold text-slate-900">{t('admin.settings.operations.currency.actions.sync_title', 'Sincronización de tasas')}</p>
+                                                        <p className="mt-1 text-xs text-slate-500">{t('admin.settings.operations.currency.actions.sync_description', 'Actualiza las tasas automáticas guardadas y conserva la última tasa válida para cada moneda activa.')}</p>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={syncCurrencyRates}
+                                                        disabled={syncingCurrencyRates}
+                                                        className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                                                    >
+                                                        {syncingCurrencyRates
+                                                            ? t('admin.settings.operations.currency.actions.syncing', 'Sincronizando...')
+                                                            : t('admin.settings.operations.currency.actions.sync_now', 'Actualizar ahora')}
+                                                    </button>
+                                                </div>
+
+                                                <div className="flex items-center gap-2">
                                                     <input
+                                                        id="currency-auto-refresh"
                                                         type="checkbox"
                                                         className="rounded border-slate-300 text-sky-600 shadow-sm focus:border-sky-500 focus:ring-sky-500"
-                                                        checked={!!item.enabled}
-                                                        disabled={item.code === 'USD'}
-                                                        onChange={(e) => updateSupportedCurrency(index, 'enabled', e.target.checked)}
+                                                        checked={!!data.currency.auto_refresh_enabled}
+                                                        onChange={handleChange('currency', 'auto_refresh_enabled')}
                                                     />
-                                                    {t('admin.settings.operations.currency.fields.enabled', 'Activa')}
-                                                </label>
-                                            </div>
+                                                    <label htmlFor="currency-auto-refresh" className="text-sm text-slate-700">
+                                                        {t('admin.settings.operations.currency.fields.auto_refresh_enabled', 'Actualizar tasas automáticamente')}
+                                                    </label>
+                                                </div>
 
-                                            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <div>
-                                                    <label className="block text-xs font-medium text-slate-600">{t('admin.settings.operations.currency.fields.symbol', 'Símbolo')}</label>
-                                                    <input
-                                                        type="text"
-                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                                        value={item.symbol || ''}
-                                                        onChange={(e) => updateSupportedCurrency(index, 'symbol', e.target.value)}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-medium text-slate-600">{t('admin.settings.operations.currency.fields.rate_mode', 'Modo de tasa')}</label>
-                                                    <select
-                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                                        value={item.rate_mode || 'auto'}
-                                                        onChange={(e) => updateSupportedCurrency(index, 'rate_mode', e.target.value.toLowerCase())}
-                                                    >
-                                                        <option value="auto">{t('admin.settings.operations.currency.modes.auto', 'Automática')}</option>
-                                                        <option value="manual">{t('admin.settings.operations.currency.modes.manual', 'Manual')}</option>
-                                                    </select>
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-medium text-slate-600">{t('admin.settings.operations.currency.fields.rate_provider', 'Proveedor')}</label>
-                                                    <select
-                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                                        value={item.rate_provider || data.currency.rate_provider || 'dolarapi'}
-                                                        onChange={(e) => updateSupportedCurrency(index, 'rate_provider', e.target.value.toLowerCase())}
-                                                    >
-                                                        {currencyProviderOptions.map((provider) => (
-                                                            <option key={provider.value} value={provider.value}>{provider.labelKey ? t(provider.labelKey, provider.defaultLabel) : provider.label}</option>
+                                                <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+                                                    <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+                                                        <div>
+                                                            <h3 className="text-sm font-semibold text-slate-900">{t('admin.settings.operations.currency.fields.supported_currencies', 'Monedas disponibles')}</h3>
+                                                            <p className="text-xs text-slate-500">{t('admin.settings.operations.currency.helpers.enabled_currencies_count', 'Activa las monedas que el usuario podrá ver sin tener que programar.')}</p>
+                                                        </div>
+                                                        <span className="inline-flex w-fit rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600">
+                                                            {enabledCurrencies.length} activas
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="mt-4 grid grid-cols-1 xl:grid-cols-2 gap-4">
+                                                        {supportedCurrencies.map((item, index) => (
+                                                            <div key={item.code || index} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                                                                <div className="flex items-start justify-between gap-3">
+                                                                    <div>
+                                                                        <p className="text-sm font-semibold text-slate-900">{item.code}</p>
+                                                                        <p className="text-xs text-slate-500">{item.name}</p>
+                                                                    </div>
+                                                                    <label className="inline-flex items-center gap-2 text-xs text-slate-600">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            className="rounded border-slate-300 text-sky-600 shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                                                            checked={!!item.enabled}
+                                                                            disabled={item.code === 'USD'}
+                                                                            onChange={(e) => updateSupportedCurrency(index, 'enabled', e.target.checked)}
+                                                                        />
+                                                                        {t('admin.settings.operations.currency.fields.enabled', 'Activa')}
+                                                                    </label>
+                                                                </div>
+
+                                                                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                    <div>
+                                                                        <label className="block text-xs font-medium text-slate-600">{t('admin.settings.operations.currency.fields.symbol', 'Símbolo')}</label>
+                                                                        <input
+                                                                            type="text"
+                                                                            className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                                            value={item.symbol || ''}
+                                                                            onChange={(e) => updateSupportedCurrency(index, 'symbol', e.target.value)}
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="block text-xs font-medium text-slate-600">{t('admin.settings.operations.currency.fields.rate_mode', 'Modo de tasa')}</label>
+                                                                        <select
+                                                                            className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                                            value={item.rate_mode || 'auto'}
+                                                                            onChange={(e) => updateSupportedCurrency(index, 'rate_mode', e.target.value.toLowerCase())}
+                                                                        >
+                                                                            <option value="auto">{t('admin.settings.operations.currency.modes.auto', 'Automática')}</option>
+                                                                            <option value="manual">{t('admin.settings.operations.currency.modes.manual', 'Manual')}</option>
+                                                                        </select>
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="block text-xs font-medium text-slate-600">{t('admin.settings.operations.currency.fields.rate_provider', 'Proveedor')}</label>
+                                                                        <select
+                                                                            className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                                            value={item.rate_provider || data.currency.rate_provider || 'dolarapi'}
+                                                                            onChange={(e) => updateSupportedCurrency(index, 'rate_provider', e.target.value.toLowerCase())}
+                                                                        >
+                                                                            {currencyProviderOptions.map((provider) => (
+                                                                                <option key={provider.value} value={provider.value}>{provider.labelKey ? t(provider.labelKey, provider.defaultLabel) : provider.label}</option>
+                                                                            ))}
+                                                                        </select>
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="block text-xs font-medium text-slate-600">{t('admin.settings.operations.currency.fields.manual_rate', 'Tasa manual')}</label>
+                                                                        <input
+                                                                            type="number"
+                                                                            step="0.0001"
+                                                                            min="0"
+                                                                            disabled={(item.rate_mode || 'auto') !== 'manual'}
+                                                                            className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm disabled:bg-slate-100"
+                                                                            value={item.manual_rate ?? ''}
+                                                                            onChange={(e) => updateSupportedCurrency(index, 'manual_rate', e.target.value)}
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="block text-xs font-medium text-slate-600">{t('admin.settings.operations.currency.fields.markup_percent', 'Margen adicional (%)')}</label>
+                                                                        <input
+                                                                            type="number"
+                                                                            step="0.01"
+                                                                            min="0"
+                                                                            max="100"
+                                                                            className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
+                                                                            value={item.markup_percent ?? 0}
+                                                                            onChange={(e) => updateSupportedCurrency(index, 'markup_percent', e.target.value)}
+                                                                        />
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-slate-600">
+                                                                    <label className="inline-flex items-center gap-2">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            className="rounded border-slate-300 text-sky-600 shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                                                            checked={!!item.visible_in_store}
+                                                                            onChange={(e) => updateSupportedCurrency(index, 'visible_in_store', e.target.checked)}
+                                                                        />
+                                                                        {t('admin.settings.operations.currency.fields.visible_in_store', 'Visible en tienda')}
+                                                                    </label>
+                                                                    <label className="inline-flex items-center gap-2">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            className="rounded border-slate-300 text-sky-600 shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                                                            checked={!!item.visible_in_admin}
+                                                                            onChange={(e) => updateSupportedCurrency(index, 'visible_in_admin', e.target.checked)}
+                                                                        />
+                                                                        {t('admin.settings.operations.currency.fields.visible_in_admin', 'Visible en admin')}
+                                                                    </label>
+                                                                    <label className="inline-flex items-center gap-2">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            className="rounded border-slate-300 text-sky-600 shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                                                            checked={!!item.allow_checkout}
+                                                                            onChange={(e) => updateSupportedCurrency(index, 'allow_checkout', e.target.checked)}
+                                                                        />
+                                                                        {t('admin.settings.operations.currency.fields.allow_checkout', 'Disponible en checkout')}
+                                                                    </label>
+                                                                </div>
+                                                            </div>
                                                         ))}
-                                                    </select>
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-medium text-slate-600">{t('admin.settings.operations.currency.fields.manual_rate', 'Tasa manual')}</label>
-                                                    <input
-                                                        type="number"
-                                                        step="0.0001"
-                                                        min="0"
-                                                        disabled={(item.rate_mode || 'auto') !== 'manual'}
-                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm disabled:bg-slate-100"
-                                                        value={item.manual_rate ?? ''}
-                                                        onChange={(e) => updateSupportedCurrency(index, 'manual_rate', e.target.value)}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-medium text-slate-600">{t('admin.settings.operations.currency.fields.markup_percent', 'Margen adicional (%)')}</label>
-                                                    <input
-                                                        type="number"
-                                                        step="0.01"
-                                                        min="0"
-                                                        max="100"
-                                                        className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                                        value={item.markup_percent ?? 0}
-                                                        onChange={(e) => updateSupportedCurrency(index, 'markup_percent', e.target.value)}
-                                                    />
+                                                    </div>
                                                 </div>
                                             </div>
-
-                                            <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-slate-600">
-                                                <label className="inline-flex items-center gap-2">
-                                                    <input
-                                                        type="checkbox"
-                                                        className="rounded border-slate-300 text-sky-600 shadow-sm focus:border-sky-500 focus:ring-sky-500"
-                                                        checked={!!item.visible_in_store}
-                                                        onChange={(e) => updateSupportedCurrency(index, 'visible_in_store', e.target.checked)}
-                                                    />
-                                                    {t('admin.settings.operations.currency.fields.visible_in_store', 'Visible en tienda')}
-                                                </label>
-                                                <label className="inline-flex items-center gap-2">
-                                                    <input
-                                                        type="checkbox"
-                                                        className="rounded border-slate-300 text-sky-600 shadow-sm focus:border-sky-500 focus:ring-sky-500"
-                                                        checked={!!item.visible_in_admin}
-                                                        onChange={(e) => updateSupportedCurrency(index, 'visible_in_admin', e.target.checked)}
-                                                    />
-                                                    {t('admin.settings.operations.currency.fields.visible_in_admin', 'Visible en admin')}
-                                                </label>
-                                                <label className="inline-flex items-center gap-2">
-                                                    <input
-                                                        type="checkbox"
-                                                        className="rounded border-slate-300 text-sky-600 shadow-sm focus:border-sky-500 focus:ring-sky-500"
-                                                        checked={!!item.allow_checkout}
-                                                        onChange={(e) => updateSupportedCurrency(index, 'allow_checkout', e.target.checked)}
-                                                    />
-                                                    {t('admin.settings.operations.currency.fields.allow_checkout', 'Disponible en checkout')}
-                                                </label>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
                                     </SettingsSection>
                                 </>
                             )}
@@ -2221,9 +2221,6 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                         </div>
                     </section>
 
-                        </div>
-                    </div>
-
                     <div className="sticky bottom-4 z-10">
                         <div className="flex flex-col gap-4 rounded-[28px] border border-slate-200 bg-white/95 px-5 py-4 shadow-lg shadow-slate-200/60 backdrop-blur sm:flex-row sm:items-center sm:justify-between">
                             <div>
@@ -2241,8 +2238,13 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                             </button>
                         </div>
                     </div>
+                </>
+            )}
+                       </div>
+            </div>
                 </form>
             </div>
         </AuthenticatedLayout>
+        
     );
 }

@@ -303,7 +303,24 @@ class SettingsController extends Controller
         \App\Support\Settings::set('security', $validated['security']);
         \App\Support\Settings::set('qr', $validated['qr']);
         \App\Support\Settings::set('mail', $validated['mail']);
-        \App\Support\Settings::set('payments', $validated['payments']);
+
+        $payments = $validated['payments'];
+        $payments['bank_accounts'] = array_map(
+            fn ($account) => [
+                ...$account,
+                'enabled' => filter_var($account['enabled'] ?? true, FILTER_VALIDATE_BOOLEAN),
+            ],
+            $payments['bank_accounts'] ?? []
+        );
+        $payments['origin_banks'] = array_map(
+            fn ($bank) => [
+                ...$bank,
+                'enabled' => filter_var($bank['enabled'] ?? true, FILTER_VALIDATE_BOOLEAN),
+            ],
+            $payments['origin_banks'] ?? []
+        );
+
+        \App\Support\Settings::set('payments', $payments);
 
         return back()->with('success', TranslationKeySanitizer::translate('app.admin.settings.notifications.updated'));
     }
