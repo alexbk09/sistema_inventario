@@ -18,7 +18,7 @@ El **Sistema de Inventario** es una aplicación web full‑stack construida sobr
 La aplicación ofrece una **parte pública** (tienda / carrito / checkout) y un **panel administrativo** protegido por autenticación, verificación de email y roles.
 
 
-## 2. Arquitectura general
+## 2. Arquitectura general 
 
 ### 2.1. Capas y tecnologías
 
