@@ -670,6 +670,9 @@ return [
           'card' => 'Card',
           'transfer' => 'Transfer',
           'zelle' => 'Zelle',
+          'paypal' => 'PayPal',
+          'stripe' => 'Credit/Debit Card',
+          'manual' => 'Transfer/Cash',
           'other' => 'Other',
         ],
         'actions' => [
@@ -2347,6 +2350,8 @@ return [
                 'description' => 'PayPal charges for checkout.',
                 'ready' => 'Credentials ready',
                 'pending' => 'Credentials missing',
+                'ready_env' => 'Credentials ready in .env',
+                'pending_env' => 'Missing credentials in .env',
               ],
               'stripe' => [
                 'title' => 'Stripe',
@@ -2354,6 +2359,8 @@ return [
                 'description' => 'Card charges with secure form.',
                 'ready' => 'Keys ready',
                 'pending' => 'Keys missing',
+                'ready_env' => 'Keys ready in .env',
+                'pending_env' => 'Missing keys in .env',
               ],
             ],
             'header' => [
@@ -2429,7 +2436,7 @@ return [
             'paypal' => [
               'defaults' => [
                 'description' => 'Enable PayPal once your credentials are ready.',
-                'instructions' => 'Set Client ID and Secret to activate it.',
+                'instructions' => 'Set Client ID and Secret in the .env file.',
               ],
               'enable' => 'Enable PayPal in checkout',
               'environment' => 'Environment',
@@ -2442,13 +2449,15 @@ return [
               'card' => [
                 'eyebrow' => 'Gateway',
                 'title' => 'Activation controlled from settings',
-                'description' => 'When this option is active, checkout will show PayPal as a selectable method. Credentials remain centralized here for the admin team.',
+                'description' => 'When this option is active, checkout will show PayPal as a selectable method. Credentials are stored in the .env file.',
               ],
+              'credentials_notice' => 'Credentials in .env file',
+              'credentials_help' => 'PayPal credentials (Client ID and Client Secret) are configured in the .env file for security. Contact your server administrator if you need to modify them.',
             ],
             'stripe' => [
               'defaults' => [
                 'description' => 'Accept card payments through Stripe.',
-                'instructions' => 'Set Publishable Key and Secret Key to activate card payments.',
+                'instructions' => 'Set Publishable Key and Secret Key in the .env file.',
               ],
               'enable' => 'Enable Stripe in checkout',
               'environment' => 'Environment',
@@ -2461,8 +2470,10 @@ return [
               'card' => [
                 'eyebrow' => 'Cards',
                 'title' => 'Integrated checkout form',
-                'description' => 'When active, checkout will show a secure card form only if the customer chooses Stripe as the payment method.',
+                'description' => 'When active, checkout will show a secure card form only if the customer chooses Stripe as the payment method. Credentials are stored in the .env file.',
               ],
+              'credentials_notice' => 'Credentials in .env file',
+              'credentials_help' => 'Stripe credentials (Publishable Key and Secret Key) are configured in the .env file for security. Contact your server administrator if you need to modify them.',
             ],
             'store' => [
               'eyebrow' => 'Showcase',
@@ -3291,11 +3302,31 @@ return [
   'confirmation' => [
     'title' => 'Confirmation',
     'default_message' => 'Your order has been registered. Thank you!',
+    'paid_title' => 'Payment completed successfully!',
+    'paid_message' => 'Thank you for your purchase! Your payment has been processed successfully.',
+    'pending_title' => 'Order registered - Pending payment',
+    'pending_message' => 'Your order has been registered. Please make the payment to complete your purchase.',
     'order_detail_message' => 'Your order details',
     'invoice_number' => 'Invoice number:',
+    'invoice_details' => 'Invoice details',
     'qr_alt' => 'Order tracking QR',
     'qr_help' => 'Scan this QR code to see the status of your order or download your receipt.',
     'back_home' => 'Back to Home',
+    'close_modal' => 'Close',
+    'view_invoice' => 'View full invoice',
+    'subtotal' => 'Subtotal:',
+    'tax' => 'Tax:',
+    'total' => 'Total:',
+    'paid_on' => 'Paid on',
+    'status_paid' => 'PAID',
+    'status_pending' => 'PENDING',
+    'download_invoice' => 'Download invoice',
+    'track_order' => 'Track order',
+    'contact_help' => 'Need help? Contact us with your invoice number.',
+    'rate_info' => 'Exchange rate:',
+    'exchange_rate' => 'Exchange rate:',
+    'original_amount' => 'Original amount:',
+    'converted_amount' => 'Converted amount:',
   ],
   'email_invoice' => [
     'subject_prefix' => 'Invoice',
@@ -3400,5 +3431,17 @@ return [
     'social_tiktok' => 'TikTok',
     'social_linkedin' => 'LinkedIn',
     'rights' => 'All rights reserved.',
+  ],
+
+  // Payment methods (root level for checkout)
+  'payment_methods' => [
+    'cash' => 'Cash',
+    'card' => 'Card',
+    'transfer' => 'Transfer',
+    'zelle' => 'Zelle',
+    'paypal' => 'PayPal',
+    'stripe' => 'Credit/Debit Card',
+    'manual' => 'Transfer/Cash',
+    'other' => 'Other',
   ],
 ];

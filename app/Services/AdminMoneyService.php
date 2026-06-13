@@ -76,7 +76,8 @@ class AdminMoneyService
 
         $rate = $context['rates'][$code] ?? null;
         if (! is_numeric($rate) || (float) $rate <= 0) {
-            throw new InvalidArgumentException("No exchange rate available for {$code}.");
+            // Fallback: retornar monto base si no hay tasa disponible
+            return round($amount, 2);
         }
 
         return round($amount * (float) $rate, 2);
@@ -99,7 +100,7 @@ class AdminMoneyService
         ];
     }
 
-    public function convertUsingSnapshot(float $amount, string $targetCurrency, array $snapshot): float
+    public function convertUsingSnapshot(float $amount, string $targetCurrency, array $snapshot, ?array $currencySettings = null): float
     {
         $baseCurrency = strtoupper((string) ($snapshot['base_currency'] ?? 'USD'));
         $code = strtoupper(trim($targetCurrency));
@@ -115,7 +116,8 @@ class AdminMoneyService
 
         $rate = $rates[$code] ?? null;
         if (! is_numeric($rate) || (float) $rate <= 0) {
-            throw new InvalidArgumentException("No snapshot exchange rate available for {$code}.");
+            // Fallback: usar tasa actual de configuración si no hay en snapshot
+            return $this->convertFromBase($amount, $code, $currencySettings);
         }
 
         return round($amount * (float) $rate, 2);
@@ -155,7 +157,7 @@ class AdminMoneyService
 
         foreach ($context['codes'] as $code) {
             $totals[$code] = $snapshot !== null
-                ? $this->convertUsingSnapshot($baseAmount, $code, $snapshot)
+                ? $this->convertUsingSnapshot($baseAmount, $code, $snapshot, $currencySettings)
                 : $this->convertFromBase($baseAmount, $code, $currencySettings);
         }
 
@@ -201,7 +203,15 @@ class AdminMoneyService
 
         $totals = [];
         foreach ($context['codes'] ?? [] as $code) {
-            $totals[$code] = $this->convertUsingSnapshot($baseAmount, $code, $effectiveSnapshot);
+            // Solo convertir si hay tasa disponible en el snapshot
+            if (isset($effectiveSnapshot['rates'][$code]) && is_numeric($effectiveSnapshot['rates'][$code])) {
+                $totals[$code] = $this->convertUsingSnapshot($baseAmount, $code, $effectiveSnapshot, $currencySettings);
+            } elseif ($code === ($effectiveSnapshot['base_currency'] ?? 'USD')) {
+                $totals[$code] = round($baseAmount, 2);
+            } else {
+                // Fallback: usar tasa actual de configuración
+                $totals[$code] = $this->convertFromBase($baseAmount, $code, $currencySettings);
+            }
         }
 
         return [

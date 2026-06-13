@@ -63,6 +63,7 @@ export default function CheckoutPage() {
     checkoutCurrency: defaultCheckoutCurrency,
     bank: '',
     originBank: '',
+    operationType: '',
     reference: '',
     date: '',
     coupon_code: '',
@@ -124,10 +125,23 @@ export default function CheckoutPage() {
       return
     }
 
-    if (!allowedCurrencies.includes(formData.checkoutCurrency)) {
-      setFormData((prev) => ({ ...prev, checkoutCurrency: allowedCurrencies[0] }))
+    // PayPal y Stripe siempre permiten USD
+    const gatewayCurrencies = ['USD']
+    if (formData.paymentMethod === 'paypal' || formData.paymentMethod === 'stripe') {
+      if (!gatewayCurrencies.includes(formData.checkoutCurrency)) {
+        setFormData((prev) => ({ ...prev, checkoutCurrency: 'USD' }))
+      }
+      return
     }
-  }, [checkoutCurrencies, formData.checkoutCurrency])
+
+    // Para otros métodos de pago, usar primera moneda NO-USD (ej: VES/BS) si está disponible
+    // Solo usar USD si no hay otra moneda activa
+    if (!allowedCurrencies.includes(formData.checkoutCurrency)) {
+      const nonUsdCurrency = allowedCurrencies.find((code) => code !== 'USD')
+      const defaultCurrency = nonUsdCurrency || allowedCurrencies[0] || 'USD'
+      setFormData((prev) => ({ ...prev, checkoutCurrency: defaultCurrency }))
+    }
+  }, [checkoutCurrencies, formData.checkoutCurrency, formData.paymentMethod])
 
   useEffect(() => {
     if (formData.paymentMethod !== 'manual') {
@@ -152,13 +166,15 @@ export default function CheckoutPage() {
       return
     }
 
-    setPaypalState({ orderID: '', captureID: '', approved: false })
+    // PayPal solo trabaja con USD - cambiar automáticamente
     setFormData((prev) => ({
       ...prev,
+      checkoutCurrency: 'USD',
       paypalOrderId: '',
       paypalCaptureId: '',
       reference: '',
     }))
+    setPaypalState({ orderID: '', captureID: '', approved: false })
   }, [formData.coupon_code, formData.paymentMethod, itemCount, total])
 
   useEffect(() => {
@@ -166,13 +182,33 @@ export default function CheckoutPage() {
       return
     }
 
-    setStripeState({ clientSecret: '', paymentIntentId: '', approved: false, preparing: false })
+    // Stripe solo trabaja con USD - cambiar automáticamente
     setFormData((prev) => ({
       ...prev,
+      checkoutCurrency: 'USD',
       stripePaymentIntentId: '',
       reference: '',
     }))
+    setStripeState({ clientSecret: '', paymentIntentId: '', approved: false, preparing: false })
   }, [formData.coupon_code, formData.paymentMethod, itemCount, total])
+
+  // Cuando cambia a método que NO es PayPal ni Stripe, cambiar a moneda no-USD si está disponible
+  useEffect(() => {
+    if (formData.paymentMethod === 'paypal' || formData.paymentMethod === 'stripe') {
+      return
+    }
+
+    const allowedCurrencies = checkoutCurrencies.map((currency) => currency.code)
+    if (allowedCurrencies.length === 0) return
+
+    // Si es USD y hay otra moneda disponible, cambiar a la primera no-USD
+    if (formData.checkoutCurrency === 'USD') {
+      const nonUsdCurrency = allowedCurrencies.find((code) => code !== 'USD')
+      if (nonUsdCurrency) {
+        setFormData((prev) => ({ ...prev, checkoutCurrency: nonUsdCurrency }))
+      }
+    }
+  }, [formData.paymentMethod, checkoutCurrencies])
 
   // Recomendaciones para upselling en checkout
   useEffect(() => {
@@ -223,7 +259,7 @@ export default function CheckoutPage() {
       return false
     }
 
-    if (paymentMethod === 'manual' && (!formData.bank || !formData.originBank || !formData.reference || !formData.date)) {
+    if (paymentMethod === 'manual' && (!formData.bank || !formData.originBank || !formData.operationType || !formData.reference || !formData.date)) {
       const msg = t('checkout.error_manual_payment_data', 'Completa los datos de la transferencia antes de confirmar.')
       setError(msg)
       toast.error(msg)
@@ -253,6 +289,7 @@ export default function CheckoutPage() {
       paymentMethod: methodKey,
       bank: methodKey === 'manual' ? prev.bank : '',
       originBank: methodKey === 'manual' ? prev.originBank : '',
+      operationType: methodKey === 'manual' ? prev.operationType : '',
       reference: methodKey === 'manual' ? prev.reference : '',
       date: methodKey === 'manual' ? prev.date : '',
       paypalOrderId: methodKey === 'paypal' ? prev.paypalOrderId : '',
@@ -272,16 +309,42 @@ export default function CheckoutPage() {
   const createPayPalOrder = async () => {
     setError('')
 
+    // Validar campos requeridos del formulario antes de crear orden PayPal
+    if (!formData.fullName || !formData.email || !formData.address || !formData.identification_type_id || !formData.identification) {
+      const missingFields = []
+      if (!formData.fullName) missingFields.push(t('checkout.field_full_name', 'Nombre completo'))
+      if (!formData.email) missingFields.push(t('checkout.field_email', 'Correo electrónico'))
+      if (!formData.address) missingFields.push(t('checkout.field_address', 'Dirección'))
+      if (!formData.identification_type_id) missingFields.push(t('checkout.field_id_type', 'Tipo de identificación'))
+      if (!formData.identification) missingFields.push(t('checkout.field_id_number', 'Número de identificación'))
+
+      const msg = t('checkout.error_fill_required_fields', 'Por favor completa los siguientes campos antes de pagar con PayPal: :fields', {
+        fields: missingFields.join(', ')
+      })
+      setError(msg)
+      toast.error(msg)
+
+      // Scroll a la sección del formulario
+      document.querySelector('form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+
+      throw new Error(msg)
+    }
+
     if (!validateCheckout('paypal', { skipGatewayConfirmation: true })) {
       throw new Error(t('checkout.error_incomplete_form', 'Formulario incompleto'))
     }
 
-    const response = await axios.post('/checkout/paypal/order', {
+    const payload = {
       paymentMethod: 'paypal',
       checkoutCurrency: formData.checkoutCurrency,
       coupon_code: formData.coupon_code,
       items: getCheckoutItemsPayload(),
-    })
+    }
+
+    // DEBUG: Ver qué se está enviando
+    console.log('PayPal Order Payload:', payload)
+
+    const response = await axios.post('/checkout/paypal/order', payload)
 
     const orderID = response?.data?.orderID
 
@@ -294,29 +357,67 @@ export default function CheckoutPage() {
   }
 
   const capturePayPalOrder = async (data) => {
-    const response = await axios.post('/checkout/paypal/capture', {
-      paymentMethod: 'paypal',
-      orderID: data.orderID,
-    })
+    console.log('Capturing PayPal order:', data.orderID)
 
-    const captureID = response?.data?.captureID
+    try {
+      const response = await axios.post('/checkout/paypal/capture', {
+        paymentMethod: 'paypal',
+        orderID: data.orderID,
+      })
 
-    if (!captureID) {
-      throw new Error(t('checkout.error_paypal_invalid_capture', 'PayPal no devolvió una captura válida.'))
+      console.log('PayPal capture response:', response.data)
+
+      const captureID = response?.data?.captureID
+
+      if (!captureID) {
+        throw new Error(t('checkout.error_paypal_invalid_capture', 'PayPal no devolvió una captura válida.'))
+      }
+
+      setPaypalState({ orderID: data.orderID, captureID, approved: true })
+      const updatedForm = {
+        ...formData,
+        paypalOrderId: data.orderID,
+        paypalCaptureId: captureID,
+        reference: captureID,
+      }
+      setFormData(updatedForm)
+      toast.success(t('checkout.paypal_success', 'Pago PayPal confirmado. Procesando pedido...'))
+      // Auto-submit: procesar la orden automáticamente
+      setTimeout(() => submitOrder(updatedForm), 300)
+    } catch (err) {
+      console.error('PayPal Capture Error:', {
+        message: err?.message,
+        response: err?.response,
+        data: err?.response?.data,
+        status: err?.response?.status,
+      })
+      throw err
     }
-
-    setPaypalState({ orderID: data.orderID, captureID, approved: true })
-    setFormData((prev) => ({
-      ...prev,
-      paypalOrderId: data.orderID,
-      paypalCaptureId: captureID,
-      reference: captureID,
-    }))
-    toast.success(t('checkout.paypal_success', 'Pago PayPal confirmado. Ahora puedes registrar el pedido.'))
   }
 
   const prepareStripePaymentIntent = async () => {
     setError('')
+
+    // Validar campos requeridos del formulario antes de crear intent Stripe
+    if (!formData.fullName || !formData.email || !formData.address || !formData.identification_type_id || !formData.identification) {
+      const missingFields = []
+      if (!formData.fullName) missingFields.push(t('checkout.field_full_name', 'Nombre completo'))
+      if (!formData.email) missingFields.push(t('checkout.field_email', 'Correo electrónico'))
+      if (!formData.address) missingFields.push(t('checkout.field_address', 'Dirección'))
+      if (!formData.identification_type_id) missingFields.push(t('checkout.field_id_type', 'Tipo de identificación'))
+      if (!formData.identification) missingFields.push(t('checkout.field_id_number', 'Número de identificación'))
+
+      const msg = t('checkout.error_fill_required_fields_stripe', 'Por favor completa los siguientes campos antes de pagar con Stripe: :fields', {
+        fields: missingFields.join(', ')
+      })
+      setError(msg)
+      toast.error(msg)
+
+      // Scroll a la sección del formulario
+      document.querySelector('form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+
+      throw new Error(msg)
+    }
 
     if (!validateCheckout('stripe', { skipGatewayConfirmation: true })) {
       throw new Error(t('checkout.error_incomplete_form', 'Formulario incompleto'))
@@ -369,27 +470,25 @@ export default function CheckoutPage() {
       approved: true,
       preparing: false,
     }))
-    setFormData((prev) => ({
-      ...prev,
+    const updatedForm = {
+      ...formData,
       stripePaymentIntentId: paymentIntentId,
       reference: paymentIntentId,
-    }))
-    toast.success(t('checkout.stripe_success', 'Pago con Stripe confirmado. Ahora puedes registrar el pedido.'))
+    }
+    setFormData(updatedForm)
+    toast.success(t('checkout.stripe_success', 'Pago con Stripe confirmado. Procesando pedido...'))
+    // Auto-submit: procesar la orden automáticamente
+    setTimeout(() => submitOrder(updatedForm), 300)
   }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  const submitOrder = async (overrideFormData = null) => {
     setError('')
-
-    if (!validateCheckout()) {
-      return
-    }
-
     setIsProcessing(true)
 
     try {
+      const data = overrideFormData || formData
       const payload = {
-        ...formData,
+        ...data,
         rateBs,
         items: getCheckoutItemsPayload(),
       }
@@ -405,7 +504,6 @@ export default function CheckoutPage() {
         onSuccess: () => {
           clearCart()
           toast.success(t('checkout.success', '¡Compra realizada con éxito!'))
-          router.visit('/confirmacion')
         },
         onFinish: () => setIsProcessing(false),
       })
@@ -415,6 +513,16 @@ export default function CheckoutPage() {
       toast.error(msg)
       setIsProcessing(false)
     }
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+
+    if (!validateCheckout()) {
+      return
+    }
+
+    await submitOrder()
   }
 
   if (cart.items.length === 0) {
@@ -684,19 +792,28 @@ export default function CheckoutPage() {
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                           <div>
                             <p className="text-sm font-semibold text-foreground">{t('checkout.charge_currency_title', 'Moneda de cobro')}</p>
-                            <p className="mt-1 text-sm text-muted-foreground">{t('checkout.charge_currency_help', 'La pasarela y el pedido se procesarán usando esta moneda si está habilitada en configuración.')}</p>
+                            {formData.paymentMethod === 'paypal' || formData.paymentMethod === 'stripe' ? (
+                              <p className="mt-1 text-sm text-muted-foreground">{t('checkout.gateway_usd_only', 'Esta pasarela solo procesa pagos en dólares (USD).')}</p>
+                            ) : (
+                              <p className="mt-1 text-sm text-muted-foreground">{t('checkout.charge_currency_help', 'La pasarela y el pedido se procesarán usando esta moneda si está habilitada en configuración.')}</p>
+                            )}
                           </div>
                           <select
                             name="checkoutCurrency"
                             value={formData.checkoutCurrency}
                             onChange={handleInputChange}
-                            className="w-full rounded-lg border border-border bg-background px-4 py-2 text-foreground transition focus:border-primary focus:outline-none sm:max-w-[220px]"
+                            disabled={formData.paymentMethod === 'paypal' || formData.paymentMethod === 'stripe'}
+                            className="w-full rounded-lg border border-border bg-background px-4 py-2 text-foreground transition focus:border-primary focus:outline-none sm:max-w-[220px] disabled:bg-slate-100 disabled:text-slate-500"
                           >
-                            {checkoutCurrencies.map((currency) => (
-                              <option key={currency.code} value={currency.code}>
-                                {currency.code} - {currency.name}
-                              </option>
-                            ))}
+                            {formData.paymentMethod === 'paypal' || formData.paymentMethod === 'stripe' ? (
+                              <option value="USD">USD - Dólares</option>
+                            ) : (
+                              checkoutCurrencies.map((currency) => (
+                                <option key={currency.code} value={currency.code}>
+                                  {currency.code} - {currency.name}
+                                </option>
+                              ))
+                            )}
                           </select>
                         </div>
                       </div>
@@ -851,6 +968,24 @@ export default function CheckoutPage() {
 
                           <div>
                             <label className="mb-2 block text-sm font-semibold text-foreground">
+                              {t('checkout.operation_type_label', 'Tipo de operación *')}
+                            </label>
+                            <select
+                              name="operationType"
+                              value={formData.operationType || ''}
+                              onChange={handleInputChange}
+                              className="w-full rounded-lg border border-border bg-background px-4 py-2 text-foreground transition focus:border-primary focus:outline-none"
+                              required
+                            >
+                              <option value="">{t('checkout.operation_type_placeholder', 'Selecciona el tipo')}</option>
+                              <option value="transferencia">{t('checkout.operation_type_transfer', 'Transferencia')}</option>
+                              <option value="deposito">{t('checkout.operation_type_deposit', 'Depósito')}</option>
+                              <option value="pago_online">{t('checkout.operation_type_online', 'Pago Online')}</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="mb-2 block text-sm font-semibold text-foreground">
                               {t('checkout.reference_label', 'Referencia *')}
                             </label>
                             <input
@@ -897,6 +1032,18 @@ export default function CheckoutPage() {
                             )}
                             {formData.paymentMethod === 'paypal' && (paypalConfig?.client_id ? (
                               <div className="mt-4 space-y-4">
+                                {/* Alerta si faltan campos requeridos */}
+                                {(!formData.fullName || !formData.email || !formData.address || !formData.identification_type_id || !formData.identification) && (
+                                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                                    <div className="flex items-start gap-2">
+                                      <span className="text-lg">⚠️</span>
+                                      <div>
+                                        <p className="font-semibold">{t('checkout.form_incomplete_title', 'Formulario incompleto')}</p>
+                                        <p className="mt-1">{t('checkout.form_incomplete_paypal', 'Completa tus datos personales arriba para poder pagar con PayPal.')}</p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
                                 <div className="rounded-2xl border p-3 text-sm border-emerald-200 bg-white/70 text-emerald-950">
                                   {t('checkout.paypal_ready_message', 'PayPal está configurado. Completa el pago con PayPal y luego registra el pedido.')}
                                 </div>
@@ -907,19 +1054,26 @@ export default function CheckoutPage() {
                                 </div>
                                 <PayPalScriptProvider options={{
                                   'client-id': paypalConfig.client_id,
-                                  currency: formData.checkoutCurrency,
+                                  currency: 'USD',
                                   intent: 'capture',
                                   components: 'buttons',
                                 }}>
                                   <PayPalButtons
                                     style={{ layout: 'vertical', shape: 'rect', label: 'paypal' }}
-                                    disabled={isProcessing || paypalState.approved}
+                                    disabled={paypalState.approved}
                                     forceReRender={[total, formData.coupon_code, paypalState.approved, formData.checkoutCurrency]}
                                     createOrder={async () => {
                                       try {
                                         return await createPayPalOrder()
                                       } catch (err) {
-                                        const msg = err?.response?.data?.message || err?.message || t('checkout.error_paypal_start', 'No se pudo iniciar PayPal.')
+                                        // DEBUG: Ver exactamente qué responde el backend
+                                        console.error('PayPal Create Order Error:', {
+                                          message: err?.message,
+                                          response: err?.response,
+                                          data: err?.response?.data,
+                                          status: err?.response?.status,
+                                        })
+                                        const msg = err?.response?.data?.message || err?.response?.data?.debug?.message || err?.message || t('checkout.error_paypal_start', 'No se pudo iniciar PayPal.')
                                         setError(msg)
                                         toast.error(msg)
                                         throw err
@@ -950,6 +1104,18 @@ export default function CheckoutPage() {
                             ))}
                             {formData.paymentMethod === 'stripe' && (
                               <div className="mt-4 space-y-4">
+                                {/* Alerta si faltan campos requeridos */}
+                                {(!formData.fullName || !formData.email || !formData.address || !formData.identification_type_id || !formData.identification) && (
+                                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                                    <div className="flex items-start gap-2">
+                                      <span className="text-lg">⚠️</span>
+                                      <div>
+                                        <p className="font-semibold">{t('checkout.form_incomplete_title', 'Formulario incompleto')}</p>
+                                        <p className="mt-1">{t('checkout.form_incomplete_stripe', 'Completa tus datos personales arriba para poder pagar con tarjeta.')}</p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
                                 <StripePaymentPanel
                                   approved={stripeState.approved}
                                   billingDetails={{

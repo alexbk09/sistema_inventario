@@ -27,6 +27,7 @@ La aplicación ofrece una **parte pública** (tienda / carrito / checkout) y un 
 - **Colas de trabajo**: Laravel Queue con `QUEUE_CONNECTION=database`.
 - **Servicio externo de IA**: FastAPI en Python (archivo `tools/image_service.py`).
 - **Integración de moneda**: Servicio `CurrencyService` que consume `https://ve.dolarapi.com/v1/dolares`.
+- integracion con pasarela de pago paypal y stripe.
 
 ### 2.2. Diagrama de arquitectura (propuesto)
 
@@ -619,3 +620,9 @@ Para convertir este documento en un PDF enriquecido, se recomiendan las siguient
     - Captura del listado `/admin/customers` y ficha de un cliente.
 
 Con este material (este Markdown + capturas + diagramas generados), puedes abrir el archivo en VS Code, un editor Markdown o un procesador de texto, incrustar las imágenes y exportar a **PDF**.
+
+## 9. Credenciales prueba pasarela de pago
+Tarjeta stripe
+ Número de tarjeta: 4242 4242 4242 4242Fecha de expiración: Cualquier fecha futura (por ejemplo, 12/34)Código CVC: Tres números cualquiera (por ejemplo, 123)Nombre/Dirección: Cualquier texto inventado
+cuenta paypal
+

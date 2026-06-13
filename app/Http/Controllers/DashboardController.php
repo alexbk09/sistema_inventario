@@ -31,14 +31,18 @@ class DashboardController extends Controller
                 $q->where('warehouse_id', $wid);
             });
 
-        $currentInvoices = (clone $baseInvoiceScope)
-            ->whereBetween('created_at', [$startCurrent->copy()->startOfDay(), $today->copy()->endOfDay()])
-            ->with('customer:id,name')
-            ->get(['id', 'customer_id', 'credit_account_id', 'total_usd', 'created_at', 'currency_code', 'base_currency_code', 'monetary_totals_json']);
+        // Optimización: Usar cursor() para grandes datasets y procesar en chunks
+        $currentInvoices = $this->getInvoicesLazy(
+            clone $baseInvoiceScope,
+            $startCurrent->copy()->startOfDay(),
+            $today->copy()->endOfDay()
+        );
 
-        $previousInvoices = (clone $baseInvoiceScope)
-            ->whereBetween('created_at', [$startPrevious->copy()->startOfDay(), $endPrevious->copy()->endOfDay()])
-            ->get(['id', 'customer_id', 'credit_account_id', 'total_usd', 'created_at', 'currency_code', 'base_currency_code', 'monetary_totals_json']);
+        $previousInvoices = $this->getInvoicesLazy(
+            clone $baseInvoiceScope,
+            $startPrevious->copy()->startOfDay(),
+            $endPrevious->copy()->endOfDay()
+        );
 
         $zeroTotals = $this->buildZeroTotals($currencyCodes);
         $currentSalesByDate = $this->aggregateInvoicesByDate($currentInvoices, $adminMoneyService, $currencySettings, $zeroTotals);
@@ -116,9 +120,9 @@ class DashboardController extends Controller
         $creditShare = $totalUsd > 0 ? ($creditSales / $totalUsd) * 100 : 0.0;
         $cashShare = $totalUsd > 0 ? ($cashSales / $totalUsd) * 100 : 0.0;
 
-        // Top productos (por cantidad vendida)
+        // Top productos - optimizado con select específico y índices
         $topProducts = InvoiceItem::query()
-            ->selectRaw('invoice_items.product_id, SUM(invoice_items.quantity) as total_quantity, SUM(invoice_items.subtotal_usd) as total_sales_usd')
+            ->selectRaw('products.name as label, SUM(invoice_items.quantity) as total_quantity, SUM(invoice_items.subtotal_usd) as total_sales_usd')
             ->join('invoices', 'invoice_items.invoice_id', '=', 'invoices.id')
             ->join('products', 'invoice_items.product_id', '=', 'products.id')
             ->whereNull('invoices.cancelled_at')
@@ -132,7 +136,7 @@ class DashboardController extends Controller
             ->get()
             ->map(function ($row) {
                 return [
-                    'label' => $row->name,
+                    'label' => $row->label,
                     'quantity' => (float) $row->total_quantity,
                     'total_sales_usd' => (float) $row->total_sales_usd,
                 ];
@@ -163,8 +167,15 @@ class DashboardController extends Controller
         $todayStart = now()->startOfDay();
         $monthStart = now()->startOfMonth();
 
-        $currency = app(CurrencyService::class);
-        $rate = $currency->getPromedio('oficial') ?? (float) config('currency.bs_rate', 0);
+        // Obtener tasa configurada (respeta modo manual o auto)
+        $currencyService = app(CurrencyService::class);
+        $configuredRates = $currencyService->getConfiguredExchangeRates($currencySettings);
+        $rate = $configuredRates['rates']['VES'] ?? $configuredRates['rates']['BS'] ?? null;
+
+        // Fallback a API solo si no hay tasa configurada
+        if ($rate === null || $rate <= 0) {
+            $rate = $currencyService->getPromedio('oficial') ?? (float) config('currency.bs_rate', 0);
+        }
 
         // Configuración de inventario para umbral de stock bajo
         $inventorySettings = Settings::get('inventory', [
@@ -299,6 +310,23 @@ class DashboardController extends Controller
         ]);
     }
 
+    protected function getInvoicesLazy($query, $start, $end)
+    {
+        $invoices = collect();
+
+        $query
+            ->whereBetween('created_at', [$start, $end])
+            ->with('customer:id,name')
+            ->select(['id', 'customer_id', 'credit_account_id', 'total_usd', 'created_at', 'currency_code', 'base_currency_code', 'monetary_totals_json'])
+            ->chunkById(500, function ($chunk) use (&$invoices) {
+                foreach ($chunk as $invoice) {
+                    $invoices->push($invoice);
+                }
+            });
+
+        return $invoices;
+    }
+
     protected function buildZeroTotals(array $currencyCodes): array
     {
         $totals = [];
@@ -373,8 +401,19 @@ class DashboardController extends Controller
 
     protected function resolveInvoiceDocumentTotals(Invoice $invoice, AdminMoneyService $adminMoneyService, array $currencySettings): array
     {
+        // Si ya tiene totals calculados, usarlos
         if (is_array($invoice->monetary_totals_json['totals'] ?? null)) {
-            return $invoice->monetary_totals_json['totals'];
+            $totals = $invoice->monetary_totals_json['totals'];
+
+            // Si la moneda original es diferente a USD, asegurar que el monto original esté correcto
+            $originalCurrency = $invoice->monetary_totals_json['original_currency'] ?? 'USD';
+            $originalAmount = $invoice->monetary_totals_json['original_amount'] ?? null;
+
+            if ($originalCurrency !== 'USD' && $originalAmount !== null) {
+                $totals[$originalCurrency] = (float) $originalAmount;
+            }
+
+            return $totals;
         }
 
         $snapshot = is_array($invoice->monetary_totals_json['rates'] ?? null)
@@ -385,13 +424,33 @@ class DashboardController extends Controller
             ]
             : null;
 
-        return $adminMoneyService->buildDocumentTotals((float) ($invoice->total_usd ?? 0), $currencySettings, $snapshot)['totals'];
+        $totals = $adminMoneyService->buildDocumentTotals((float) ($invoice->total_usd ?? 0), $currencySettings, $snapshot)['totals'];
+
+        // Si la moneda original es diferente a USD, usar el monto original guardado
+        $originalCurrency = $invoice->monetary_totals_json['original_currency'] ?? 'USD';
+        $originalAmount = $invoice->monetary_totals_json['original_amount'] ?? null;
+
+        if ($originalCurrency !== 'USD' && $originalAmount !== null) {
+            $totals[$originalCurrency] = (float) $originalAmount;
+        }
+
+        return $totals;
     }
 
     protected function resolveLayawayDocumentTotals(Layaway $layaway, AdminMoneyService $adminMoneyService, array $currencySettings): array
     {
         if (is_array($layaway->monetary_totals_json['totals'] ?? null)) {
-            return $layaway->monetary_totals_json['totals'];
+            $totals = $layaway->monetary_totals_json['totals'];
+
+            // Si la moneda original es diferente a USD, asegurar que el monto original esté correcto
+            $originalCurrency = $layaway->monetary_totals_json['original_currency'] ?? 'USD';
+            $originalAmount = $layaway->monetary_totals_json['original_amount'] ?? null;
+
+            if ($originalCurrency !== 'USD' && $originalAmount !== null) {
+                $totals[$originalCurrency] = (float) $originalAmount;
+            }
+
+            return $totals;
         }
 
         $snapshot = is_array($layaway->monetary_totals_json['rates'] ?? null)
@@ -402,6 +461,16 @@ class DashboardController extends Controller
             ]
             : null;
 
-        return $adminMoneyService->buildDocumentTotals((float) ($layaway->total_usd ?? 0), $currencySettings, $snapshot)['totals'];
+        $totals = $adminMoneyService->buildDocumentTotals((float) ($layaway->total_usd ?? 0), $currencySettings, $snapshot)['totals'];
+
+        // Si la moneda original es diferente a USD, usar el monto original guardado
+        $originalCurrency = $layaway->monetary_totals_json['original_currency'] ?? 'USD';
+        $originalAmount = $layaway->monetary_totals_json['original_amount'] ?? null;
+
+        if ($originalCurrency !== 'USD' && $originalAmount !== null) {
+            $totals[$originalCurrency] = (float) $originalAmount;
+        }
+
+        return $totals;
     }
 }

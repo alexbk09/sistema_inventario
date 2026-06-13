@@ -575,6 +575,52 @@ Un flujo comun de uso administrativo seria:
 - php artisan queue:work
 - php artisan storage:link
 
+### Sincronizacion de tasas de moneda (Cron Job)
+
+El sistema incluye sincronizacion automatica de tasas de cambio desde APIs externas. Para que funcione en produccion, debes configurar el cron de Laravel:
+
+**1. Configurar el cron en Linux/Mac:**
+
+```bash
+# Abrir crontab
+sudo crontab -e
+
+# Agregar esta linea para ejecutar el scheduler cada minuto
+* * * * * cd /ruta/a/tu/proyecto && php artisan schedule:run >> /dev/null 2>&1
+```
+
+**2. En Windows (XAMPP/Laragon local):**
+
+Las tasas se actualizan automaticamente al visitar el panel de administracion (via middleware). Para forzar sincronizacion manual:
+
+```powershell
+# Ver estado actual de tasas
+php artisan currency:status
+
+# Forzar sincronizacion
+php artisan currency:sync-configured-rates
+```
+
+**3. Comandos disponibles:**
+
+```powershell
+# Verificar estado de tasas
+php artisan currency:status
+
+# Sincronizar tasas configuradas
+php artisan currency:sync-configured-rates
+
+# Rellenar snapshots historicos en documentos antiguos
+php artisan currency:backfill-document-snapshots
+```
+
+**4. Configuracion desde el Admin:**
+
+- Ve a **Configuracion → Operaciones → Monedas**
+- Activa **"Actualizar tasas automaticamente"**
+- Ajusta el intervalo en minutos (por defecto: 60 minutos)
+- Configura cada moneda en modo "Auto" (API) o "Manual" (tasa fija)
+
 ### Smoke y validacion
 
 - powershell -ExecutionPolicy Bypass -File .\tools\run-backoffice-smoke.ps1

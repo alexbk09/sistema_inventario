@@ -1119,6 +1119,9 @@ return [
                 'card' => 'Carta',
                 'transfer' => 'Bonifico',
                 'zelle' => 'Zelle',
+                'paypal' => 'PayPal',
+                'stripe' => 'Carta di credito/debito',
+                'manual' => 'Bonifico/Contanti',
                 'other' => 'Altro',
             ],
             'actions' => [

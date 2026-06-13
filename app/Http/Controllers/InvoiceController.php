@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\{Invoice, InvoiceItem, Product, Customer, MovementType, InvoiceStatus, Warehouse, InvoiceAdjustment, CreditAccount, CreditMovement, Layaway};
 use App\Services\{AdminMoneyService, AdminNotificationService, CurrencyService, InventoryService};
 use App\Support\{Settings, Audit};
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -409,15 +410,25 @@ class InvoiceController extends Controller
 
             $qty = (int) $itemData['quantity'];
             $subtotalUsd = (float) $item->price_usd * $qty;
-            $subtotalBs = $currency->usdToBs($subtotalUsd);
+            // Usar tasa del snapshot de la factura, no la tasa actual
+            $snapshotRate = isset($documentSnapshot['rates']['VES']) && is_numeric($documentSnapshot['rates']['VES'])
+                ? (float) $documentSnapshot['rates']['VES']
+                : null;
+            $subtotalBs = $snapshotRate !== null
+                ? round($subtotalUsd * $snapshotRate, 2)
+                : $currency->usdToBs($subtotalUsd);
 
             $item->update([
                 'quantity' => $qty,
                 'subtotal_usd' => $subtotalUsd,
                 'subtotal_bs' => $subtotalBs,
                 'unit_currency_code' => $documentCurrency,
-                'unit_price_original' => $adminMoneyService->convertUsingSnapshot((float) $item->price_usd, $documentCurrency, $documentSnapshot),
-                'subtotal_original' => $adminMoneyService->convertUsingSnapshot($subtotalUsd, $documentCurrency, $documentSnapshot),
+                'unit_price_original' => isset($documentSnapshot['rates'][$documentCurrency]) && is_numeric($documentSnapshot['rates'][$documentCurrency])
+                    ? $adminMoneyService->convertUsingSnapshot((float) $item->price_usd, $documentCurrency, $documentSnapshot, $currencySettings)
+                    : ($documentCurrency === 'USD' ? (float) $item->price_usd : $adminMoneyService->convertFromBase((float) $item->price_usd, $documentCurrency, $currencySettings)),
+                'subtotal_original' => isset($documentSnapshot['rates'][$documentCurrency]) && is_numeric($documentSnapshot['rates'][$documentCurrency])
+                    ? $adminMoneyService->convertUsingSnapshot($subtotalUsd, $documentCurrency, $documentSnapshot, $currencySettings)
+                    : ($documentCurrency === 'USD' ? $subtotalUsd : $adminMoneyService->convertFromBase($subtotalUsd, $documentCurrency, $currencySettings)),
                 'exchange_rate_snapshot' => $documentCurrency === ($documentSnapshot['base_currency'] ?? 'USD')
                     ? 1
                     : (float) ($documentSnapshot['rates'][$documentCurrency] ?? null),
@@ -432,7 +443,13 @@ class InvoiceController extends Controller
         $totalUsd = $itemsTotalUsd + $taxUsd;
 
         $invoice->total_usd = $totalUsd;
-        $invoice->total_bs = $currency->usdToBs($totalUsd);
+        // Usar tasa del snapshot de la factura para total_bs
+        $totalSnapshotRate = isset($documentSnapshot['rates']['VES']) && is_numeric($documentSnapshot['rates']['VES'])
+            ? (float) $documentSnapshot['rates']['VES']
+            : null;
+        $invoice->total_bs = $totalSnapshotRate !== null
+            ? round($totalUsd * $totalSnapshotRate, 2)
+            : $currency->usdToBs($totalUsd);
         $invoice->base_currency_code = $documentSnapshot['base_currency'] ?? ($invoice->base_currency_code ?: 'USD');
         $invoice->currency_code = $documentCurrency;
         $invoice->exchange_rate_snapshot = $documentCurrency === ($documentSnapshot['base_currency'] ?? 'USD')
@@ -443,7 +460,9 @@ class InvoiceController extends Controller
             : ($adminMoneyService->resolveCurrencyRateSource($documentCurrency, $currencySettings) ?? $invoice->exchange_rate_source);
         $invoice->monetary_totals_json = [
             'original_currency' => $documentCurrency,
-            'original_amount' => $adminMoneyService->convertUsingSnapshot($totalUsd, $documentCurrency, $documentSnapshot),
+            'original_amount' => isset($documentSnapshot['rates'][$documentCurrency]) && is_numeric($documentSnapshot['rates'][$documentCurrency])
+                ? $adminMoneyService->convertUsingSnapshot($totalUsd, $documentCurrency, $documentSnapshot, $currencySettings)
+                : ($documentCurrency === 'USD' ? $totalUsd : $adminMoneyService->convertFromBase($totalUsd, $documentCurrency, $currencySettings)),
             ...$adminMoneyService->buildDocumentTotals($totalUsd, $currencySettings, $documentSnapshot),
         ];
         $invoice->status = $data['status'];
@@ -572,6 +591,15 @@ class InvoiceController extends Controller
             );
         }
 
+        // Si es petición AJAX, devolver JSON
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Factura actualizada correctamente',
+                'invoice' => $invoice->load(['invoiceStatus', 'customer', 'items.product']),
+            ]);
+        }
+
         return redirect()->route('admin.invoices.index');
     }
 
@@ -585,7 +613,7 @@ class InvoiceController extends Controller
         $originalAmount = round((float) ($payment['amount_usd'] ?? 0), 2);
         $baseAmount = $adminMoneyService->convertToBase($originalAmount, $currencyCode, $currencySettings, $documentSnapshot);
         $vesAmount = isset($documentSnapshot['rates']['VES'])
-            ? $adminMoneyService->convertUsingSnapshot($baseAmount, 'VES', $documentSnapshot)
+            ? $adminMoneyService->convertUsingSnapshot($baseAmount, 'VES', $documentSnapshot, $currencySettings)
             : round((float) ($payment['amount_bs'] ?? 0), 2);
 
         return [
@@ -675,5 +703,128 @@ class InvoiceController extends Controller
             : null;
 
         return $adminMoneyService->buildDocumentTotals((float) ($invoice->total_usd ?? 0), $currencySettings, $snapshot)['totals'];
+    }
+
+    public function downloadPdf(Invoice $invoice)
+    {
+        $this->authorize('view', $invoice);
+
+        // Cargar relaciones necesarias
+        $invoice->load(['items.product', 'customer', 'payments', 'warehouse']);
+
+        // Obtener configuraciones de la empresa
+        $settings = Settings::get('company', []);
+        $currencySettings = Settings::get('currency', []);
+
+        // Calcular totales
+        $adminMoneyService = app(AdminMoneyService::class);
+        $currencySettings = Settings::get('currency', []);
+
+        $snapshot = $invoice->exchange_rate_snapshot
+            ? [
+                'base_currency' => (string) ($invoice->base_currency_code ?: 'USD'),
+                'captured_at' => $invoice->monetary_totals_json['captured_at'] ?? null,
+                'rates' => $invoice->monetary_totals_json['rates'],
+            ]
+            : null;
+
+        $totals = $adminMoneyService->buildDocumentTotals((float) ($invoice->total_usd ?? 0), $currencySettings, $snapshot)['totals'];
+
+        // Preparar datos de pagos
+        $payments = $invoice->payments->map(function ($payment) {
+            return [
+                'id' => $payment->id,
+                'method' => $payment->method,
+                'method_label' => $this->getPaymentMethodLabel($payment->method),
+                'amount_usd' => $payment->amount_original ?? $payment->amount_usd,
+                'amount_bs' => $payment->amount_bs,
+                'currency_code' => $payment->payment_currency_code ?? 'USD',
+                'reference' => $payment->reference,
+                'bank' => $payment->bank ?? $payment->bank_name ?? $payment->bank_account,
+                'origin_bank' => $payment->origin_bank,
+                'operation_type' => $payment->operation_type,
+                'operation_type_label' => $this->getOperationTypeLabel($payment->operation_type),
+                'payment_date' => $payment->payment_date ?? $payment->created_at,
+                'notes' => $payment->notes,
+                'payer' => $payment->payer ?? $payment->paid_by,
+                'exchange_rate' => $payment->exchange_rate_snapshot ?? $payment->exchange_rate,
+            ];
+        });
+
+        // Preparar datos del cliente
+        $customer = [
+            'name' => $invoice->customer?->name ?? $invoice->contact['full_name'] ?? $invoice->contact['name'] ?? 'Cliente',
+            'email' => $invoice->customer?->email ?? $invoice->contact['email'] ?? '',
+            'phone' => $invoice->customer?->phone ?? $invoice->contact['phone'] ?? '',
+            'address' => $invoice->customer?->address ?? $invoice->contact['address'] ?? '',
+            'city' => $invoice->customer?->city ?? $invoice->contact['city'] ?? '',
+            'document' => $invoice->customer?->document ?? $invoice->contact['document'] ?? $invoice->contact['dni'] ?? '',
+        ];
+
+        // Preparar datos de la empresa
+        $company = [
+            'name' => $settings['name'] ?? config('app.name', 'Mi Empresa'),
+            'address' => $settings['address'] ?? '',
+            'phone' => $settings['phone'] ?? '',
+            'email' => $settings['email'] ?? '',
+            'tax_id' => $settings['tax_id'] ?? $settings['rif'] ?? '',
+            'logo' => $settings['logo'] ?? null,
+        ];
+
+        // Generar PDF
+        $pdf = Pdf::loadView('pdf.invoice-detail', [
+            'invoice' => $invoice,
+            'customer' => $customer,
+            'company' => $company,
+            'payments' => $payments,
+            'totals' => $totals,
+            'currencySettings' => $currencySettings,
+        ]);
+
+        // Configurar opciones del PDF
+        $pdf->setPaper('A4');
+        $pdf->setOptions([
+            'isPhpEnabled' => true,
+            'isRemoteEnabled' => true,
+            'isHtml5ParserEnabled' => true,
+        ]);
+
+        $filename = 'factura_' . ($invoice->number ?? $invoice->id) . '.pdf';
+
+        return $pdf->download($filename);
+    }
+
+    private function getPaymentMethodLabel($method)
+    {
+        $methods = [
+            'credit_card' => 'Tarjeta de Crédito',
+            'debit_card' => 'Tarjeta de Débito',
+            'paypal' => 'PayPal',
+            'transfer' => 'Transferencia Bancaria',
+            'cash' => 'Efectivo',
+            'zelle' => 'Zelle',
+            'binance' => 'Binance Pay',
+            'pago_movil' => 'Pago Móvil',
+            'other' => 'Otro',
+        ];
+
+        return $methods[$method] ?? $method;
+    }
+
+    private function getOperationTypeLabel($type)
+    {
+        $types = [
+            'local' => 'Transferencia Local',
+            'international' => 'Transferencia Internacional',
+            'same_bank' => 'Mismo Banco',
+            'zelle' => 'Zelle',
+            'paypal' => 'PayPal',
+            'pago_movil' => 'Pago Móvil',
+            'binance' => 'Binance Pay',
+            'cash' => 'Efectivo',
+            'other' => 'Otro',
+        ];
+
+        return $types[$type] ?? $type;
     }
 }

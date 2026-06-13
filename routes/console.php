@@ -17,12 +17,74 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-Artisan::command('currency:sync-configured-rates', function (CurrencyService $currencyService) {
-    $synced = $currencyService->syncConfiguredRates();
-    Settings::set('currency', $synced);
+Artisan::command('currency:status', function (CurrencyService $currencyService) {
+    $settings = Settings::get('currency', []);
+    $this->info('Currency Status Check');
+    $this->info('======================');
 
-    $count = count($synced['supported_currencies'] ?? []);
-    $this->info("Currency rates synchronized for {$count} configured currencies.");
+    $supportedCurrencies = $settings['supported_currencies'] ?? [];
+    $now = now();
+
+    foreach ($supportedCurrencies as $currency) {
+        $code = $currency['code'] ?? 'N/A';
+        $enabled = $currency['enabled'] ?? false ? '✓' : '✗';
+        $rateMode = $currency['rate_mode'] ?? 'manual';
+        $lastRate = $currency['last_rate'] ?? null;
+        $lastSynced = $currency['last_synced_at'] ?? null;
+
+        $syncStatus = 'N/A';
+        if ($rateMode === 'auto' && $lastSynced) {
+            try {
+                $syncedAt = \Carbon\Carbon::parse($lastSynced);
+                $hours = $now->diffInHours($syncedAt);
+                if ($hours < 1) {
+                    $syncStatus = 'Fresh (< 1h)';
+                } elseif ($hours < 24) {
+                    $syncStatus = "{$hours}h ago";
+                } else {
+                    $syncStatus = 'STALE (> 24h)';
+                }
+            } catch (\Throwable $e) {
+                $syncStatus = 'Invalid date';
+            }
+        }
+
+        $rateDisplay = $lastRate ? number_format($lastRate, 6) : 'N/A';
+        $manualRate = $currency['manual_rate'] ?? null;
+        $manualRateDisplay = $manualRate ? number_format($manualRate, 6) : 'N/A';
+
+        if ($rateMode === 'manual') {
+            $this->info("[{$enabled}] {$code} | Rate: {$rateDisplay} | Mode: {$rateMode} | Manual: {$manualRateDisplay} | Sync: {$syncStatus}");
+        } else {
+            $this->info("[{$enabled}] {$code} | Rate: {$rateDisplay} | Mode: {$rateMode} | Sync: {$syncStatus}");
+        }
+    }
+
+    $this->info('');
+    $this->info('To force sync: php artisan currency:sync-configured-rates');
+})->purpose('Check current currency rates status');
+
+Artisan::command('currency:sync-configured-rates', function (CurrencyService $currencyService) {
+    $this->info('Syncing currency rates...');
+    try {
+        $synced = $currencyService->syncConfiguredRates();
+        Settings::set('currency', $synced);
+
+        $count = count($synced['supported_currencies'] ?? []);
+        $this->info("✓ Currency rates synchronized for {$count} configured currencies.");
+
+        // Show rates
+        foreach ($synced['supported_currencies'] ?? [] as $currency) {
+            $code = $currency['code'] ?? 'N/A';
+            $rate = $currency['last_rate'] ?? null;
+            if ($rate) {
+                $this->info("  {$code}: " . number_format($rate, 6));
+            }
+        }
+    } catch (\Throwable $e) {
+        $this->error('Sync failed: ' . $e->getMessage());
+        \Log::error('Currency sync failed', ['error' => $e->getMessage()]);
+    }
 })->purpose('Synchronize configured currency rates and persist latest values');
 
 Artisan::command('currency:backfill-document-snapshots', function (AdminMoneyService $adminMoneyService) {

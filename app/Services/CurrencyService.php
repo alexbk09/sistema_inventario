@@ -24,14 +24,24 @@ class CurrencyService
                 return $currency;
             }
 
-            if (($currency['rate_mode'] ?? 'auto') === 'auto' && is_numeric($resolvedRate) && (float) $resolvedRate > 0) {
-                $currency['last_rate'] = round((float) $resolvedRate, 6);
-                $currency['last_synced_at'] = $syncedAt;
+            $rateMode = (string) ($currency['rate_mode'] ?? 'auto');
+
+            if ($rateMode === 'manual') {
+                // En modo manual, SIEMPRE usar manual_rate si está disponible
+                $manualRate = isset($currency['manual_rate']) && is_numeric($currency['manual_rate']) ? (float) $currency['manual_rate'] : null;
+                if ($manualRate !== null && $manualRate > 0) {
+                    $currency['last_rate'] = round($manualRate, 6);
+                    $currency['last_synced_at'] = $syncedAt;
+                }
+                // No usar resolvedRate de la API en modo manual
+                unset($currency['resolved_rate']);
+                return $currency;
             }
 
-            if (($currency['rate_mode'] ?? 'auto') === 'manual' && is_numeric($currency['manual_rate'] ?? null)) {
-                $currency['last_rate'] = round((float) $currency['manual_rate'], 6);
-                $currency['last_synced_at'] = $currency['last_synced_at'] ?? $syncedAt;
+            // Solo para modo auto: actualizar con tasa de API
+            if ($rateMode === 'auto' && is_numeric($resolvedRate) && (float) $resolvedRate > 0) {
+                $currency['last_rate'] = round((float) $resolvedRate, 6);
+                $currency['last_synced_at'] = $syncedAt;
             }
 
             unset($currency['resolved_rate']);
@@ -138,13 +148,18 @@ class CurrencyService
 
             $rateMode = (string) ($currency['rate_mode'] ?? 'auto');
             if ($rateMode === 'manual') {
-                $rate = $this->applyMarkup((float) ($currency['manual_rate'] ?? 0), (float) ($currency['markup_percent'] ?? 0));
-                if ($rate > 0) {
+                $manualRate = isset($currency['manual_rate']) && is_numeric($currency['manual_rate']) ? (float) $currency['manual_rate'] : null;
+                if ($manualRate !== null && $manualRate > 0) {
+                    $rate = $this->applyMarkup($manualRate, (float) ($currency['markup_percent'] ?? 0));
                     $rates[$code] = $rate;
                     $currency['resolved_rate'] = $rate;
                     $currencies[] = $currency;
                     continue;
                 }
+                // Si está en manual pero no hay tasa válida, no caer a auto - dejar null para que falle gracefully
+                $currency['resolved_rate'] = null;
+                $currencies[] = $currency;
+                continue;
             }
 
             $lastRate = isset($currency['last_rate']) && is_numeric($currency['last_rate']) ? (float) $currency['last_rate'] : null;

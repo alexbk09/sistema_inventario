@@ -123,7 +123,7 @@ function SettingsSection({ eyebrow, title, description, children, contentClassNa
     );
 }
 
-export default function SettingsIndex({ general, location, branding, billing, currency, store, inventory, warehouses, security, qr, mail, payments, warehouseOptions = [] }) {
+export default function SettingsIndex({ general, location, branding, billing, currency, store, inventory, warehouses, security, qr, mail, payments, warehouseOptions = [], envPaypalConfigured, envStripeConfigured }) {
     const { t } = useI18n();
     const page = usePage();
     const flash = page.props?.flash ?? {};
@@ -210,9 +210,18 @@ export default function SettingsIndex({ general, location, branding, billing, cu
     const updateSupportedCurrency = (index, field, value) => {
         const nextCurrencies = [...supportedCurrencies];
         const current = nextCurrencies[index] ?? {};
-        const nextValue = field === 'code' || field === 'rate_provider' || field === 'rate_mode'
-            ? String(value || '').toUpperCase().replace('EXCHANGERATEHOST', 'exchangeratehost').replace('DOLARAPI', 'dolarapi').replace('FRANKFURTER', 'frankfurter').replace('MANUAL', 'manual')
-            : value;
+        let nextValue = value;
+
+        if (field === 'code' || field === 'rate_provider' || field === 'rate_mode') {
+            nextValue = String(value || '').toUpperCase().replace('EXCHANGERATEHOST', 'exchangeratehost').replace('DOLARAPI', 'dolarapi').replace('FRANKFURTER', 'frankfurter').replace('MANUAL', 'manual');
+        } else if (field === 'manual_rate') {
+            // Convertir a número o null para evitar enviar strings vacíos al backend
+            const num = parseFloat(value);
+            nextValue = isNaN(num) || value === '' || value === null ? null : num;
+        } else if (field === 'markup_percent') {
+            const num = parseFloat(value);
+            nextValue = isNaN(num) ? 0 : num;
+        }
 
         nextCurrencies[index] = {
             ...current,
@@ -431,10 +440,12 @@ export default function SettingsIndex({ general, location, branding, billing, cu
             eyebrow: t('admin.settings.commerce.tabs.paypal.eyebrow', 'Wallet'),
             description: paypalMethod.description || t('admin.settings.commerce.tabs.paypal.description', 'Cobros con PayPal para checkout.'),
             enabled: !!paypalMethod.enabled,
-            readiness: paypalMethod.client_id ? t('admin.settings.commerce.tabs.paypal.ready', 'Credenciales listas') : t('admin.settings.commerce.tabs.paypal.pending', 'Faltan credenciales'),
+            readiness: envPaypalConfigured
+                ? t('admin.settings.commerce.tabs.paypal.ready', 'Credenciales listas en .env')
+                : t('admin.settings.commerce.tabs.paypal.pending', 'Faltan credenciales en .env'),
             accent: 'from-sky-500/20 via-sky-500/10 to-white',
             ring: 'border-sky-200',
-            badge: paypalMethod.client_id ? 'text-sky-700 bg-sky-100' : 'text-amber-700 bg-amber-100',
+            badge: envPaypalConfigured ? 'text-sky-700 bg-sky-100' : 'text-amber-700 bg-amber-100',
         },
         {
             key: 'stripe',
@@ -442,10 +453,12 @@ export default function SettingsIndex({ general, location, branding, billing, cu
             eyebrow: t('admin.settings.commerce.tabs.stripe.eyebrow', 'Tarjetas'),
             description: stripeMethod.description || t('admin.settings.commerce.tabs.stripe.description', 'Cobros con tarjeta y formulario seguro.'),
             enabled: !!stripeMethod.enabled,
-            readiness: stripeMethod.publishable_key ? t('admin.settings.commerce.tabs.stripe.ready', 'Llaves listas') : t('admin.settings.commerce.tabs.stripe.pending', 'Faltan llaves'),
+            readiness: envStripeConfigured
+                ? t('admin.settings.commerce.tabs.stripe.ready', 'Llaves listas en .env')
+                : t('admin.settings.commerce.tabs.stripe.pending', 'Faltan llaves en .env'),
             accent: 'from-fuchsia-500/20 via-fuchsia-500/10 to-white',
             ring: 'border-fuchsia-200',
-            badge: stripeMethod.publishable_key ? 'text-fuchsia-700 bg-fuchsia-100' : 'text-amber-700 bg-amber-100',
+            badge: envStripeConfigured ? 'text-fuchsia-700 bg-fuchsia-100' : 'text-amber-700 bg-amber-100',
         },
     ];
     const activePaymentTab = paymentTabs.find((tab) => tab.key === paymentTab) ?? paymentTabs[0];
@@ -2042,23 +2055,20 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                                     <option value="live">{t('admin.settings.commerce.paypal.options.live', 'Live')}</option>
                                                 </select>
                                             </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.paypal.client_id', 'Client ID')}</label>
-                                                <input
-                                                    type="text"
-                                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                                    value={paypalMethod.client_id || ''}
-                                                    onChange={(e) => updatePaymentMethod('paypal', 'client_id', e.target.value)}
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.paypal.client_secret', 'Client Secret')}</label>
-                                                <input
-                                                    type="password"
-                                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                                    value={paypalMethod.client_secret || ''}
-                                                    onChange={(e) => updatePaymentMethod('paypal', 'client_secret', e.target.value)}
-                                                />
+                                            <div className="md:col-span-2 rounded-lg bg-amber-50 border border-amber-200 p-4">
+                                                <div className="flex items-start gap-3">
+                                                    <svg className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                                    </svg>
+                                                    <div>
+                                                        <p className="text-sm font-medium text-amber-800">
+                                                            {t('admin.settings.commerce.paypal.credentials_notice', 'Credenciales en archivo .env')}
+                                                        </p>
+                                                        <p className="text-xs text-amber-700 mt-1">
+                                                            {t('admin.settings.commerce.paypal.credentials_help', 'Las credenciales de PayPal (Client ID y Client Secret) se configuran en el archivo .env para mayor seguridad. Contacta al administrador del servidor si necesitas modificarlas.')}
+                                                        </p>
+                                                    </div>
+                                                </div>
                                             </div>
                                             <div>
                                                 <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.common.fee_percent', 'Recargo (%)')}</label>
@@ -2147,23 +2157,20 @@ export default function SettingsIndex({ general, location, branding, billing, cu
                                                     <option value="live">{t('admin.settings.commerce.stripe.options.live', 'Live')}</option>
                                                 </select>
                                             </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.stripe.publishable_key', 'Publishable Key')}</label>
-                                                <input
-                                                    type="text"
-                                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                                    value={stripeMethod.publishable_key || ''}
-                                                    onChange={(e) => updatePaymentMethod('stripe', 'publishable_key', e.target.value)}
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.stripe.secret_key', 'Secret Key')}</label>
-                                                <input
-                                                    type="password"
-                                                    className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
-                                                    value={stripeMethod.secret_key || ''}
-                                                    onChange={(e) => updatePaymentMethod('stripe', 'secret_key', e.target.value)}
-                                                />
+                                            <div className="md:col-span-2 rounded-lg bg-amber-50 border border-amber-200 p-4">
+                                                <div className="flex items-start gap-3">
+                                                    <svg className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                                    </svg>
+                                                    <div>
+                                                        <p className="text-sm font-medium text-amber-800">
+                                                            {t('admin.settings.commerce.stripe.credentials_notice', 'Credenciales en archivo .env')}
+                                                        </p>
+                                                        <p className="text-xs text-amber-700 mt-1">
+                                                            {t('admin.settings.commerce.stripe.credentials_help', 'Las credenciales de Stripe (Publishable Key y Secret Key) se configuran en el archivo .env para mayor seguridad. Contacta al administrador del servidor si necesitas modificarlas.')}
+                                                        </p>
+                                                    </div>
+                                                </div>
                                             </div>
                                             <div>
                                                 <label className="block text-sm font-medium text-slate-700">{t('admin.settings.commerce.common.fee_percent', 'Recargo (%)')}</label>

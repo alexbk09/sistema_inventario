@@ -1136,6 +1136,9 @@ return [
                 'card' => 'Carte',
                 'transfer' => 'Virement',
                 'zelle' => 'Zelle',
+                'paypal' => 'PayPal',
+                'stripe' => 'Carte de crédit/débit',
+                'manual' => 'Virement/Espèces',
                 'other' => 'Autre',
             ],
             'actions' => [

@@ -184,6 +184,9 @@ Route::middleware(['auth', 'verified', 'role:admin|supervisor|cashier|warehouse'
     Route::get('/admin/invoices/create', [InvoiceController::class, 'create'])->name('admin.invoices.create');
     Route::post('/admin/invoices', [InvoiceController::class, 'store'])->name('admin.invoices.store');
     Route::put('/admin/invoices/{invoice}', [InvoiceController::class, 'update'])->name('admin.invoices.update');
+    Route::get('/admin/invoices/{invoice}/download-pdf', [InvoiceController::class, 'downloadPdf'])
+        ->name('admin.invoices.download-pdf')
+        ->middleware('permission:view invoices');
 
     // Devoluciones y Garantías (RMA)
     Route::get('/admin/rmas', [RmaController::class, 'index'])->name('admin.rmas.index');

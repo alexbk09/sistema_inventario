@@ -140,6 +140,8 @@ class SettingsController extends Controller
             'mail' => $mail,
             'payments' => $payments,
             'warehouseOptions' => $warehouseOptions,
+            'envPaypalConfigured' => filled(config('services.paypal.client_id')) && filled(config('services.paypal.client_secret')),
+            'envStripeConfigured' => filled(config('services.stripe.publishable_key')) && filled(config('services.stripe.secret_key')),
         ]);
     }
 
@@ -319,6 +321,17 @@ class SettingsController extends Controller
             ],
             $payments['origin_banks'] ?? []
         );
+
+        // Eliminar credenciales sensibles de la configuración guardada en DB
+        // Las credenciales deben estar en .env (config/services.php)
+        if (isset($payments['methods']['stripe'])) {
+            unset($payments['methods']['stripe']['secret_key']);
+            unset($payments['methods']['stripe']['publishable_key']);
+        }
+        if (isset($payments['methods']['paypal'])) {
+            unset($payments['methods']['paypal']['client_secret']);
+            unset($payments['methods']['paypal']['client_id']);
+        }
 
         \App\Support\Settings::set('payments', $payments);
 

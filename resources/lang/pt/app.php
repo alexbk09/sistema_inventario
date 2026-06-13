@@ -1189,6 +1189,9 @@ return [
                 'card' => 'Cartão',
                 'transfer' => 'Transferência',
                 'zelle' => 'Zelle',
+                'paypal' => 'PayPal',
+                'stripe' => 'Cartão de crédito/débito',
+                'manual' => 'Transferência/Dinheiro',
                 'other' => 'Outro',
             ],
             'actions' => [
@@ -2860,6 +2863,8 @@ return [
                             'description' => 'Cobranças com PayPal para checkout.',
                             'ready' => 'Credenciais prontas',
                             'pending' => 'Faltam credenciais',
+                            'ready_env' => 'Credenciais prontas no .env',
+                            'pending_env' => 'Faltam credenciais no .env',
                         ],
                         'stripe' => [
                             'title' => 'Stripe',
@@ -2867,6 +2872,8 @@ return [
                             'description' => 'Cobranças com cartão e formulário seguro.',
                             'ready' => 'Chaves prontas',
                             'pending' => 'Faltam chaves',
+                            'ready_env' => 'Chaves prontas no .env',
+                            'pending_env' => 'Faltam chaves no .env',
                         ],
                     ],
                     'header' => [
@@ -2942,8 +2949,10 @@ return [
                     'paypal' => [
                         'defaults' => [
                             'description' => 'Habilite o PayPal quando suas credenciais estiverem prontas.',
-                            'instructions' => 'Configure Client ID e Secret para ativá-lo.',
+                            'instructions' => 'Configure Client ID e Secret no arquivo .env.',
                         ],
+                        'credentials_notice' => 'Credenciais no arquivo .env',
+                        'credentials_help' => 'As credenciais do PayPal (Client ID e Client Secret) são configuradas no arquivo .env para maior segurança. Contacte o administrador do servidor se precisar modificá-las.',
                         'enable' => 'Habilitar PayPal no checkout',
                         'environment' => 'Ambiente',
                         'client_id' => 'Client ID',
@@ -2961,8 +2970,10 @@ return [
                     'stripe' => [
                         'defaults' => [
                             'description' => 'Aceite pagamentos com cartão via Stripe.',
-                            'instructions' => 'Configure Publishable Key e Secret Key para ativar a cobrança com cartão.',
+                            'instructions' => 'Configure Publishable Key e Secret Key no arquivo .env.',
                         ],
+                        'credentials_notice' => 'Credenciais no arquivo .env',
+                        'credentials_help' => 'As credenciais do Stripe (Publishable Key e Secret Key) são configuradas no arquivo .env para maior segurança. Contacte o administrador do servidor se precisar modificá-las.',
                         'enable' => 'Habilitar Stripe no checkout',
                         'environment' => 'Ambiente',
                         'publishable_key' => 'Publishable Key',

@@ -1,5 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
+import axios from 'axios';
+import { toast } from 'react-hot-toast';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.jsx';
 import AdminTable from '@/Components/admin/provider/AdminTableProviders.jsx';
 import AdminFilters from '@/Components/common/AdminFilters.jsx';
@@ -22,7 +24,15 @@ export default function Index({ invoices, filters, adminCurrencyContext = {} }) 
     : [displayCurrency, ...(secondaryCurrency ? [secondaryCurrency] : [])].filter(Boolean);
   const currencyColumns = [...new Set(visibleCurrencyCodes)];
   const formatServerAmount = (code, value) => formatCurrency(Number(value || 0), code);
-  const { data } = invoices;
+  const { data: initialData } = invoices;
+  const [invoicesData, setInvoicesData] = useState(initialData);
+  
+  // Actualizar datos cuando cambian las props
+  useEffect(() => {
+    setInvoicesData(initialData);
+  }, [initialData]);
+  
+  const data = invoicesData;
   const page = invoices.current_page ?? invoices?.meta?.current_page ?? 1;
   const totalPages = invoices.last_page ?? invoices?.meta?.last_page ?? 1;
   const [search, setSearch] = useState(filters?.search ?? '');
@@ -68,7 +78,8 @@ export default function Index({ invoices, filters, adminCurrencyContext = {} }) 
       width: '15%',
       render: (value, row) => {
         const code = row?.status ?? row?.invoice_status?.code ?? '';
-        const name = row?.invoice_status?.name ?? statusNames[code] ?? value;
+        // Usar traducción del frontend primero, luego el nombre del backend
+        const name = statusNames[code] ?? row?.invoice_status?.name ?? value;
 
         const color = statusStyles[code] ?? 'bg-muted text-foreground';
 
@@ -97,6 +108,72 @@ export default function Index({ invoices, filters, adminCurrencyContext = {} }) 
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedInvoice(null);
+  };
+
+  const [isSubmittingStatus, setIsSubmittingStatus] = useState(false);
+
+  const handleStatusChange = async (newStatus) => {
+    if (!selectedInvoice || isSubmittingStatus) return;
+    
+    // Validar que el estado realmente cambió
+    if (newStatus === selectedInvoice.status) {
+      toast.info(t('admin.invoices.status_no_change', 'El estado no ha cambiado'));
+      return;
+    }
+    
+    setIsSubmittingStatus(true);
+    
+    try {
+      // Preparar items desde la factura actual
+      const items = selectedInvoice.items?.map(item => ({
+        id: item.id,
+        quantity: item.quantity,
+      })) || [];
+
+      // Axios maneja CSRF automáticamente
+      await axios.put(`/admin/invoices/${selectedInvoice.id}`, {
+        status: newStatus,
+        items: items,
+      }, {
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'Accept': 'application/json',
+        }
+      });
+
+      // Actualizar la factura en la lista
+      setInvoicesData((prevData) =>
+        prevData.map((inv) =>
+          inv.id === selectedInvoice.id ? { 
+            ...inv, 
+            status: newStatus,
+            invoice_status: {
+              ...inv.invoice_status,
+              code: newStatus,
+              name: statusNames[newStatus]
+            }
+          } : inv
+        )
+      );
+
+      // Actualizar la factura seleccionada
+      setSelectedInvoice((prev) => ({ 
+        ...prev, 
+        status: newStatus,
+        invoice_status: {
+          ...prev.invoice_status,
+          code: newStatus,
+          name: statusNames[newStatus]
+        }
+      }));
+      
+      toast.success(t('admin.invoices.status_updated', 'Estado actualizado correctamente'));
+    } catch (error) {
+      console.error('Error updating invoice status:', error);
+      toast.error(error.response?.data?.message || error.message || t('admin.invoices.status_update_error', 'Error al actualizar el estado'));
+    } finally {
+      setIsSubmittingStatus(false);
+    }
   };
 
   return (
@@ -138,6 +215,9 @@ export default function Index({ invoices, filters, adminCurrencyContext = {} }) 
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         invoice={selectedInvoice}
+        isEditable={selectedInvoice?.status === 'pending'}
+        onStatusChange={handleStatusChange}
+        isSubmittingStatus={isSubmittingStatus}
       />
     </AuthenticatedLayout>
   );

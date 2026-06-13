@@ -65,15 +65,31 @@ class StripeService
             throw new RuntimeException('Stripe no esta configurado correctamente.');
         }
 
-        return Http::baseUrl('https://api.stripe.com')
+        $http = Http::baseUrl('https://api.stripe.com')
             ->withToken((string) Arr::get($this->config(), 'secret_key'))
             ->asForm()
             ->acceptJson()
             ->timeout(20);
+
+        // Deshabilitar verificación SSL solo en desarrollo local (Windows/XAMPP)
+        if (app()->environment('local', 'development')) {
+            $http = $http->withoutVerifying();
+        }
+
+        return $http;
     }
 
     protected function config(): array
     {
-        return Settings::get('payments', ['methods' => []])['methods']['stripe'] ?? [];
+        // Configuración general desde Settings (no sensible)
+        $settingsConfig = Settings::get('payments', ['methods' => []])['methods']['stripe'] ?? [];
+
+        // Credenciales sensibles desde .env (seguro)
+        $envConfig = [
+            'secret_key' => config('services.stripe.secret_key'),
+            'publishable_key' => config('services.stripe.publishable_key'),
+        ];
+
+        return array_merge($settingsConfig, $envConfig);
     }
 }

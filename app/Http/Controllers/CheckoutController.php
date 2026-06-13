@@ -231,8 +231,15 @@ class CheckoutController extends Controller
                 $subtotalBs = $rate !== null
                     ? round($subtotalUsd * $rate, 2)
                     : $currency->usdToBs($subtotalUsd);
-                $unitPriceOriginal = $adminMoneyService->convertUsingSnapshot($priceUsd, $checkoutCurrency, $documentSnapshot);
-                $subtotalOriginal = $adminMoneyService->convertUsingSnapshot($subtotalUsd, $checkoutCurrency, $documentSnapshot);
+
+                // Si hay tasa en snapshot, usarla; si no, usar conversión actual
+                $hasSnapshotRate = isset($documentSnapshot['rates'][$checkoutCurrency]) && is_numeric($documentSnapshot['rates'][$checkoutCurrency]);
+                $unitPriceOriginal = $hasSnapshotRate
+                    ? $adminMoneyService->convertUsingSnapshot($priceUsd, $checkoutCurrency, $documentSnapshot, $currencySettings)
+                    : ($checkoutCurrency === 'USD' ? $priceUsd : $adminMoneyService->convertFromBase($priceUsd, $checkoutCurrency, $currencySettings));
+                $subtotalOriginal = $hasSnapshotRate
+                    ? $adminMoneyService->convertUsingSnapshot($subtotalUsd, $checkoutCurrency, $documentSnapshot, $currencySettings)
+                    : ($checkoutCurrency === 'USD' ? $subtotalUsd : $adminMoneyService->convertFromBase($subtotalUsd, $checkoutCurrency, $currencySettings));
 
                 InvoiceItem::create([
                     'invoice_id' => $invoice->id,
@@ -337,6 +344,7 @@ class CheckoutController extends Controller
                 'payment_method' => $payload['paymentMethod'],
                 'bank' => $payload['bank'] ?: ($methodConfig['label'] ?? strtoupper($payload['paymentMethod'])),
                 'origin_bank' => $payload['originBank'] ?: ($payload['paymentMethod'] === 'paypal' ? 'PayPal' : ($payload['bank'] ?: 'N/A')),
+                'operation_type' => $payload['operationType'] ?? null,
                 'reference' => $payload['reference'] ?: ($payload['paypalCaptureId'] ?? $payload['paypalOrderId'] ?? 'N/A'),
                 'payment_date' => $payload['date'] ?: now()->toDateString(),
             ]);
@@ -437,30 +445,141 @@ class CheckoutController extends Controller
         $invoiceNumber = session('invoice_number');
 
         $publicUrl = null;
+        $qrUrl = null;
+        $isPaid = false;
+        $invoice = null;
+        $rate = null;
+
         if ($invoiceId) {
             $publicUrl = route('order.track', ['invoice' => $invoiceId]);
+            $qrUrl = route('qr.invoice', ['invoice' => $invoiceId]);
+
+            // Cargar factura completa para mostrar detalles
+            $invoiceModel = Invoice::with(['items.product', 'customer', 'payments'])->find($invoiceId);
+            if ($invoiceModel) {
+                $isPaid = $invoiceModel->status === 'paid' || $invoiceModel->invoiceStatus?->code === 'paid';
+
+                // Obtener tasa de cambio según la moneda de la factura
+                $currencySettings = Settings::get('currency', []);
+                $currencyService = app(CurrencyService::class);
+                $configuredRates = $currencyService->getConfiguredExchangeRates($currencySettings);
+                $rate = $configuredRates['rates']['VES'] ?? $configuredRates['rates']['BS'] ?? null;
+
+                // Si no hay tasa configurada, intentar obtener de la API
+                if ($rate === null || $rate <= 0) {
+                    $rate = $currencyService->getPromedio('oficial') ?? (float) config('currency.bs_rate', 0);
+                }
+
+                // Obtener montos en la moneda original de la factura
+                $documentCurrency = $invoiceModel->currency_code ?? 'USD';
+                $documentTotals = $invoiceModel->monetary_totals_json ?? [];
+                $originalAmount = $documentTotals['original_amount'] ?? $invoiceModel->total_usd;
+
+                // Preparar items de la factura
+                $invoiceItems = $invoiceModel->items->map(function ($item) {
+                    $itemOriginal = $item->unit_price_original ?? $item->price_usd;
+                    $itemSubtotalOriginal = $item->subtotal_original ?? $item->subtotal_usd;
+
+                    return [
+                        'id' => $item->id,
+                        'name' => $item->product?->name,
+                        'quantity' => $item->quantity,
+                        'price' => $itemOriginal,
+                        'total' => $itemSubtotalOriginal,
+                    ];
+                });
+
+                $invoice = [
+                    'id' => $invoiceModel->id,
+                    'number' => $invoiceModel->number,
+                    'status' => $invoiceModel->status,
+                    'currency_code' => $documentCurrency,
+                    'total' => $originalAmount,
+                    'subtotal' => $documentTotals['original_amount'] ?? $invoiceModel->items->sum('subtotal_usd'),
+                    'tax' => $originalAmount - ($documentTotals['original_amount'] ?? $invoiceModel->items->sum('subtotal_usd')),
+                    'items' => $invoiceItems,
+                    'customer' => $invoiceModel->customer ? [
+                        'name' => $invoiceModel->customer->name,
+                        'email' => $invoiceModel->customer->email,
+                        'phone' => $invoiceModel->customer->phone,
+                        'address' => $invoiceModel->customer->address,
+                        'city' => $invoiceModel->customer->city,
+                    ] : null,
+                    'created_at' => $invoiceModel->created_at?->toISOString(),
+                ];
+            }
         }
 
         return Inertia::render('Checkout/Confirmation', [
-            'message' => __('app.confirmation.default_message'),
             'publicUrl' => $publicUrl,
-            'qrUrl' => $invoiceId ? route('qr.invoice', ['invoice' => $invoiceId]) : null,
+            'qrUrl' => $qrUrl,
             'invoiceNumber' => $invoiceNumber,
+            'invoiceId' => $invoiceId,
+            'isPaid' => $isPaid,
+            'invoice' => $invoice,
+            'rate' => $rate,
         ]);
     }
 
     public function createPayPalOrder(Request $request, PayPalService $payPalService): JsonResponse
     {
-        $payload = $request->validate([
-            'paymentMethod' => ['required', 'in:paypal'],
-            'checkoutCurrency' => ['required', 'string', 'max:10'],
-            'coupon_code' => ['nullable', 'string', 'max:50'],
-            'items' => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['required', 'exists:products,id'],
-            'items.*.quantity' => ['required', 'integer', 'min:1'],
-        ]);
+        // DEBUG: Ver qué está llegando
+        $debugData = [
+            'all_request' => $request->all(),
+            'items' => $request->input('items'),
+            'has_items' => $request->has('items'),
+            'items_count' => count($request->input('items', [])),
+        ];
+
+        // Si items está vacío o no es array válido, devolver error detallado
+        $items = $request->input('items', []);
+        if (empty($items) || !is_array($items)) {
+            return response()->json([
+                'message' => 'No items in cart or invalid items format',
+                'debug' => $debugData,
+            ], 422);
+        }
+
+        // Verificar que cada item tenga product_id y quantity
+        foreach ($items as $index => $item) {
+            if (empty($item['product_id'])) {
+                return response()->json([
+                    'message' => "Item {$index} missing product_id",
+                    'item' => $item,
+                    'debug' => $debugData,
+                ], 422);
+            }
+            // Verificar que el producto existe
+            $productExists = \DB::table('products')->where('id', $item['product_id'])->exists();
+            if (! $productExists) {
+                return response()->json([
+                    'message' => "Product ID {$item['product_id']} does not exist",
+                    'debug' => $debugData,
+                ], 422);
+            }
+        }
+
+        try {
+            $payload = $request->validate([
+                'paymentMethod' => ['required', 'in:paypal'],
+                'checkoutCurrency' => ['required', 'string', 'max:10'],
+                'coupon_code' => ['nullable', 'string', 'max:50'],
+                'items' => ['required', 'array', 'min:1'],
+                'items.*.product_id' => ['required', 'exists:products,id'],
+                'items.*.quantity' => ['required', 'integer', 'min:1'],
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed: '.json_encode($e->errors()),
+                'debug' => $debugData,
+            ], 422);
+        }
 
         if (! $payPalService->isEnabled()) {
+            \Log::error('PayPal Service Not Enabled', [
+                'config' => $payPalService->publicConfiguration(),
+            ]);
+
             return response()->json(['message' => __('app.checkout.error_paypal_unavailable')], 422);
         }
 
@@ -476,12 +595,23 @@ class CheckoutController extends Controller
             $baseForFees = max(0, $itemsTotalUsd - $discountUsd);
             $paymentFeeUsd = round($baseForFees * (((float) ($methodConfig['fee_percent'] ?? 0)) / 100), 2);
             $taxUsd = round($baseForFees * 0.15, 2);
-            $totalUsd = $baseForFees + $taxUsd + 200.0 + $paymentFeeUsd;
+            $totalUsd = $baseForFees + $taxUsd + $paymentFeeUsd;
             $checkoutCurrency = $this->resolveCheckoutCurrency((string) ($payload['checkoutCurrency'] ?? 'USD'));
             [$chargedAmount] = $this->convertUsdAmount(app(CurrencyService::class), $totalUsd, $checkoutCurrency);
 
             $general = Settings::get('general', ['company_name' => config('app.name')]);
-            $order = $payPalService->createOrder($chargedAmount, $checkoutCurrency, [
+
+            \Log::info('Creating PayPal Order', [
+                'amount' => $chargedAmount,
+                'currency' => $checkoutCurrency,
+                'items' => $payload['items'] ?? [],
+            ]);
+
+            // PayPal solo soporta USD (no VES), usar siempre USD
+            $paypalCurrency = 'USD';
+            $paypalAmount = $totalUsd;
+
+            $order = $payPalService->createOrder($paypalAmount, $paypalCurrency, [
                 'brand_name' => $general['company_name'] ?? config('app.name'),
                 'description' => 'Pedido en checkout',
                 'custom_id' => 'checkout-'.Str::lower(Str::random(10)),
@@ -493,10 +623,15 @@ class CheckoutController extends Controller
         } catch (ValidationException $e) {
             throw $e;
         } catch (\Throwable $e) {
-            report($e);
+            $errorMsg = $e->getMessage();
 
             return response()->json([
-                'message' => $e->getCode() === 422 ? $e->getMessage() : __('app.checkout.error_paypal_start'),
+                'message' => 'PayPal Error: '.$errorMsg,
+                'debug' => [
+                    'error' => $errorMsg,
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                ],
             ], 422);
         }
     }
@@ -509,16 +644,34 @@ class CheckoutController extends Controller
         ]);
 
         try {
-            $capture = $payPalService->captureOrder($payload['orderID']);
+            try {
+                $capture = $payPalService->captureOrder($payload['orderID']);
+            } catch (\Throwable $paypalErr) {
+                return response()->json([
+                    'message' => 'PayPal API Error: '.$paypalErr->getMessage(),
+                    'debug' => [
+                        'error' => $paypalErr->getMessage(),
+                        'file' => $paypalErr->getFile(),
+                        'line' => $paypalErr->getLine(),
+                    ],
+                ], 422);
+            }
+
             $captureId = $capture['purchase_units'][0]['payments']['captures'][0]['id'] ?? null;
             $captureStatus = (string) ($capture['status'] ?? '');
 
             if (! is_string($captureId) || $captureId === '') {
-                return response()->json(['message' => __('app.checkout.error_paypal_invalid_capture')], 422);
+                return response()->json([
+                    'message' => 'Invalid capture ID from PayPal',
+                    'capture_response' => $capture,
+                ], 422);
             }
 
             if ($captureStatus !== 'COMPLETED') {
-                return response()->json(['message' => __('app.checkout.error_paypal_capture_not_completed')], 422);
+                return response()->json([
+                    'message' => 'PayPal capture not completed. Status: '.$captureStatus,
+                    'capture_response' => $capture,
+                ], 422);
             }
 
             $captureAmount = (float) ($capture['purchase_units'][0]['payments']['captures'][0]['amount']['value'] ?? 0);
@@ -550,9 +703,21 @@ class CheckoutController extends Controller
         } catch (ValidationException $e) {
             throw $e;
         } catch (\Throwable $e) {
-            report($e);
+            \Log::error('PayPal Capture Error Details', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+            ]);
 
-            return response()->json(['message' => __('app.checkout.error_paypal_confirm')], 422);
+            return response()->json([
+                'message' => 'PayPal Capture Error: '.$e->getMessage(),
+                'debug' => [
+                    'error' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                ],
+            ], 422);
         }
     }
 
@@ -583,11 +748,12 @@ class CheckoutController extends Controller
             $baseForFees = max(0, $itemsTotalUsd - $discountUsd);
             $paymentFeeUsd = round($baseForFees * (((float) ($methodConfig['fee_percent'] ?? 0)) / 100), 2);
             $taxUsd = round($baseForFees * 0.15, 2);
-            $totalUsd = $baseForFees + $taxUsd + 200.0 + $paymentFeeUsd;
-            $checkoutCurrency = $this->resolveCheckoutCurrency((string) ($payload['checkoutCurrency'] ?? 'USD'));
-            [$chargedAmount] = $this->convertUsdAmount(app(CurrencyService::class), $totalUsd, $checkoutCurrency);
+            $totalUsd = $baseForFees + $taxUsd + $paymentFeeUsd;
+            // Stripe no soporta VES, usar siempre USD
+            $stripeCurrency = 'USD';
+            $stripeAmount = $totalUsd;
 
-            $intent = $stripeService->createPaymentIntent($chargedAmount, strtolower($checkoutCurrency), [
+            $intent = $stripeService->createPaymentIntent($stripeAmount, strtolower($stripeCurrency), [
                 'description' => 'Pedido en checkout',
                 'checkout_ref' => 'checkout-'.Str::lower(Str::random(10)),
             ]);
@@ -599,8 +765,17 @@ class CheckoutController extends Controller
         } catch (\Throwable $e) {
             report($e);
 
+            $errorMessage = $e->getMessage();
+            \Log::error('Stripe Payment Intent Error', [
+                'message' => $errorMessage,
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
             return response()->json([
                 'message' => __('app.checkout.error_stripe_prepare'),
+                'debug' => app()->environment('local', 'development') ? $errorMessage : null,
             ], 422);
         }
     }
@@ -658,7 +833,10 @@ class CheckoutController extends Controller
         $methods = collect($payments['methods'] ?? [])->map(function (array $method, string $key) {
             if ($key === 'paypal') {
                 unset($method['client_secret']);
-
+                // Inyectar client_id desde .env si no está en DB
+                if (empty($method['client_id'])) {
+                    $method['client_id'] = config('services.paypal.client_id');
+                }
                 if (! empty($method['client_id'])) {
                     $method['instructions'] = $method['description'] ?? $method['instructions'] ?? null;
                 }
@@ -666,6 +844,10 @@ class CheckoutController extends Controller
 
             if ($key === 'stripe') {
                 unset($method['secret_key']);
+                // Inyectar publishable_key desde .env si no está en DB
+                if (empty($method['publishable_key'])) {
+                    $method['publishable_key'] = config('services.stripe.publishable_key');
+                }
             }
 
             $method['enabled'] = filter_var($method['enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
@@ -724,7 +906,9 @@ class CheckoutController extends Controller
             'origin_banks' => [],
         ];
 
-        return array_replace_recursive($defaults, Settings::get('payments', $defaults) ?? []);
+        // Cargar configuración guardada y mezclar con defaults
+        $saved = Settings::get('payments', []);
+        return array_replace_recursive($defaults, is_array($saved) ? $saved : []);
     }
 
     protected function resolveCartAmounts(array $payload): array

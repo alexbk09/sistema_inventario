@@ -21,8 +21,10 @@ class PayPalService
 
     public function createOrder(float $amount, string $currency = 'USD', array $metadata = []): array
     {
+        $token = $this->accessToken();
+
         $response = $this->client()
-            ->withToken($this->accessToken())
+            ->withToken($token)
             ->post('/v2/checkout/orders', [
                 'intent' => 'CAPTURE',
                 'purchase_units' => [[
@@ -41,7 +43,9 @@ class PayPalService
             ]);
 
         if ($response->failed()) {
-            throw new RuntimeException('No se pudo crear la orden de PayPal.');
+            $errorBody = $response->json();
+            $errorMsg = $errorBody['message'] ?? $errorBody['error_description'] ?? 'Unknown PayPal error';
+            throw new RuntimeException("PayPal API Error: {$errorMsg} (Status: {$response->status()})");
         }
 
         return $response->json();
@@ -49,12 +53,26 @@ class PayPalService
 
     public function captureOrder(string $orderId): array
     {
-        $response = $this->client()
-            ->withToken($this->accessToken())
-            ->post("/v2/checkout/orders/{$orderId}/capture");
+        $isLive = Arr::get($this->config(), 'environment') === 'live';
+
+        $client = $this->client()
+            ->withToken($this->accessToken());
+
+        // En desarrollo local (XAMPP/Windows), deshabilitar SSL verify para sandbox
+        if (! $isLive && app()->environment('local', 'development')) {
+            $client = $client->withoutVerifying();
+        }
+
+        $response = $client
+            ->withHeaders([
+                'Content-Type' => 'application/json',
+            ])
+            ->post("/v2/checkout/orders/{$orderId}/capture", new \stdClass());
 
         if ($response->failed()) {
-            throw new RuntimeException('No se pudo capturar la orden de PayPal.');
+            $errorBody = $response->json();
+            $errorMsg = $errorBody['message'] ?? $errorBody['error_description'] ?? $errorBody['details'][0]['description'] ?? 'Unknown capture error';
+            throw new RuntimeException("PayPal Capture Error: {$errorMsg} (Status: {$response->status()})");
         }
 
         return $response->json();
@@ -72,7 +90,8 @@ class PayPalService
     protected function accessToken(): string
     {
         if (! $this->isEnabled()) {
-            throw new RuntimeException('PayPal no esta configurado correctamente.');
+            $config = $this->config();
+            throw new RuntimeException('PayPal not configured: enabled='.($config['enabled'] ?? 'null').', has_client_id='.(filled($config['client_id'] ?? null) ? 'yes' : 'no').', has_secret='.(filled($config['client_secret'] ?? null) ? 'yes' : 'no'));
         }
 
         $response = $this->client()
@@ -83,13 +102,15 @@ class PayPalService
             ]);
 
         if ($response->failed()) {
-            throw new RuntimeException('No se pudo autenticar con PayPal.');
+            $errorBody = $response->json();
+            $errorMsg = $errorBody['error_description'] ?? $errorBody['error'] ?? 'Unknown auth error';
+            throw new RuntimeException("PayPal Auth Failed: {$errorMsg} (Status: {$response->status()})");
         }
 
         $token = $response->json('access_token');
 
         if (! is_string($token) || $token === '') {
-            throw new RuntimeException('PayPal no devolvio un token valido.');
+            throw new RuntimeException('PayPal returned empty token.');
         }
 
         return $token;
@@ -97,17 +118,34 @@ class PayPalService
 
     protected function client(): PendingRequest
     {
-        $baseUrl = Arr::get($this->config(), 'environment') === 'live'
+        $isLive = Arr::get($this->config(), 'environment') === 'live';
+        $baseUrl = $isLive
             ? 'https://api-m.paypal.com'
             : 'https://api-m.sandbox.paypal.com';
 
-        return Http::baseUrl($baseUrl)
+        $client = Http::baseUrl($baseUrl)
             ->acceptJson()
             ->timeout(20);
+
+        // En desarrollo local (XAMPP/Windows), deshabilitar SSL verify para sandbox
+        if (! $isLive && app()->environment('local', 'development')) {
+            $client = $client->withoutVerifying();
+        }
+
+        return $client;
     }
 
     protected function config(): array
     {
-        return Settings::get('payments', ['methods' => []])['methods']['paypal'] ?? [];
+        // Configuración general desde Settings (no sensible)
+        $settingsConfig = Settings::get('payments', ['methods' => []])['methods']['paypal'] ?? [];
+
+        // Credenciales sensibles desde .env (seguro)
+        $envConfig = [
+            'client_id' => config('services.paypal.client_id'),
+            'client_secret' => config('services.paypal.client_secret'),
+        ];
+
+        return array_merge($settingsConfig, $envConfig);
     }
 }

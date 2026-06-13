@@ -13,7 +13,7 @@ class InvoiceContact extends Model
     protected $fillable = [
         'invoice_id',
         'full_name', 'email', 'phone', 'address', 'city', 'zip_code',
-        'payment_method', 'bank', 'origin_bank', 'reference', 'payment_date',
+        'payment_method', 'bank', 'origin_bank', 'operation_type', 'reference', 'payment_date',
     ];
 
     protected $casts = [
