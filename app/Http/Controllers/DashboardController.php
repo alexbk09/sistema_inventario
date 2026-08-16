@@ -271,11 +271,78 @@ class DashboardController extends Controller
             return $layaway;
         })->values();
 
+        // Créditos al límite o cerca del límite (uso >= 80%)
+        $creditAlerts = CreditAccount::with('customer:id,name')
+            ->where('status', 'active')
+            ->whereRaw('credit_limit_usd > 0')
+            ->whereRaw('balance_usd >= (credit_limit_usd * 0.80)')
+            ->orderByRaw('(balance_usd / credit_limit_usd) DESC')
+            ->take(8)
+            ->get(['id', 'customer_id', 'balance_usd', 'credit_limit_usd', 'status'])
+            ->map(fn ($c) => [
+                'id'          => $c->id,
+                'customer'    => $c->customer?->name ?? 'Sin cliente',
+                'balance_usd' => (float) $c->balance_usd,
+                'limit_usd'   => (float) $c->credit_limit_usd,
+                'pct'         => $c->credit_limit_usd > 0
+                    ? round(($c->balance_usd / $c->credit_limit_usd) * 100, 1)
+                    : 100,
+            ]);
+
+        // Recent activity feed — últimas 12 facturas + 5 RMAs
+        $recentInvoices = Invoice::with('customer:id,name')
+            ->latest()
+            ->limit(12)
+            ->get(['id','number','status','total_usd','customer_id','created_at'])
+            ->map(fn($i) => [
+                'type'        => 'invoice',
+                'id'          => $i->id,
+                'label'       => $i->number,
+                'sub'         => $i->customer?->name ?? 'Sin cliente',
+                'status'      => $i->status,
+                'amount_usd'  => (float) $i->total_usd,
+                'created_at'  => $i->created_at?->toISOString(),
+            ]);
+
+        $recentRmas = Rma::with('customer:id,name')
+            ->latest()
+            ->limit(5)
+            ->get(['id','number','status','customer_id','created_at'])
+            ->map(fn($r) => [
+                'type'       => 'rma',
+                'id'         => $r->id,
+                'label'      => $r->number ?? "RMA #{$r->id}",
+                'sub'        => $r->customer?->name ?? 'Sin cliente',
+                'status'     => $r->status,
+                'amount_usd' => null,
+                'created_at' => $r->created_at?->toISOString(),
+            ]);
+
+        $recentActivity = $recentInvoices->concat($recentRmas)
+            ->sortByDesc('created_at')
+            ->values()
+            ->take(12);
+
+        // Heatmap: ventas por día de semana (0=Dom..6=Sab) x hora (0-23) — últimos 90 días
+        $heatmapRows = Invoice::where('status', 'paid')
+            ->where('created_at', '>=', Carbon::now()->subDays(90))
+            ->selectRaw('DAYOFWEEK(created_at) - 1 as dow, HOUR(created_at) as hour, COUNT(*) as cnt')
+            ->groupBy('dow', 'hour')
+            ->get();
+
+        // Construir matriz [dow][hour] = cnt (7 días x 24 horas)
+        $heatmap = array_fill(0, 7, array_fill(0, 24, 0));
+        foreach ($heatmapRows as $row) {
+            $heatmap[(int)$row->dow][(int)$row->hour] = (int)$row->cnt;
+        }
+
         return inertia('Admin/Dashboard', [
             'filters' => [
                 'mode' => $mode,
                 'warehouse_id' => $warehouseId,
             ],
+            'recentActivity' => $recentActivity,
+            'creditAlerts'   => $creditAlerts,
             'charts' => [
                 'sales' => [
                     'labels' => $labels,
@@ -284,6 +351,7 @@ class DashboardController extends Controller
                     'currentByCurrency' => $currentSeriesByCurrency,
                     'previousByCurrency' => $previousSeriesByCurrency,
                 ],
+                'heatmap' => $heatmap,
             ],
             'metrics' => [
                 'total_invoices' => $totalInvoices,

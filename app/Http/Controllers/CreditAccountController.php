@@ -141,6 +141,36 @@ class CreditAccountController extends Controller
         ]);
     }
 
+    public function updateLimit(Request $request, CreditAccount $account, AdminMoneyService $adminMoneyService)
+    {
+        if (!$request->user() || !$request->user()->can('manage credits')) {
+            abort(403);
+        }
+
+        $data = $request->validate([
+            'credit_limit_usd' => ['nullable', 'numeric', 'min:0'],
+            'currency_code'    => ['nullable', 'string', 'max:10'],
+            'status'           => ['nullable', 'in:active,suspended,closed'],
+        ]);
+
+        if (array_key_exists('credit_limit_usd', $data)) {
+            if ($data['credit_limit_usd'] === null || $data['credit_limit_usd'] === '') {
+                $account->credit_limit_usd = null;
+            } else {
+                $currencyCode = strtoupper((string) ($data['currency_code'] ?? 'USD'));
+                $account->credit_limit_usd = $adminMoneyService->convertToBase((float) $data['credit_limit_usd'], $currencyCode);
+            }
+        }
+
+        if (!empty($data['status'])) {
+            $account->status = $data['status'];
+        }
+
+        $account->save();
+
+        return back()->with('success', 'Límite de crédito actualizado.');
+    }
+
     public function storeMovement(Request $request, CreditAccount $account, AdminNotificationService $notificationService, AdminMoneyService $adminMoneyService)
     {
         if (!$request->user() || !$request->user()->can('manage credits')) {

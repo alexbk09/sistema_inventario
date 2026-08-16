@@ -3,6 +3,7 @@ import { Head, Link, usePage } from '@inertiajs/react'
 import { useCart } from '@/Hooks/useCart'
 import { useEffect, useState } from 'react'
 import { ShoppingCart, ArrowLeft, ChevronLeft, ChevronRight, Star } from 'lucide-react'
+import Breadcrumb from '@/Components/shop/Breadcrumb.jsx'
 import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates'
 import { useI18n } from '@/Hooks/useI18n'
 
@@ -80,7 +81,7 @@ export default function ProductShow({ product, related = [], rate }) {
       name: product.name,
       price: priceUsd,
       image: selectedImage?.url ?? images[0]?.url ?? product.image ?? '',
-      category: product.category ?? (Array.isArray(product.categories) ? (product.categories[0]?.name ?? product.categories[0]) : undefined),
+      category: product.category?.name ?? (Array.isArray(product.categories) ? (product.categories[0]?.name ?? product.categories[0]) : undefined),
     })
   }
 
@@ -135,20 +136,22 @@ export default function ProductShow({ product, related = [], rate }) {
     setTouchStartX(null)
   }
 
+  const breadcrumbItems = [
+    { label: t('shop.title', 'Tienda'), href: route('shop.index') },
+    ...(product.category?.name ? [{
+      label: product.category.name,
+      href: route('shop.index') + '?category=' + (product.category.id ?? ''),
+    }] : []),
+    { label: product.name },
+  ]
+
   return (
     <GuestLayout>
       <Head title={product.name} />
       <main className="flex flex-col min-h-screen bg-background">
         <div className="flex-1">
           <div className="max-w-7xl mx-auto px-4 py-8">
-            <div className="mb-4 flex items-center justify-between">
-              <Link
-                href={route('shop.index')}
-                className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary"
-              >
-                <ArrowLeft className="w-4 h-4" /> {t('product.back_to_shop', 'Volver a la tienda')}
-              </Link>
-            </div>
+            <Breadcrumb items={breadcrumbItems} />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {/* Galería */}
@@ -229,7 +232,7 @@ export default function ProductShow({ product, related = [], rate }) {
               <div className="flex flex-col gap-4">
                 <div>
                   <p className="text-xs text-accent font-semibold uppercase mb-1 tracking-wide">
-                    {product.category ?? (Array.isArray(product.categories) ? (product.categories[0]?.name ?? product.categories[0]) : '')}
+                    {product.category?.name ?? (Array.isArray(product.categories) ? (product.categories[0]?.name ?? product.categories[0]) : '')}
                   </p>
                   <h1 className="text-3xl font-bold text-foreground mb-2">{product.name}</h1>
                   <div className="flex items-center gap-2 mb-2">

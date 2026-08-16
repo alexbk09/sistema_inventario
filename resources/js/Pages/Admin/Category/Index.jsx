@@ -2,14 +2,15 @@ import { Head, router } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.jsx';
 import AdminTable from '@/Components/admin/provider/AdminTableProviders.jsx';
-import AdminFilters from '@/Components/common/AdminFilters.jsx';
-import AdminIndexShell from '@/Components/admin/AdminIndexShell.jsx';
+import PageHeader from '@/Components/admin/PageHeader.jsx';
+import StatsCard from '@/Components/admin/StatsCard.jsx';
 import CategoryModal from '@/Components/admin/category/CategoryModal.jsx';
 import ConfirmDialog from '@/Components/common/ConfirmDialog.jsx';
 import toast from 'react-hot-toast';
 import { useI18n } from '@/Hooks/useI18n';
+import { Tag, Package, FileText, Plus, Search, X } from 'lucide-react';
 
-export default function Index({ categories, filters }) {
+export default function Index({ categories, filters, summary = {} }) {
   const { t } = useI18n();
   const { data } = categories;
   const page = categories.current_page ?? categories?.meta?.current_page ?? 1;
@@ -70,42 +71,126 @@ export default function Index({ categories, filters }) {
   };
 
   const columns = [
-    { key: 'name', label: t('admin.categories.index.table.name', 'Nombre'), width: '40%' },
-    { key: 'slug', label: t('admin.categories.index.table.slug', 'Slug'), width: '30%' },
-    { key: 'description', label: t('admin.categories.index.table.description', 'Descripción'), width: '30%', render: (v) => (<p className="truncate" title={v}>{v || t('admin.categories.values.empty', '-')}</p>) },
+    {
+      key: 'name',
+      label: t('admin.categories.index.table.name', 'Nombre'),
+      width: '35%',
+      render: (value) => (
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-lg bg-violet-50 dark:bg-violet-900/20 flex items-center justify-center shrink-0">
+            <Tag className="w-3.5 h-3.5 text-violet-600" />
+          </div>
+          <span className="font-medium text-foreground text-sm">{value}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'slug',
+      label: t('admin.categories.index.table.slug', 'Slug'),
+      width: '30%',
+      render: (v) => (
+        <code className="inline-flex items-center px-2 py-0.5 rounded bg-muted text-xs font-mono text-muted-foreground">
+          {v}
+        </code>
+      ),
+    },
+    {
+      key: 'description',
+      label: t('admin.categories.index.table.description', 'Descripción'),
+      width: '35%',
+      render: (v) => (
+        <p className="truncate text-sm text-muted-foreground" title={v}>
+          {v || <span className="italic text-muted-foreground/50">{t('admin.categories.values.empty', 'Sin descripción')}</span>}
+        </p>
+      ),
+    },
   ];
 
   return (
     <AuthenticatedLayout>
       <Head title={t('admin.categories.index.page_title', 'Categorías')} />
-      <AdminIndexShell
-        title={t('admin.categories.index.hero_title', 'Ordena categorías con un flujo visual más claro para catálogo')}
-        description={t('admin.categories.index.hero_description', 'La vista concentra búsqueda, alta rápida y mantenimiento de categorías dentro del mismo sistema de listados del backoffice.')}
-        stats={[
-          { label: t('admin.categories.index.stats.visible', 'Categorías visibles'), value: data.length },
-          { label: t('admin.categories.index.stats.page', 'Página'), value: `${page}/${totalPages}` },
-          { label: t('admin.categories.index.stats.search', 'Búsqueda'), value: debounced ? t('admin.categories.values.active_female', 'Activa') : t('admin.categories.values.general', 'General') },
+
+      <PageHeader
+        title={t('admin.categories.index.page_title', 'Categorías')}
+        description={t('admin.categories.index.context_description', 'Gestiona el árbol de categorías del catálogo de productos.')}
+        icon={Tag}
+        breadcrumbs={[
+          { label: 'Dashboard', href: route('dashboard') },
+          { label: t('admin.categories.index.page_title', 'Categorías') },
         ]}
-        contextTitle={t('admin.categories.index.context_title', 'Categorías')}
-        contextDescription={t('admin.categories.index.context_description', 'Mantén limpio el árbol comercial del catálogo sin separar la tabla principal de las acciones frecuentes.')}
-        contextItems={[
-          { label: t('admin.categories.index.context_items.visible_results', 'Resultados visibles'), value: data.length },
-          { label: t('admin.categories.index.context_items.filter', 'Filtro'), value: debounced || t('admin.categories.values.no_filter', 'Sin filtro') },
-          { label: t('admin.categories.index.context_items.modal', 'Modal'), value: isModalOpen ? t('admin.categories.values.open', 'Abierto') : t('admin.categories.values.available', 'Disponible') },
-        ]}
-        primaryAction={
+        actions={
           <button
             type="button"
             onClick={handleAddNew}
-            className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
           >
+            <Plus className="w-4 h-4" />
             {t('admin.categories.index.actions.new', 'Nueva categoría')}
           </button>
         }
-        filters={<AdminFilters searchPlaceholder={t('admin.categories.index.filters.search_placeholder', 'Buscar por nombre o slug')} searchValue={search} onSearchChange={setSearch} />}
-      >
-        <AdminTable columns={columns} data={data} page={page} totalPages={totalPages} onPageChange={handlePageChange} onEdit={handleEdit} onDelete={handleDelete} />
-      </AdminIndexShell>
+      />
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <StatsCard
+          label={t('admin.categories.index.stats.total', 'Total categorías')}
+          value={summary?.total ?? categories?.total ?? data.length}
+          icon={Tag}
+          iconColor="text-violet-600"
+          iconBg="bg-violet-50 dark:bg-violet-900/20"
+          sparkColor="#7C3AED"
+        />
+        <StatsCard
+          label={t('admin.categories.index.stats.with_products', 'Con productos')}
+          value={summary?.with_products ?? 0}
+          icon={Package}
+          iconColor="text-blue-600"
+          iconBg="bg-blue-50 dark:bg-blue-900/20"
+          sparkColor="#3B82F6"
+        />
+        <StatsCard
+          label={t('admin.categories.index.stats.with_description', 'Con descripción')}
+          value={summary?.with_description ?? 0}
+          icon={FileText}
+          iconColor="text-emerald-600"
+          iconBg="bg-emerald-50 dark:bg-emerald-900/20"
+          sparkColor="#10B981"
+        />
+      </div>
+
+      <div className="bg-card border border-border rounded-xl overflow-hidden">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
+          <div className="flex-1 relative">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t('admin.categories.index.filters.search_placeholder', 'Buscar por nombre o slug...')}
+              className="w-full pl-9 pr-4 py-2 text-sm border border-border rounded-lg bg-background focus:ring-2 focus:ring-ring focus:outline-none"
+            />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            {search && (
+              <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          <span className="text-xs text-muted-foreground whitespace-nowrap">{data.length} {t('admin.categories.values.results', 'resultados')}</span>
+        </div>
+        <div className="p-4">
+          <AdminTable
+            columns={columns}
+            data={data}
+            page={page}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            emptyPreset="products"
+            emptyTitle={t('admin.categories.index.empty.title', 'Sin categorías')}
+            emptyDescription={t('admin.categories.index.empty.description', 'Crea tu primera categoría para organizar el catálogo.')}
+          />
+        </div>
+      </div>
 
       <CategoryModal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); setEditingCategory(null); }} onSave={handleSave} editingCategory={editingCategory} />
 

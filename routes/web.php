@@ -21,10 +21,15 @@ use App\Http\Controllers\QrController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\AdminNotificationController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\CustomerNoteController;
 use App\Http\Controllers\Reports\SalesReportController;
 use App\Http\Controllers\Reports\InventoryReportController;
 use App\Http\Controllers\Reports\InventoryKardexController;
 use App\Http\Controllers\Reports\InventoryByWarehouseController;
+use App\Http\Controllers\Reports\ProfitabilityReportController;
+use App\Http\Controllers\Reports\CashFlowReportController;
+use App\Http\Controllers\Reports\InventoryAgeReportController;
+use App\Http\Controllers\Reports\ReportsDashboardController;
 use App\Http\Controllers\Reports\CreditReportController;
 use App\Http\Controllers\Reports\CreditMovementsReportController;
 use App\Http\Controllers\Reports\LayawayReportController;
@@ -74,6 +79,7 @@ Route::middleware(['auth', 'verified', 'role:admin|supervisor|cashier|warehouse'
     Route::get('/admin/products/{product}/edit', [ProductController::class, 'edit'])->name('admin.products.edit');
     Route::put('/admin/products/{product}', [ProductController::class, 'update'])->name('admin.products.update');
     Route::delete('/admin/products/{product}', [ProductController::class, 'destroy'])->name('admin.products.destroy');
+    Route::post('/admin/products/bulk-destroy', [ProductController::class, 'bulkDestroy'])->name('admin.products.bulk-destroy');
 
     Route::delete('/admin/product-images/{image}', [ProductImageController::class, 'destroy'])->name('admin.product-images.destroy');
 
@@ -106,6 +112,10 @@ Route::middleware(['auth', 'verified', 'role:admin|supervisor|cashier|warehouse'
         ->name('admin.audit.index');
 
     // Reportes
+    Route::get('/admin/reports', [ReportsDashboardController::class, 'index'])
+        ->middleware('permission:view invoices')
+        ->name('admin.reports.dashboard');
+
     Route::get('/admin/reports/sales', [SalesReportController::class, 'index'])
         ->middleware('permission:view invoices')
         ->name('admin.reports.sales.index');
@@ -142,6 +152,10 @@ Route::middleware(['auth', 'verified', 'role:admin|supervisor|cashier|warehouse'
         ->middleware('permission:view products')
         ->name('admin.reports.inventory.kardex');
 
+    Route::get('/admin/reports/inventory/kardex/export', [InventoryKardexController::class, 'export'])
+        ->middleware('permission:view products')
+        ->name('admin.reports.inventory.kardex.export');
+
     Route::get('/admin/reports/inventory/by-warehouse', [InventoryByWarehouseController::class, 'index'])
         ->middleware('permission:view products')
         ->name('admin.reports.inventory.by_warehouse');
@@ -149,6 +163,18 @@ Route::middleware(['auth', 'verified', 'role:admin|supervisor|cashier|warehouse'
     Route::get('/admin/reports/inventory/rotation', [InventoryRotationController::class, 'index'])
         ->middleware('permission:view products')
         ->name('admin.reports.inventory.rotation');
+
+    Route::get('/admin/reports/profitability', [ProfitabilityReportController::class, 'index'])
+        ->middleware('permission:view invoices')
+        ->name('admin.reports.profitability');
+
+    Route::get('/admin/reports/cash-flow', [CashFlowReportController::class, 'index'])
+        ->middleware('permission:view invoices')
+        ->name('admin.reports.cash_flow');
+
+    Route::get('/admin/reports/inventory-age', [InventoryAgeReportController::class, 'index'])
+        ->middleware('permission:view products')
+        ->name('admin.reports.inventory_age');
 
     Route::get('/admin/reports/credits', [CreditReportController::class, 'index'])
         ->middleware('permission:view credits')
@@ -174,6 +200,10 @@ Route::middleware(['auth', 'verified', 'role:admin|supervisor|cashier|warehouse'
     Route::get('/admin/customers', [CustomerController::class, 'index'])->name('admin.customers.index');
     Route::post('/admin/customers', [CustomerController::class, 'store'])->name('admin.customers.store');
     Route::get('/admin/customers/{customer}', [CustomerController::class, 'show'])->name('admin.customers.show');
+    Route::post('/admin/customers/{customer}/notes', [CustomerNoteController::class, 'store'])->name('admin.customers.notes.store');
+    Route::put('/admin/customers/{customer}/notes/{note}', [CustomerNoteController::class, 'update'])->name('admin.customers.notes.update');
+    Route::delete('/admin/customers/{customer}/notes/{note}', [CustomerNoteController::class, 'destroy'])->name('admin.customers.notes.destroy');
+    Route::patch('/admin/customers/{customer}/notes/{note}/pin', [CustomerNoteController::class, 'togglePin'])->name('admin.customers.notes.pin');
 
     // Usuarios
     Route::get('/admin/users', [UserController::class, 'index'])->name('admin.users.index');
@@ -181,12 +211,22 @@ Route::middleware(['auth', 'verified', 'role:admin|supervisor|cashier|warehouse'
 
     // Facturas
     Route::get('/admin/invoices', [InvoiceController::class, 'index'])->name('admin.invoices.index');
+    Route::get('/admin/invoices/kanban', [InvoiceController::class, 'kanban'])->name('admin.invoices.kanban');
     Route::get('/admin/invoices/create', [InvoiceController::class, 'create'])->name('admin.invoices.create');
+    Route::get('/admin/invoices/pos', [InvoiceController::class, 'pos'])->name('admin.invoices.pos');
+    Route::get('/admin/invoices/export', [\App\Http\Controllers\Reports\InvoiceExportController::class, '__invoke'])
+        ->name('admin.invoices.export')
+        ->middleware('permission:view invoices');
     Route::post('/admin/invoices', [InvoiceController::class, 'store'])->name('admin.invoices.store');
+    Route::get('/admin/invoices/{invoice}', [InvoiceController::class, 'show'])->name('admin.invoices.show');
     Route::put('/admin/invoices/{invoice}', [InvoiceController::class, 'update'])->name('admin.invoices.update');
     Route::get('/admin/invoices/{invoice}/download-pdf', [InvoiceController::class, 'downloadPdf'])
         ->name('admin.invoices.download-pdf')
         ->middleware('permission:view invoices');
+    Route::patch('/admin/invoices/{invoice}/internal-notes', [InvoiceController::class, 'updateInternalNotes'])
+        ->name('admin.invoices.internal-notes.update');
+    Route::post('/admin/invoices/{invoice}/send-email', [InvoiceController::class, 'sendEmail'])
+        ->name('admin.invoices.send-email');
 
     // Devoluciones y Garantías (RMA)
     Route::get('/admin/rmas', [RmaController::class, 'index'])->name('admin.rmas.index');
@@ -215,14 +255,30 @@ Route::middleware(['auth', 'verified', 'role:admin|supervisor|cashier|warehouse'
         Route::get('/admin/credits', [CreditAccountController::class, 'index'])->name('admin.credits.index');
         Route::post('/admin/credits', [CreditAccountController::class, 'store'])->name('admin.credits.store');
     Route::get('/admin/credits/{account}', [CreditAccountController::class, 'show'])->name('admin.credits.show');
+    Route::patch('/admin/credits/{account}/limit', [CreditAccountController::class, 'updateLimit'])->name('admin.credits.limit.update');
     Route::post('/admin/credits/{account}/movements', [CreditAccountController::class, 'storeMovement'])->name('admin.credits.movements.store');
 });
 
-Route::get('/', [HomeController::class, 'index'])->name('home');
+Route::get('/', [\App\Http\Controllers\Public\HomeController::class, 'index'])->name('home');
 
 Route::get('/shop', [ShopController::class, 'index'])->name('shop.index');
 
 Route::get('/product/{product}', [ShopController::class, 'show'])->name('product.show');
+
+// Reviews
+Route::get('/product/{product}/reviews', [ReviewController::class, 'index'])->name('reviews.index');
+
+// Wishlist (requiere autenticación)
+Route::middleware('auth')->group(function () {
+    Route::get('/wishlist', [WishlistController::class, 'index'])->name('wishlist.index');
+    Route::post('/wishlist', [WishlistController::class, 'store'])->name('wishlist.store');
+    Route::delete('/wishlist/{wishlist}', [WishlistController::class, 'destroy'])->name('wishlist.destroy');
+
+    // Reviews (requiere autenticación)
+    Route::post('/product/{product}/reviews', [ReviewController::class, 'store'])->name('reviews.store');
+    Route::put('/reviews/{review}', [ReviewController::class, 'update'])->name('reviews.update');
+    Route::delete('/reviews/{review}', [ReviewController::class, 'destroy'])->name('reviews.destroy');
+});
 
 // Checkout protegido (requiere autenticación)
 Route::middleware('auth')->group(function () {

@@ -1,7 +1,8 @@
 import React, { memo } from "react"
-
-import { ChevronLeft, ChevronRight, Edit, Trash2, Eye } from 'lucide-react'
+import { Edit, Trash2, Eye } from 'lucide-react'
 import AdminPagination from '@/Components/admin/AdminPagination.jsx'
+import EmptyState from '@/Components/admin/EmptyState.jsx'
+import TableSkeleton from '@/Components/admin/TableSkeleton.jsx'
 import { useI18n } from '@/Hooks/useI18n'
 
 function AdminTable({
@@ -14,104 +15,114 @@ function AdminTable({
   onDelete,
   onView,
   loading = false,
+  emptyTitle,
+  emptyDescription,
+  emptyPreset = 'default',
 }) {
   const { t } = useI18n()
+  const colSpan = columns.length + (onEdit || onDelete || onView ? 1 : 0)
 
   return (
     <div className="space-y-4">
       <div className="overflow-x-auto rounded-lg border border-border">
-        <table className="w-full">
-          <thead className="bg-muted border-b border-border">
-            <tr>
+        {loading ? (
+          <>
+            <div className="bg-muted border-b border-border px-4 py-3 flex gap-4">
               {columns.map((col) => (
-                <th
-                  key={String(col.key)}
-                  className="px-4 py-3 text-left text-sm font-semibold text-foreground"
-                  style={{ width: col.width }}
-                >
-                  {col.label}
-                </th>
+                <div key={String(col.key)} className="h-4 bg-border/60 rounded" style={{ width: col.width ?? '80px' }} />
               ))}
-              {(onEdit || onDelete || onView) && (
-                <th className="px-4 py-3 text-left text-sm font-semibold text-foreground">
-                  {t('admin.common.table.actions', 'Actions')}
-                </th>
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
+            </div>
+            <TableSkeleton rows={6} cols={columns.length} />
+          </>
+        ) : data.length === 0 ? (
+          <EmptyState
+            title={emptyTitle ?? t('admin.common.table.empty', 'Sin registros')}
+            description={emptyDescription ?? t('admin.common.table.empty_desc', 'No hay datos que coincidan con tu búsqueda o filtros.')}
+            preset={emptyPreset}
+            size="md"
+          />
+        ) : (
+          <table className="w-full">
+            <thead className="bg-muted border-b border-border">
               <tr>
-                <td colSpan={columns.length + (onEdit || onDelete || onView ? 1 : 0)} className="px-4 py-8 text-center text-muted-foreground">
-                  {t('admin.common.table.loading', 'Loading...')}
-                </td>
+                {columns.map((col) => (
+                  <th
+                    key={String(col.key)}
+                    className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide"
+                    style={{ width: col.width }}
+                  >
+                    {col.label}
+                  </th>
+                ))}
+                {(onEdit || onDelete || onView) && (
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide w-24">
+                    {t('admin.common.table.actions', 'Acciones')}
+                  </th>
+                )}
               </tr>
-            ) : data.length === 0 ? (
-              <tr>
-                <td colSpan={columns.length + (onEdit || onDelete || onView ? 1 : 0)} className="px-4 py-8 text-center text-muted-foreground">
-                  {t('admin.common.table.empty', 'No records found')}
-                </td>
-              </tr>
-            ) : (
-                data.map((row) => (
-                  <Row
-                    key={row.id}
-                    row={row}
-                    columns={columns}
-                    onEdit={onEdit}
-                    onDelete={onDelete}
-                    onView={onView}
-                    t={t}
-                  />
-                ))
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {data.map((row) => (
+                <Row
+                  key={row.id}
+                  row={row}
+                  columns={columns}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                  onView={onView}
+                  t={t}
+                />
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
-      <AdminPagination page={page} totalPages={totalPages} onPageChange={onPageChange} />
+      {!loading && data.length > 0 && (
+        <AdminPagination page={page} totalPages={totalPages} onPageChange={onPageChange} />
+      )}
     </div>
   )
 }
 
   const Row = memo(function Row({ row, columns, onEdit, onDelete, onView, t }) {
     return (
-      <tr key={row.id} className="border-b border-border hover:bg-muted/50 transition">
+      <tr className="border-b border-border last:border-0 hover:bg-muted/40 transition-colors group">
         {columns.map((col) => (
           <td key={String(col.key)} className="px-4 py-3 text-sm text-foreground">
             {col.render
               ? col.render(row[col.key], row)
-              : String(row[col.key] || t('admin.common.table.values.empty_dash', '—'))}
+              : String(row[col.key] ?? '—')}
           </td>
         ))}
         {(onEdit || onDelete || onView) && (
           <td className="px-4 py-3 text-sm">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
               {onView && (
                 <button
                   onClick={() => onView(row)}
-                  className="p-1 hover:bg-muted rounded transition text-foreground"
-                  title={t('admin.common.table.view', 'View')}
+                  className="p-1.5 hover:bg-primary/10 rounded-md transition text-muted-foreground hover:text-primary"
+                  title={t('admin.common.table.view', 'Ver')}
                 >
-                  <Eye className="w-4 h-4" />
+                  <Eye className="w-3.5 h-3.5" />
                 </button>
               )}
               {onEdit && (
                 <button
                   onClick={() => onEdit(row)}
-                  className="p-1 hover:bg-muted rounded transition text-accent"
-                  title={t('admin.common.table.edit', 'Edit')}
+                  className="p-1.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition text-muted-foreground hover:text-blue-600"
+                  title={t('admin.common.table.edit', 'Editar')}
                 >
-                  <Edit className="w-4 h-4" />
+                  <Edit className="w-3.5 h-3.5" />
                 </button>
               )}
               {onDelete && (
                 <button
                   onClick={() => onDelete(row)}
-                  className="p-1 hover:bg-destructive/10 rounded transition text-destructive"
-                  title={t('admin.common.table.delete', 'Delete')}
+                  className="p-1.5 hover:bg-destructive/10 rounded-md transition text-muted-foreground hover:text-destructive"
+                  title={t('admin.common.table.delete', 'Eliminar')}
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>

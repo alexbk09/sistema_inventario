@@ -23,14 +23,19 @@ class ProviderController extends Controller
                 });
             })
             ->latest()
-            ->paginate(12)
+            ->paginate(15)
             ->withQueryString();
+
+        $summary = [
+            'total'      => Provider::count(),
+            'with_email' => Provider::whereNotNull('email')->where('email', '!=', '')->count(),
+            'with_phone' => Provider::whereNotNull('phone')->where('phone', '!=', '')->count(),
+        ];
 
         return Inertia::render('Admin/Provider/Index', [
             'providers' => $providers,
-            'filters' => [
-                'search' => $search,
-            ],
+            'filters'   => ['search' => $search],
+            'summary'   => $summary,
         ]);
     }
 

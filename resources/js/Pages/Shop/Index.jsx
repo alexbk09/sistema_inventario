@@ -2,8 +2,11 @@ import GuestLayout from '@/Layouts/GuestLayout.jsx';
 import ProductCard from '@/Components/ProductCard.jsx'
 import ProductFilters from '@/Components/shop/ProductFilters.jsx'
 import ShoppingCart from '@/Components/shop/ShoppingCart.jsx'
+import QuickView from '@/Components/shop/QuickView.jsx'
+import ProductCompare from '@/Components/shop/ProductCompare.jsx'
+import Breadcrumb from '@/Components/shop/Breadcrumb.jsx'
 import { useState, useMemo } from 'react'
-import { ShoppingBag, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ShoppingBag, ChevronLeft, ChevronRight, Scale } from 'lucide-react'
 import { useCart } from '@/Hooks/useCart'
 import { useI18n } from '@/Hooks/useI18n'
 import { router } from '@inertiajs/react'
@@ -21,17 +24,21 @@ const ensureArray = (value) => {
   return []
 }
 
-export default function ShopIndex({ products = {}, categories = [], canLogin }) {
+export default function ShopIndex({ products = {}, categories = [], filters = {}, canLogin }) {
   const { t } = useI18n()
-  const [filters, setFilters] = useState({
+  const [localFilters, setLocalFilters] = useState({
     categories: [],
     priceRange: [0, 5000],
-    search: '',
-    sortBy: 'relevance',
-    inStockOnly: false,
+    search: filters.search || '',
+    sortBy: filters.sort || 'latest',
+    inStockOnly: filters.in_stock === 'true' || filters.in_stock === true,
     tags: [],
   })
   const [isCartOpen, setIsCartOpen] = useState(false)
+  const [quickViewProduct, setQuickViewProduct] = useState(null)
+  const [isQuickViewOpen, setIsQuickViewOpen] = useState(false)
+  const [compareProducts, setCompareProducts] = useState([])
+  const [isCompareOpen, setIsCompareOpen] = useState(false)
   const { itemCount } = useCart()
   const [productList, setProductList] = useState(() => ensureArray(products.data))
   const [page, setPage] = useState(products.current_page || 1)
@@ -39,20 +46,28 @@ export default function ShopIndex({ products = {}, categories = [], canLogin }) 
   const [loadingMore, setLoadingMore] = useState(false)
   const safeCategories = ensureArray(categories)
 
-  // Cuando cambian los productos (por navegación o filtros), actualiza el listado
+  // Sincronizar filtros del servidor con estado local
   useEffect(() => {
-    setProductList(ensureArray(products.data))
-    setPage(products.current_page || 1)
-    setLastPage(products.last_page || 1)
-  }, [products])
+    setLocalFilters({
+      categories: filters.category ? [filters.category] : [],
+      priceRange: [
+        filters.min_price ? parseFloat(filters.min_price) : 0,
+        filters.max_price ? parseFloat(filters.max_price) : 5000
+      ],
+      search: filters.search || '',
+      sortBy: filters.sort || 'latest',
+      inStockOnly: filters.in_stock === 'true' || filters.in_stock === true,
+      tags: [],
+    })
+  }, [filters])
 
   // Filtrar y ordenar productos (solo sobre los cargados)
   const filteredProducts = useMemo(() => {
     let result = [...productList]
 
     // Filtro por búsqueda (nombre, descripción, SKU, código de barras)
-    if (filters.search) {
-      const term = filters.search.toLowerCase()
+    if (localFilters.search) {
+      const term = localFilters.search.toLowerCase()
       result = result.filter((p) => {
         const name = p.name?.toLowerCase() ?? ''
         const desc = p.description?.toLowerCase() ?? ''
@@ -68,32 +83,32 @@ export default function ShopIndex({ products = {}, categories = [], canLogin }) 
     }
 
     // Filtro por categorías
-    if (filters.categories.length > 0) {
+    if (localFilters.categories.length > 0) {
       result = result.filter((p) => {
         const productCategories = (p.categories || []).map((c) => (typeof c === 'string' ? c : c.name))
-        return filters.categories.some((c) => productCategories.includes(c))
+        return localFilters.categories.some((c) => productCategories.includes(c))
       })
     }
 
     // Filtro por rango de precio
     result = result.filter(
-      (p) => p.price >= filters.priceRange[0] && p.price <= filters.priceRange[1]
+      (p) => p.price >= localFilters.priceRange[0] && p.price <= localFilters.priceRange[1]
     )
 
     // Filtro por disponibilidad (solo con stock)
-    if (filters.inStockOnly) {
+    if (localFilters.inStockOnly) {
       result = result.filter((p) => (p.stock ?? 0) > 0)
     }
 
     // Filtro por etiquetas simples (por ahora: destacados)
-    if (filters.tags && filters.tags.length > 0) {
-      if (filters.tags.includes('featured')) {
+    if (localFilters.tags && localFilters.tags.length > 0) {
+      if (localFilters.tags.includes('featured')) {
         result = result.filter((p) => !!p.is_featured)
       }
     }
 
     // Ordenamiento
-    switch (filters.sortBy) {
+    switch (localFilters.sortBy) {
       case 'price-asc':
         result.sort((a, b) => a.price - b.price)
         break
@@ -116,7 +131,50 @@ export default function ShopIndex({ products = {}, categories = [], canLogin }) 
     }
 
     return result
-  }, [filters, productList])
+  }, [localFilters, productList])
+
+  // Aplicar filtros con navegación URL
+  const applyFilters = (newFilters) => {
+    const urlParams = new URLSearchParams()
+    
+    if (newFilters.search) urlParams.set('search', newFilters.search)
+    if (newFilters.categories.length > 0) urlParams.set('category', newFilters.categories[0])
+    if (newFilters.priceRange[0] > 0) urlParams.set('min_price', newFilters.priceRange[0])
+    if (newFilters.priceRange[1] < 5000) urlParams.set('max_price', newFilters.priceRange[1])
+    if (newFilters.inStockOnly) urlParams.set('in_stock', 'true')
+    if (newFilters.sortBy !== 'latest') urlParams.set('sort', newFilters.sortBy)
+    
+    urlParams.set('page', 1)
+    
+    router.get(route('shop.index') + '?' + urlParams.toString(), {}, {
+      preserveScroll: false,
+      preserveState: false,
+    })
+  }
+
+  // Abrir QuickView
+  const handleQuickView = (product) => {
+    setQuickViewProduct(product)
+    setIsQuickViewOpen(true)
+  }
+
+  // Agregar producto a comparación
+  const handleAddToCompare = (product) => {
+    if (compareProducts.find(p => p.id === product.id)) {
+      // Ya está en comparación, removerlo
+      setCompareProducts(prev => prev.filter(p => p.id !== product.id))
+    } else if (compareProducts.length < 3) {
+      // Agregar si hay menos de 3
+      setCompareProducts(prev => [...prev, product])
+    }
+  }
+
+  // Abrir modal de comparación
+  const handleOpenCompare = () => {
+    if (compareProducts.length > 0) {
+      setIsCompareOpen(true)
+    }
+  }
 
   // Cargar más productos (siguiente página)
   const handleLoadMore = () => {
@@ -200,32 +258,45 @@ export default function ShopIndex({ products = {}, categories = [], canLogin }) 
 
       <div className="flex-1">
         <div className="max-w-7xl mx-auto px-4 py-8">
+          <Breadcrumb items={[{ label: t('shop.title', 'Tienda') }]} />
           {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold text-foreground mb-2">
-              {t('shop.title', 'Tienda')}
-            </h1>
-            <p className="text-muted-foreground">
-              {t('shop.results', `${filteredProducts.length} producto${filteredProducts.length !== 1 ? 's' : ''}`, { count: filteredProducts.length })}
-            </p>
+          <div className="mb-8 mt-2 flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-bold text-foreground mb-2">
+                {t('shop.title', 'Tienda')}
+              </h1>
+              <p className="text-muted-foreground">
+                {t('shop.results', `${filteredProducts.length} producto${filteredProducts.length !== 1 ? 's' : ''}`, { count: filteredProducts.length })}
+              </p>
+            </div>
+            {compareProducts.length > 0 && (
+              <button
+                onClick={handleOpenCompare}
+                className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+              >
+                <Scale className="w-5 h-5" />
+                {t('shop.compare_button', 'Comparar')} ({compareProducts.length}/3)
+              </button>
+            )}
           </div>
 
           {/* Main Content */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             {/* Filtros */}
             <ProductFilters
-              onFilterChange={setFilters}
+              onFilterChange={applyFilters}
               onReset={() =>
-                setFilters({
+                applyFilters({
                   categories: [],
                   priceRange: [0, 5000],
                   search: '',
-                  sortBy: 'relevance',
+                  sortBy: 'latest',
                   inStockOnly: false,
                   tags: [],
                 })
               }
               categories={safeCategories}
+              initialFilters={localFilters}
             />
 
             {/* Productos */}
@@ -241,11 +312,11 @@ export default function ShopIndex({ products = {}, categories = [], canLogin }) 
                   </p>
                   <button
                     onClick={() =>
-                      setFilters({
+                      applyFilters({
                         categories: [],
                         priceRange: [0, 5000],
                         search: '',
-                        sortBy: 'relevance',
+                        sortBy: 'latest',
                         inStockOnly: false,
                         tags: [],
                       })
@@ -263,6 +334,9 @@ export default function ShopIndex({ products = {}, categories = [], canLogin }) 
                         key={product.id}
                         product={product}
                         onAddedToCart={() => setIsCartOpen(true)}
+                        onQuickView={() => handleQuickView(product)}
+                        onCompare={() => handleAddToCompare(product)}
+                        isComparing={compareProducts.some(p => p.id === product.id)}
                       />
                     ))}
                   </div>
@@ -276,6 +350,21 @@ export default function ShopIndex({ products = {}, categories = [], canLogin }) 
 
       {/* Shopping Cart Sidebar */}
       <ShoppingCart isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
+
+      {/* Quick View Modal */}
+      <QuickView
+        product={quickViewProduct}
+        isOpen={isQuickViewOpen}
+        onClose={() => setIsQuickViewOpen(false)}
+        onAddToCart={() => setIsCartOpen(true)}
+      />
+
+      {/* Product Compare Modal */}
+      <ProductCompare
+        products={compareProducts}
+        isOpen={isCompareOpen}
+        onClose={() => setIsCompareOpen(false)}
+      />
 
     </main>
     </GuestLayout>

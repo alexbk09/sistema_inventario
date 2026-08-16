@@ -32,22 +32,81 @@ class ShopController extends Controller
             ->groupBy('product_id')
             ->pluck('total_sold', 'product_id');
 
+        // Filtros avanzados
+        $filters = [
+            'search' => $request->input('search'),
+            'category' => $request->input('category'),
+            'min_price' => $request->input('min_price'),
+            'max_price' => $request->input('max_price'),
+            'sort' => $request->input('sort', 'latest'),
+            'in_stock' => $request->input('in_stock'),
+        ];
 
         // Obtener el número de página desde la request (por defecto 1)
         $page = (int) $request->input('page', 1);
 
-        $products = Product::with([
+        $query = Product::with([
                 'categories:id,name',
                 'images' => function ($q) {
                     $q->orderBy('sort_order');
                 },
-            ])
-            ->latest()
-            ->paginate(10, ['*'], 'page', $page);
+            ]);
+
+        // Aplicar filtros
+        if ($filters['search']) {
+            $query->where(function ($q) use ($filters) {
+                $q->where('name', 'like', '%' . $filters['search'] . '%')
+                  ->orWhere('sku', 'like', '%' . $filters['search'] . '%')
+                  ->orWhere('description', 'like', '%' . $filters['search'] . '%');
+            });
+        }
+
+        if ($filters['category']) {
+            $query->whereHas('categories', function ($q) use ($filters) {
+                $q->where('slug', $filters['category']);
+            });
+        }
+
+        if ($filters['min_price']) {
+            $query->where('price_usd', '>=', $filters['min_price']);
+        }
+
+        if ($filters['max_price']) {
+            $query->where('price_usd', '<=', $filters['max_price']);
+        }
+
+        if ($filters['in_stock']) {
+            $query->where('stock', '>', 0);
+        }
+
+        // Ordenamiento
+        switch ($filters['sort']) {
+            case 'price_asc':
+                $query->orderBy('price_usd', 'asc');
+                break;
+            case 'price_desc':
+                $query->orderBy('price_usd', 'desc');
+                break;
+            case 'name_asc':
+                $query->orderBy('name', 'asc');
+                break;
+            case 'name_desc':
+                $query->orderBy('name', 'desc');
+                break;
+            case 'popular':
+                $query->orderByDesc('sold_quantity');
+                break;
+            case 'latest':
+            default:
+                $query->latest();
+                break;
+        }
+
+        $products = $query->paginate(12, ['*'], 'page', $page);
 
         // Si la página solicitada no tiene productos y no es la primera, redirigir a la primera página
         if ($products->isEmpty() && $page > 1) {
-            return redirect()->route('shop.index', ['page' => 1]);
+            return redirect()->route('shop.index', array_filter($filters) + ['page' => 1]);
         }
 
         // Mapear los productos para mantener compatibilidad de campos
@@ -78,11 +137,12 @@ class ShopController extends Controller
             ];
         });
 
-        $categories = Category::orderBy('name')->get(['id', 'name']);
+        $categories = Category::orderBy('name')->get(['id', 'name', 'slug']);
 
         return Inertia::render('Shop/Index', [
             'products' => $products,
             'categories' => $categories,
+            'filters' => $filters,
             'rate' => $rate,
             'store' => $store,
             'company' => $general,
@@ -114,7 +174,9 @@ class ShopController extends Controller
                 'url' => $img->url,
             ]),
             'image' => $product->image,
-            'category' => optional($product->categories->first())->name ?? null,
+            'category' => $product->categories->first()
+                ? ['id' => $product->categories->first()->id, 'name' => $product->categories->first()->name]
+                : null,
             'categories' => $product->categories->pluck('name'),
             'stock' => (int) $product->stock,
             'rating' => 5,

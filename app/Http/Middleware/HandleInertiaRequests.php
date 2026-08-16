@@ -2,7 +2,9 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Category;
 use App\Services\AdminNotificationService;
+use Illuminate\Support\Facades\Cache;
 use App\Support\CurrencySettings;
 use App\Support\Settings;
 use App\Support\TranslationKeySanitizer;
@@ -95,6 +97,12 @@ class HandleInertiaRequests extends Middleware
                         : [],
                 ] : null,
             ],
+            'nav_categories' => Cache::remember('nav_categories', 600, fn () =>
+                Category::has('products')
+                    ->orderBy('name')
+                    ->limit(12)
+                    ->get(['id', 'name', 'slug'])
+            ),
             'settings' => [
                 'general' => Settings::get('general', null),
                 'location' => Settings::get('location', null),

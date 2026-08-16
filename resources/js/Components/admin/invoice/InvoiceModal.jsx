@@ -151,17 +151,36 @@ export default function InvoiceModal({
   const totals = useMemo(() => {
     const currency = invoice?.currency_code ?? 'USD'
     const totalUsd = parseFloat(invoice?.total_usd ?? 0)
-    const subtotal = invoice?.subtotal_usd ?? totalUsd
-    const tax = invoice?.tax_usd ?? 0
-    const shipping = invoice?.shipping_usd ?? 0
-    return { currency, subtotal, tax, shipping, total: totalUsd }
+    const mtJson = invoice?.monetary_totals_json ?? {}
+
+    // Subtotal: suma real de items
+    const subtotalFromItems = (invoice?.items ?? []).reduce(
+      (sum, i) => sum + parseFloat(i.subtotal_usd ?? (i.price_usd * i.quantity) ?? 0), 0
+    )
+
+    // Tax: desde monetary_totals_json (nuevas facturas) o inferido desde diferencia (facturas antiguas)
+    const taxFromJson = parseFloat(mtJson?.tax_usd ?? mtJson?.tax ?? -1)
+    const subtotal = subtotalFromItems > 0 ? subtotalFromItems : parseFloat(mtJson?.subtotal_usd ?? totalUsd)
+    const tax = taxFromJson >= 0
+      ? taxFromJson
+      : (subtotalFromItems > 0 ? Math.max(0, parseFloat((totalUsd - subtotalFromItems).toFixed(2))) : 0)
+
+    const shipping = parseFloat(invoice?.shipping_usd ?? mtJson?.shipping_usd ?? mtJson?.shipping ?? 0)
+    const discount = parseFloat(invoice?.discount_usd ?? mtJson?.discount_usd ?? mtJson?.discount ?? 0)
+    // Tasa de cambio
+    const exchangeRate = invoice?.exchange_rate_snapshot ?? mtJson?.rates?.VES ?? null
+    const exchangeRateDate = mtJson?.captured_at ?? null
+    return { currency, subtotal, tax, shipping, discount, total: totalUsd, exchangeRate, exchangeRateDate }
   }, [invoice])
 
   const paymentTotals = useMemo(() => {
+    // Si la factura está pagada, no hay pendiente
+    const isPaid = invoice?.status === 'paid' || invoice?.invoiceStatus?.code === 'paid'
+    if (isPaid) return { received: totals.total, pending: 0 }
     const received = totalPaidUSD
     const pending = Math.max(0, totals.total - received)
     return { received, pending }
-  }, [totalPaidUSD, totals.total])
+  }, [totalPaidUSD, totals.total, invoice?.status, invoice?.invoiceStatus?.code])
 
   const contact = useMemo(() => ({
     full_name: invoice?.customer?.name ?? invoice?.contact?.full_name ?? invoice?.contact?.name ?? invoice?.full_name,
@@ -407,16 +426,47 @@ export default function InvoiceModal({
                 </tbody>
                 <tfoot className="bg-muted/50 font-medium">
                   <tr>
-                    <td colSpan="3" className="p-2 text-right">{t('admin.invoices.modal.subtotal', 'Subtotal')}:</td>
-                    <td className="p-2 text-right">{formatCurrency(invoice.subtotal_usd || invoice.items.reduce((sum, i) => sum + (i.subtotal_usd || 0), 0), 'USD')}</td>
+                    <td colSpan="3" className="p-2 text-right text-muted-foreground">
+                      Subtotal (neto):
+                    </td>
+                    <td className="p-2 text-right">{formatCurrency(totals.subtotal, 'USD')}</td>
                   </tr>
-                  {(invoice.tax_usd || 0) > 0 && (
+                  <tr className={totals.tax > 0 ? '' : 'opacity-50'}>
+                    <td colSpan="3" className="p-2 text-right text-muted-foreground">
+                      {t('admin.invoices.modal.tax', 'IVA / Impuestos')}:
+                    </td>
+                    <td className={`p-2 text-right ${totals.tax > 0 ? 'text-amber-600 font-semibold' : 'text-muted-foreground'}`}>
+                      {totals.tax > 0 ? `+ ${formatCurrency(totals.tax, 'USD')}` : formatCurrency(0, 'USD')}
+                    </td>
+                  </tr>
+                  {totals.shipping > 0 && (
                     <tr>
-                      <td colSpan="3" className="p-2 text-right">{t('admin.invoices.modal.tax', 'Impuestos')}:</td>
-                      <td className="p-2 text-right">{formatCurrency(invoice.tax_usd, 'USD')}</td>
+                      <td colSpan="3" className="p-2 text-right text-muted-foreground">{t('admin.invoices.modal.shipping', 'Envío')}:</td>
+                      <td className="p-2 text-right">+ {formatCurrency(totals.shipping, 'USD')}</td>
                     </tr>
                   )}
-                  <tr className="text-base">
+                  {totals.discount > 0 && (
+                    <tr>
+                      <td colSpan="3" className="p-2 text-right text-green-600">{t('admin.invoices.modal.discount', 'Descuento')}:</td>
+                      <td className="p-2 text-right text-green-600">- {formatCurrency(totals.discount, 'USD')}</td>
+                    </tr>
+                  )}
+                  {totals.exchangeRate && totals.exchangeRate > 1 && (
+                    <tr>
+                      <td colSpan="4" className="p-2">
+                        <div className="flex items-center gap-2 text-xs bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded px-3 py-2">
+                          <ArrowRightLeft className="w-3 h-3 text-amber-600" />
+                          <span className="text-amber-700 dark:text-amber-300">
+                            Tasa aplicada: <strong>1 USD = Bs. {Number(totals.exchangeRate).toFixed(2)}</strong>
+                            {totals.exchangeRateDate && (
+                              <span className="ml-2 opacity-70">({new Date(totals.exchangeRateDate).toLocaleDateString()})</span>
+                            )}
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  <tr className="text-base border-t-2 border-border">
                     <td colSpan="3" className="p-2 text-right font-bold">{t('admin.invoices.modal.total', 'Total')}:</td>
                     <td className="p-2 text-right font-bold text-primary">
                       {formatCurrency(invoice.total_usd, 'USD')}
@@ -577,11 +627,16 @@ export default function InvoiceModal({
 
             {/* Totales de Pago */}
             <div className="bg-primary/10 p-4 rounded-lg mt-4">
-              <h5 className="font-semibold text-foreground mb-2">{t('admin.invoices.modal.payment_summary', 'Resumen de Pagos')}</h5>
+              <h5 className="font-semibold text-foreground mb-3">{t('admin.invoices.modal.payment_summary', 'Resumen de Pagos')}</h5>
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">{t('admin.invoices.modal.total_invoice', 'Total Factura')}</p>
                   <p className="text-lg font-semibold">{formatCurrency(totals.total, 'USD')}</p>
+                  {totals.tax > 0 && (
+                    <p className="text-xs text-amber-600 mt-0.5">
+                      Incl. IVA: {formatCurrency(totals.tax, 'USD')}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">{t('admin.invoices.modal.total_paid', 'Total Pagado')}</p>
@@ -593,7 +648,7 @@ export default function InvoiceModal({
                 <div>
                   <p className="text-sm text-muted-foreground">{t('admin.invoices.modal.pending', 'Pendiente')}</p>
                   <p className={`text-lg font-semibold ${paymentTotals.pending > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                    {formatCurrency(paymentTotals.pending, 'USD')}
+                    {paymentTotals.pending > 0 ? formatCurrency(paymentTotals.pending, 'USD') : '✓ Pagado'}
                   </p>
                 </div>
               </div>

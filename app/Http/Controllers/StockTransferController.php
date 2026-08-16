@@ -66,6 +66,11 @@ class StockTransferController extends Controller
             $transfer->notes = $data['notes'] ?? null;
             $transfer->user_id = $request->user()->id ?? null;
             $transfer->save();
+            
+            // Generar código QR único (URL para escanear)
+            $qrData = route('admin.transfers.show', $transfer->id);
+            $transfer->qr_code = $qrData;
+            $transfer->save();
 
             foreach ($data['items'] as $item) {
                 StockTransferItem::create([
@@ -115,29 +120,53 @@ class StockTransferController extends Controller
         }
 
         $data = $request->validate([
-            'status' => ['required','in:draft,completed,cancelled'],
+            'status' => ['required','in:draft,sent,in_transit,received,cancelled'],
         ]);
 
+        $newStatus = $data['status'];
+        
+        // Validar transición de estado
+        if (!$transfer->canTransitionTo($newStatus)) {
+            return redirect()->route('admin.transfers.show', $transfer->id)
+                ->with('error', __('app.transfers.invalid_transition', 'Transición de estado no válida'));
+        }
+
         $oldStatus = $transfer->status;
-        $transfer->status = $data['status'];
+        $transfer->status = $newStatus;
+
+        // Actualizar timestamps según el estado
+        if ($newStatus === StockTransfer::STATUS_SENT && !$transfer->sent_at) {
+            $transfer->sent_at = now();
+        }
+        if ($newStatus === StockTransfer::STATUS_RECEIVED && !$transfer->received_at) {
+            $transfer->received_at = now();
+        }
+
         $transfer->save();
 
         // Nota: aquí se podría integrar con InventoryService para ajustar stock por sucursal
+        // Cuando se recibe, se debería agregar stock a la bodega destino y restar de la origen
 
         if ($oldStatus !== $transfer->status) {
+            $severity = match($newStatus) {
+                StockTransfer::STATUS_RECEIVED => 'success',
+                StockTransfer::STATUS_CANCELLED => 'error',
+                default => 'info',
+            };
+
             $notificationService->notifyStaff(
                 'transfer_status_changed',
                 'Traslado '.$transfer->number.' actualizado',
-                'Estado: '.$oldStatus.' -> '.$transfer->status,
+                'Estado: '.$transfer->status_label.' (anterior: '.$transfer->getOriginal('status').')',
                 [
-                    'severity' => $transfer->status === 'completed' ? 'success' : 'warning',
+                    'severity' => $severity,
                     'action_url' => route('admin.transfers.show', $transfer->id),
                     'action_label' => 'Ver traslado',
-                    'dedupe_key' => 'transfer_status_changed:'.$transfer->id.':'.$transfer->status,
+                    'dedupe_key' => 'transfer_status_changed:'.$transfer->id.':'.$newStatus,
                     'data' => [
                         'transfer_id' => $transfer->id,
                         'old_status' => $oldStatus,
-                        'new_status' => $transfer->status,
+                        'new_status' => $newStatus,
                     ],
                 ]
             );

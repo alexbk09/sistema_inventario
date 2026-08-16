@@ -2,14 +2,15 @@ import { Head, router } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.jsx';
 import AdminTable from '@/Components/admin/provider/AdminTableProviders.jsx';
-import AdminFilters from '@/Components/admin/provider/AdminTableFilterProviders.jsx';
 import SupplierModal from '@/Components/admin/provider/SuplimerModal.jsx';
 import ConfirmDialog from '@/Components/common/ConfirmDialog.jsx';
-import AdminIndexShell from '@/Components/admin/AdminIndexShell.jsx';
+import PageHeader from '@/Components/admin/PageHeader.jsx';
+import StatsCard from '@/Components/admin/StatsCard.jsx';
 import toast from 'react-hot-toast';
 import { useI18n } from '@/Hooks/useI18n';
+import { Truck, Building2, Phone, Mail, Plus, Search, X } from 'lucide-react';
 
-export default function Index({ providers, filters }) {
+export default function Index({ providers, filters, summary = {} }) {
   const { t } = useI18n();
   const { data } = providers;
   const page = providers.current_page ?? providers?.meta?.current_page ?? 1;
@@ -136,35 +137,48 @@ export default function Index({ providers, filters }) {
       key: 'name',
       label: t('admin.providers.index.table.company', 'Empresa'),
       width: '25%',
+      render: (value) => (
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+            <Building2 className="w-3.5 h-3.5 text-primary" />
+          </div>
+          <span className="font-medium text-foreground text-sm">{value}</span>
+        </div>
+      ),
     },
     {
       key: 'contact_name',
       label: t('admin.providers.index.table.contact', 'Encargado'),
       width: '20%',
+      render: (v) => v || <span className="text-muted-foreground text-xs">—</span>,
     },
     {
       key: 'email',
       label: t('admin.providers.index.table.email', 'Email'),
-      width: '25%',
-      render: (value) => (
-        <a href={`mailto:${value}`} className="text-accent hover:underline">
-          {value}
+      width: '22%',
+      render: (value) => value ? (
+        <a href={`mailto:${value}`} className="inline-flex items-center gap-1 text-sm text-primary hover:underline">
+          <Mail className="w-3 h-3" />{value}
         </a>
-      ),
+      ) : <span className="text-muted-foreground text-xs">—</span>,
     },
     {
       key: 'phone',
       label: t('admin.providers.index.table.phone', 'Teléfono'),
-      width: '20%',
-      render: (value) => value || t('admin.providers.values.empty', '-'),
+      width: '15%',
+      render: (value) => value ? (
+        <span className="inline-flex items-center gap-1 text-sm">
+          <Phone className="w-3 h-3 text-muted-foreground" />{value}
+        </span>
+      ) : <span className="text-muted-foreground text-xs">—</span>,
     },
     {
       key: 'address',
       label: t('admin.providers.index.table.address', 'Dirección'),
-      width: '10%',
+      width: '18%',
       render: (value) => (
-        <p className="truncate" title={value}>
-          {value || t('admin.providers.values.empty', '-')}
+        <p className="truncate text-sm text-muted-foreground" title={value}>
+          {value || '—'}
         </p>
       ),
     },
@@ -173,48 +187,87 @@ export default function Index({ providers, filters }) {
   return (
     <AuthenticatedLayout>
       <Head title={t('admin.providers.index.page_title', 'Proveedores')} />
-      <AdminIndexShell
-        title={t('admin.providers.index.hero_title', 'Ordena proveedores con mejor contexto operativo y menos fricción')}
-        description={t('admin.providers.index.hero_description', 'La vista reúne búsqueda, alta rápida, edición y limpieza del padrón de proveedores en un mismo flujo consistente con el resto del panel.')}
-        stats={[
-          { label: t('admin.providers.index.stats.visible', 'Proveedores visibles'), value: data.length },
-          { label: t('admin.providers.index.stats.page', 'Página'), value: `${page}/${totalPages}` },
-          { label: t('admin.providers.index.stats.search', 'Búsqueda'), value: debounced ? t('admin.providers.values.active_female', 'Activa') : t('admin.providers.values.general', 'General') },
+
+      <PageHeader
+        title={t('admin.providers.index.page_title', 'Proveedores')}
+        description={t('admin.providers.index.context_description', 'Gestiona contactos comerciales y catálogo de abastecimiento.')}
+        icon={Truck}
+        breadcrumbs={[
+          { label: 'Dashboard', href: route('dashboard') },
+          { label: t('admin.providers.index.page_title', 'Proveedores') },
         ]}
-        contextTitle={t('admin.providers.index.context_title', 'Proveedores')}
-        contextDescription={t('admin.providers.index.context_description', 'Gestiona contactos comerciales, datos de empresa y mantenimiento del catálogo de abastecimiento desde una sola pantalla.')}
-        contextItems={[
-          { label: t('admin.providers.index.context_items.visible_results', 'Resultados visibles'), value: data.length },
-          { label: t('admin.providers.index.context_items.filter', 'Filtro'), value: debounced || t('admin.providers.values.no_filter', 'Sin filtro') },
-          { label: t('admin.providers.index.context_items.modal', 'Modal'), value: isModalOpen ? t('admin.providers.values.open', 'Abierto') : t('admin.providers.values.available', 'Disponible') },
-        ]}
-        primaryAction={
+        actions={
           <button
             type="button"
             onClick={handleAddNew}
-            className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
           >
+            <Plus className="w-4 h-4" />
             {t('admin.providers.index.actions.new', 'Nuevo proveedor')}
           </button>
         }
-        filters={
-          <AdminFilters
-            searchPlaceholder={t('admin.providers.index.filters.search_placeholder', 'Buscar por empresa, encargado o email...')}
-            searchValue={search}
-            onSearchChange={setSearch}
-          />
-        }
-      >
-        <AdminTable
-          columns={columns}
-          data={data}
-          page={page}
-          totalPages={totalPages}
-          onPageChange={handlePageChange}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
+      />
+
+      {/* Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <StatsCard
+          label={t('admin.providers.index.stats.total', 'Total proveedores')}
+          value={summary?.total ?? providers?.total ?? data.length}
+          icon={Truck}
+          iconColor="text-blue-600"
+          iconBg="bg-blue-50 dark:bg-blue-900/20"
+          sparkColor="#3B82F6"
         />
-      </AdminIndexShell>
+        <StatsCard
+          label={t('admin.providers.index.stats.with_email', 'Con email')}
+          value={summary?.with_email ?? 0}
+          icon={Mail}
+          iconColor="text-emerald-600"
+          iconBg="bg-emerald-50 dark:bg-emerald-900/20"
+          sparkColor="#10B981"
+        />
+        <StatsCard
+          label={t('admin.providers.index.stats.with_phone', 'Con teléfono')}
+          value={summary?.with_phone ?? 0}
+          icon={Phone}
+          iconColor="text-amber-600"
+          iconBg="bg-amber-50 dark:bg-amber-900/20"
+          sparkColor="#F59E0B"
+        />
+      </div>
+
+      {/* Table */}
+      <div className="bg-card border border-border rounded-xl overflow-hidden">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
+          <div className="flex-1 relative">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t('admin.providers.index.filters.search_placeholder', 'Buscar por empresa, encargado o email...')}
+              className="w-full pl-9 pr-4 py-2 text-sm border border-border rounded-lg bg-background focus:ring-2 focus:ring-ring focus:outline-none"
+            />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            {search && (
+              <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          <span className="text-xs text-muted-foreground whitespace-nowrap">{data.length} {t('admin.providers.values.results', 'resultados')}</span>
+        </div>
+        <div className="p-4">
+          <AdminTable
+            columns={columns}
+            data={data}
+            page={page}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
+        </div>
+      </div>
       <SupplierModal
         isOpen={isModalOpen}
         onClose={() => {

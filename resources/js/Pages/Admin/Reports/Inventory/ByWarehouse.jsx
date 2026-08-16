@@ -6,6 +6,7 @@ import AdminIndexShell from '@/Components/admin/AdminIndexShell.jsx';
 import { useI18n } from '@/Hooks/useI18n';
 import { useLocaleFormat } from '@/Hooks/useLocaleFormat';
 import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates';
+import { LayoutGrid, List, Package } from 'lucide-react';
 
 export default function InventoryByWarehouse({ rows, filters = {}, warehouses = [], valuation, adminCurrencyContext = {} }) {
   const { t } = useI18n();
@@ -19,11 +20,13 @@ export default function InventoryByWarehouse({ rows, filters = {}, warehouses = 
   const [localFilters, setLocalFilters] = useState({
     warehouse_id: filters.warehouse_id || '',
     search: filters.search || '',
+    view_mode: filters.view_mode || 'list',
   });
 
   const page = rows.current_page ?? rows?.meta?.current_page ?? 1;
   const totalPages = rows.last_page ?? rows?.meta?.last_page ?? 1;
   const activeFilters = Object.values(filters || {}).filter((value) => value !== null && value !== undefined && value !== '').length;
+  const isMatrixView = localFilters.view_mode === 'matrix';
 
   const submitFilters = () => {
     router.get(route('admin.reports.inventory.by_warehouse'), {
@@ -37,6 +40,16 @@ export default function InventoryByWarehouse({ rows, filters = {}, warehouses = 
     router.get(route('admin.reports.inventory.by_warehouse'), {
       ...filters,
       page: nextPage,
+    }, { preserveScroll: true, replace: true });
+  };
+
+  const toggleViewMode = () => {
+    const newMode = isMatrixView ? 'list' : 'matrix';
+    setLocalFilters((prev) => ({ ...prev, view_mode: newMode }));
+    router.get(route('admin.reports.inventory.by_warehouse'), {
+      ...filters,
+      view_mode: newMode,
+      page: 1,
     }, { preserveScroll: true, replace: true });
   };
 
@@ -65,10 +78,21 @@ export default function InventoryByWarehouse({ rows, filters = {}, warehouses = 
         contextTitle={t('admin.reports.inventory.by_warehouse.context_title', 'Inventario por bodega')}
         contextDescription={t('admin.reports.inventory.by_warehouse.context_description', 'Úsalo para comparar stock y valorización entre sucursales sin salir del ecosistema de reportes de inventario.')}
         contextItems={[
-          { label: t('admin.reports.inventory.by_warehouse.context_items.view', 'Vista'), value: t('admin.reports.inventory.by_warehouse.context_items.view_value', 'Producto y bodega') },
+          { label: t('admin.reports.inventory.by_warehouse.context_items.view', 'Vista'), value: isMatrixView ? t('admin.reports.inventory.by_warehouse.context_items.matrix', 'Matriz') : t('admin.reports.inventory.by_warehouse.context_items.list', 'Lista') },
           { label: t('admin.reports.inventory.by_warehouse.context_items.page', 'Página'), value: `${page}/${totalPages}` },
           { label: t('admin.reports.inventory.by_warehouse.context_items.visible_rows', 'Filas visibles'), value: rows.data.length },
         ]}
+        actions={
+          <button
+            type="button"
+            onClick={toggleViewMode}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-background text-sm font-medium hover:bg-muted transition-colors"
+            title={isMatrixView ? t('admin.reports.inventory.by_warehouse.actions.switch_list', 'Cambiar a vista lista') : t('admin.reports.inventory.by_warehouse.actions.switch_matrix', 'Cambiar a vista matriz')}
+          >
+            {isMatrixView ? <List className="w-4 h-4" /> : <LayoutGrid className="w-4 h-4" />}
+            {isMatrixView ? t('admin.reports.inventory.by_warehouse.actions.list_view', 'Lista') : t('admin.reports.inventory.by_warehouse.actions.matrix_view', 'Matriz')}
+          </button>
+        }
         filters={
           <div className="space-y-4 text-sm">
             <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
@@ -131,70 +155,154 @@ export default function InventoryByWarehouse({ rows, filters = {}, warehouses = 
       >
         <div className="space-y-4 p-6">
 
-        {/* Tabla de inventario por bodega */}
-        <div className="overflow-x-auto rounded-lg border border-border bg-white">
-          <table className="w-full text-sm">
-            <thead className="bg-muted border-b border-border">
-              <tr>
-                <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.inventory.by_warehouse.table.branch', 'Sucursal')}</th>
-                <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.inventory.by_warehouse.table.product', 'Producto')}</th>
-                <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.inventory.by_warehouse.table.sku_barcode', 'SKU / Código')}</th>
-                <th className="px-3 py-2 text-right font-semibold">{t('admin.reports.inventory.by_warehouse.table.stock_units', 'Stock unidades')}</th>
-                <th className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.inventory.by_warehouse.table.avg_cost', 'Costo prom.')} ${displayCurrency}`}</th>
-                <th className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.inventory.by_warehouse.table.price', 'Precio')} ${displayCurrency}`}</th>
-                {visibleCurrencyCodes.map((code) => (
-                  <th key={`cost-${code}`} className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.inventory.by_warehouse.table.cost_value', 'Valor costo')} ${code}`}</th>
-                ))}
-                {visibleCurrencyCodes.map((code) => (
-                  <th key={`sales-${code}`} className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.inventory.by_warehouse.table.sales_value', 'Valor venta')} ${code}`}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.data.map((row) => {
-                return (
-                  <tr key={`${row.product_id}-${row.warehouse_id}`} className="border-b border-border hover:bg-muted/40">
-                    <td className="px-3 py-2 text-xs">{row.warehouse?.name || row.warehouse?.code || t('admin.reports.inventory.by_warehouse.values.empty_dash', '—')}</td>
-                    <td className="px-3 py-2 text-xs">{row.product?.name || t('admin.reports.inventory.by_warehouse.table.deleted_product', 'Producto eliminado')}</td>
-                    <td className="px-3 py-2 text-xs">{row.product?.sku || row.product?.barcode || t('admin.reports.inventory.by_warehouse.values.empty_dash', '—')}</td>
-                    <td className="px-3 py-2 text-xs text-right">{formatNumber(row.stock_units ?? 0, { maximumFractionDigits: 0 })}</td>
-                    <td className="px-3 py-2 text-xs text-right">
-                      {row.average_cost_admin_totals?.[displayCurrency] !== undefined
-                        ? formatServerAmount(displayCurrency, row.average_cost_admin_totals[displayCurrency])
-                        : formatActiveAmount(row.product?.average_cost_usd || 0)}
-                    </td>
-                    <td className="px-3 py-2 text-xs text-right">
-                      {row.price_admin_totals?.[displayCurrency] !== undefined
-                        ? formatServerAmount(displayCurrency, row.price_admin_totals[displayCurrency])
-                        : formatActiveAmount(row.product?.price_usd || 0)}
-                    </td>
-                    {visibleCurrencyCodes.map((code) => (
-                      <td key={`${row.product_id}-${row.warehouse_id}-cost-${code}`} className="px-3 py-2 text-xs text-right">
-                        {row.value_cost_admin_totals?.[code] !== undefined
-                          ? formatServerAmount(code, row.value_cost_admin_totals[code])
-                          : formatActiveAmount((row.stock_units || 0) * (row.product?.average_cost_usd || 0))}
-                      </td>
-                    ))}
-                    {visibleCurrencyCodes.map((code) => (
-                      <td key={`${row.product_id}-${row.warehouse_id}-sales-${code}`} className="px-3 py-2 text-xs text-right">
-                        {row.value_price_admin_totals?.[code] !== undefined
-                          ? formatServerAmount(code, row.value_price_admin_totals[code])
-                          : formatActiveAmount((row.stock_units || 0) * (row.product?.price_usd || 0))}
-                      </td>
-                    ))}
-                  </tr>
-                );
-              })}
-              {rows.data.length === 0 && (
+        {/* Vista Matriz - Comparativa de stock por bodega */}
+        {isMatrixView ? (
+          <div className="overflow-x-auto rounded-lg border border-border bg-white">
+            <table className="w-full text-sm">
+              <thead className="bg-muted border-b border-border">
                 <tr>
-                  <td colSpan={6 + (visibleCurrencyCodes.length * 2)} className="px-3 py-6 text-center text-sm text-muted-foreground">
-                    {t('admin.reports.inventory.by_warehouse.empty', 'No hay registros para los filtros seleccionados.')}
-                  </td>
+                  <th className="px-3 py-2 text-left font-semibold sticky left-0 bg-muted z-10">{t('admin.reports.inventory.by_warehouse.matrix.product', 'Producto')}</th>
+                  <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.inventory.by_warehouse.matrix.sku', 'SKU')}</th>
+                  {warehouses.map((wh) => (
+                    <th key={wh.id} className="px-3 py-2 text-center font-semibold whitespace-nowrap">
+                      {wh.name}
+                      <br />
+                      <span className="text-xs text-muted-foreground">({wh.code})</span>
+                    </th>
+                  ))}
+                  <th className="px-3 py-2 text-right font-semibold bg-blue-50 dark:bg-blue-900/20">{t('admin.reports.inventory.by_warehouse.matrix.total', 'Total')}</th>
+                  <th className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.inventory.by_warehouse.matrix.value_cost', 'Valor costo')} ${displayCurrency}`}</th>
+                  <th className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.inventory.by_warehouse.matrix.value_price', 'Valor venta')} ${displayCurrency}`}</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {rows.data.map((product) => {
+                  const totalStock = product.total_stock ?? 0;
+                  const isLowStock = totalStock < (product.min_stock ?? 0) && (product.min_stock ?? 0) > 0;
+                  return (
+                    <tr key={product.id} className="border-b border-border hover:bg-muted/40">
+                      <td className="px-3 py-2 text-xs font-medium sticky left-0 bg-white dark:bg-background z-10">
+                        <div className="flex items-center gap-2">
+                          {product.image && (
+                            <img src={product.image} alt="" className="w-8 h-8 rounded object-cover" />
+                          )}
+                          <span className="truncate max-w-[200px]" title={product.name}>{product.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 text-xs text-muted-foreground font-mono">{product.sku || '—'}</td>
+                      {warehouses.map((wh) => {
+                        const warehouseStock = product.warehouse_stock?.find((ws) => ws.warehouse_id === wh.id);
+                        const stock = warehouseStock?.stock_units ?? 0;
+                        return (
+                          <td key={wh.id} className="px-3 py-2 text-xs text-center">
+                            {stock > 0 ? (
+                              <span className={`inline-flex items-center justify-center px-2 py-1 rounded-full text-xs font-semibold ${
+                                stock >= 10
+                                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400'
+                                  : stock > 0
+                                  ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400'
+                                  : 'bg-rose-50 text-rose-700 dark:bg-rose-900/20 dark:text-rose-400'
+                              }`}>
+                                {stock}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                      <td className="px-3 py-2 text-xs text-right font-semibold bg-blue-50 dark:bg-blue-900/20">
+                        {totalStock}
+                      </td>
+                      <td className="px-3 py-2 text-xs text-right">
+                        {product.total_value_cost_admin_totals?.[displayCurrency] !== undefined
+                          ? formatServerAmount(displayCurrency, product.total_value_cost_admin_totals[displayCurrency])
+                          : formatActiveAmount(product.total_value_cost_usd || 0)}
+                      </td>
+                      <td className="px-3 py-2 text-xs text-right">
+                        {product.total_value_price_admin_totals?.[displayCurrency] !== undefined
+                          ? formatServerAmount(displayCurrency, product.total_value_price_admin_totals[displayCurrency])
+                          : formatActiveAmount(product.total_value_price_usd || 0)}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {rows.data.length === 0 && (
+                  <tr>
+                    <td colSpan={3 + warehouses.length} className="px-3 py-6 text-center text-sm text-muted-foreground">
+                      {t('admin.reports.inventory.by_warehouse.empty', 'No hay registros para los filtros seleccionados.')}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          /* Vista Lista Original */
+          <div className="overflow-x-auto rounded-lg border border-border bg-white">
+            <table className="w-full text-sm">
+              <thead className="bg-muted border-b border-border">
+                <tr>
+                  <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.inventory.by_warehouse.table.branch', 'Sucursal')}</th>
+                  <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.inventory.by_warehouse.table.product', 'Producto')}</th>
+                  <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.inventory.by_warehouse.table.sku_barcode', 'SKU / Código')}</th>
+                  <th className="px-3 py-2 text-right font-semibold">{t('admin.reports.inventory.by_warehouse.table.stock_units', 'Stock unidades')}</th>
+                  <th className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.inventory.by_warehouse.table.avg_cost', 'Costo prom.')} ${displayCurrency}`}</th>
+                  <th className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.inventory.by_warehouse.table.price', 'Precio')} ${displayCurrency}`}</th>
+                  {visibleCurrencyCodes.map((code) => (
+                    <th key={`cost-${code}`} className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.inventory.by_warehouse.table.cost_value', 'Valor costo')} ${code}`}</th>
+                  ))}
+                  {visibleCurrencyCodes.map((code) => (
+                    <th key={`sales-${code}`} className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.inventory.by_warehouse.table.sales_value', 'Valor venta')} ${code}`}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.data.map((row) => {
+                  return (
+                    <tr key={`${row.product_id}-${row.warehouse_id}`} className="border-b border-border hover:bg-muted/40">
+                      <td className="px-3 py-2 text-xs">{row.warehouse?.name || row.warehouse?.code || t('admin.reports.inventory.by_warehouse.values.empty_dash', '—')}</td>
+                      <td className="px-3 py-2 text-xs">{row.product?.name || t('admin.reports.inventory.by_warehouse.table.deleted_product', 'Producto eliminado')}</td>
+                      <td className="px-3 py-2 text-xs">{row.product?.sku || row.product?.barcode || t('admin.reports.inventory.by_warehouse.values.empty_dash', '—')}</td>
+                      <td className="px-3 py-2 text-xs text-right">{formatNumber(row.stock_units ?? 0, { maximumFractionDigits: 0 })}</td>
+                      <td className="px-3 py-2 text-xs text-right">
+                        {row.average_cost_admin_totals?.[displayCurrency] !== undefined
+                          ? formatServerAmount(displayCurrency, row.average_cost_admin_totals[displayCurrency])
+                          : formatActiveAmount(row.product?.average_cost_usd || 0)}
+                      </td>
+                      <td className="px-3 py-2 text-xs text-right">
+                        {row.price_admin_totals?.[displayCurrency] !== undefined
+                          ? formatServerAmount(displayCurrency, row.price_admin_totals[displayCurrency])
+                          : formatActiveAmount(row.product?.price_usd || 0)}
+                      </td>
+                      {visibleCurrencyCodes.map((code) => (
+                        <td key={`${row.product_id}-${row.warehouse_id}-cost-${code}`} className="px-3 py-2 text-xs text-right">
+                          {row.value_cost_admin_totals?.[code] !== undefined
+                            ? formatServerAmount(code, row.value_cost_admin_totals[code])
+                            : formatActiveAmount((row.stock_units || 0) * (row.product?.average_cost_usd || 0))}
+                        </td>
+                      ))}
+                      {visibleCurrencyCodes.map((code) => (
+                        <td key={`${row.product_id}-${row.warehouse_id}-sales-${code}`} className="px-3 py-2 text-xs text-right">
+                          {row.value_price_admin_totals?.[code] !== undefined
+                            ? formatServerAmount(code, row.value_price_admin_totals[code])
+                            : formatActiveAmount((row.stock_units || 0) * (row.product?.price_usd || 0))}
+                        </td>
+                      ))}
+                    </tr>
+                  );
+                })}
+                {rows.data.length === 0 && (
+                  <tr>
+                    <td colSpan={6 + (visibleCurrencyCodes.length * 2)} className="px-3 py-6 text-center text-sm text-muted-foreground">
+                      {t('admin.reports.inventory.by_warehouse.empty', 'No hay registros para los filtros seleccionados.')}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         <AdminPagination page={page} totalPages={totalPages} onPageChange={handlePageChange} />
         </div>

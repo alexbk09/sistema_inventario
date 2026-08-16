@@ -19,9 +19,12 @@ class ProductController extends Controller
 {
     public function index(Request $request, AdminMoneyService $adminMoneyService)
     {
-        $search = trim((string) $request->input('search', ''));
+        $search      = trim((string) $request->input('search', ''));
+        $stockStatus = $request->input('stock_status', '');
+        $categoryId  = $request->input('category_id', '');
         $currencySettings = Settings::get('currency', []);
         $adminCurrencyContext = $adminMoneyService->getAdminCurrencyContext($currencySettings);
+
         $products = Product::query()
             ->when($search !== '', function ($q) use ($search) {
                 $q->where(function ($qq) use ($search) {
@@ -30,16 +33,21 @@ class ProductController extends Controller
                         ->orWhere('description', 'like', "%{$search}%");
                 });
             })
+            ->when($stockStatus === 'out_of_stock', fn($q) => $q->where('stock', '<=', 0))
+            ->when($stockStatus === 'low_stock', fn($q) => $q->where('stock', '>', 0)->where('stock', '<=', 5))
+            ->when($stockStatus === 'in_stock', fn($q) => $q->where('stock', '>', 5))
+            ->when($categoryId !== '', fn($q) => $q->where('category_id', $categoryId))
             ->with(['images' => function ($q) {
                 $q->orderBy('sort_order');
-            }])
+            }, 'category:id,name'])
             ->latest()
-            ->select(['id', 'name', 'sku', 'barcode', 'price_usd', 'stock', 'min_stock', 'description', 'is_featured', 'image_url'])
-            ->paginate(12)
+            ->select(['id', 'name', 'sku', 'barcode', 'price_usd', 'stock', 'min_stock', 'description', 'is_featured', 'image_url', 'category_id'])
+            ->paginate(15)
             ->withQueryString();
 
         $products->getCollection()->transform(function (Product $product) use ($adminMoneyService, $adminCurrencyContext) {
             $product->price_admin_totals = $adminMoneyService->buildTotalsWithContext((float) ($product->price_usd ?? 0), $adminCurrencyContext)['totals'];
+            $product->effective_min_stock = $product->min_stock ?? 0;
 
             return $product;
         });
@@ -57,12 +65,18 @@ class ProductController extends Controller
                 ->sum('quantity'),
             'total_entries' => (int) InventoryMovement::where('type', 'entry')->sum('quantity'),
         ];
+
         return Inertia::render('Admin/Product/Index', [
             'products' => $products,
-            'filters' => ['search' => $search],
-            'summary' => $summary,
-            'adminCurrencyContext' => $adminCurrencyContext,
-            'warehouses' => \App\Models\Warehouse::orderBy('name')->get(['id','name','code']),
+            'filters' => [
+                'search'       => $search,
+                'stock_status' => $stockStatus,
+                'category_id'  => $categoryId,
+            ],
+            'summary'              => $summary,
+            'adminCurrencyContext'  => $adminCurrencyContext,
+            'warehouses'           => \App\Models\Warehouse::orderBy('name')->get(['id','name','code']),
+            'categories'           => Category::orderBy('name')->get(['id','name']),
         ]);
     }
 
@@ -307,6 +321,13 @@ class ProductController extends Controller
     {
         $product->delete();
         return redirect()->route('admin.products.index');
+    }
+
+    public function bulkDestroy(Request $request)
+    {
+        $ids = $request->validate(['ids' => ['required', 'array'], 'ids.*' => ['integer']])['ids'];
+        Product::whereIn('id', $ids)->delete();
+        return back()->with('success', count($ids) . ' productos eliminados.');
     }
 
     /**

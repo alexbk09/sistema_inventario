@@ -6,6 +6,7 @@ import AdminIndexShell from '@/Components/admin/AdminIndexShell.jsx';
 import { useI18n } from '@/Hooks/useI18n';
 import { useLocaleFormat } from '@/Hooks/useLocaleFormat';
 import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates';
+import { Download } from 'lucide-react';
 
 export default function InventoryKardex({ movements, filters = {}, product, products = [], warehouses = [], adminCurrencyContext = {} }) {
   const { t } = useI18n();
@@ -40,6 +41,13 @@ export default function InventoryKardex({ movements, filters = {}, product, prod
     }, { preserveScroll: true, replace: true });
   };
 
+  const exportToExcel = () => {
+    const params = new URLSearchParams({
+      ...filters,
+    });
+    window.open(route('admin.reports.inventory.kardex.export') + '?' + params.toString(), '_blank');
+  };
+
   return (
     <AuthenticatedLayout>
       <Head title={t('admin.reports.inventory.kardex.page_title', 'Kardex de inventario')} />
@@ -59,6 +67,17 @@ export default function InventoryKardex({ movements, filters = {}, product, prod
           { label: t('admin.reports.inventory.kardex.context_items.warehouse', 'Bodega'), value: localFilters.warehouse_id || t('admin.reports.inventory.filters.all_female', 'Todas') },
           { label: t('admin.reports.inventory.kardex.context_items.product', 'Producto'), value: product?.sku || t('admin.reports.inventory.kardex.context_items.pending', 'Pendiente') },
         ]}
+        actions={
+          <button
+            type="button"
+            onClick={exportToExcel}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-background text-sm font-medium hover:bg-muted transition-colors"
+            title={t('admin.reports.inventory.kardex.actions.export_excel', 'Exportar a Excel')}
+          >
+            <Download className="w-4 h-4" />
+            {t('admin.reports.inventory.kardex.actions.export', 'Exportar')}
+          </button>
+        }
         filters={
           <div className="space-y-4 text-sm">
             <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
@@ -175,6 +194,7 @@ export default function InventoryKardex({ movements, filters = {}, product, prod
                 <th className="px-3 py-2 text-right font-semibold">{t('admin.reports.inventory.kardex.table.quantity', 'Cantidad')}</th>
                 <th className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.inventory.kardex.table.unit_value', 'Costo/Precio')} ${displayCurrency}`}</th>
                 <th className="px-3 py-2 text-right font-semibold">{`${t('admin.reports.inventory.kardex.table.total_value', 'Total')} ${displayCurrency}`}</th>
+                <th className="px-3 py-2 text-right font-semibold bg-blue-50 dark:bg-blue-900/20">{t('admin.reports.inventory.kardex.table.running_balance', 'Saldo Acumulado')}</th>
                 <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.inventory.kardex.table.reference', 'Referencia')}</th>
                 <th className="px-3 py-2 text-left font-semibold">{t('admin.reports.inventory.kardex.table.notes', 'Notas')}</th>
               </tr>
@@ -188,13 +208,14 @@ export default function InventoryKardex({ movements, filters = {}, product, prod
                   <td className="px-3 py-2 text-xs text-right">{formatNumber(mov.quantity ?? 0, { maximumFractionDigits: 0 })}</td>
                   <td className="px-3 py-2 text-xs text-right">{mov.unit_price_admin_totals?.[displayCurrency] !== undefined ? formatServerAmount(displayCurrency, mov.unit_price_admin_totals[displayCurrency]) : formatActiveAmount(mov.unit_price_usd ?? mov.cost_usd ?? 0)}</td>
                   <td className="px-3 py-2 text-xs text-right">{mov.total_value_admin_totals?.[displayCurrency] !== undefined ? formatServerAmount(displayCurrency, mov.total_value_admin_totals[displayCurrency]) : formatActiveAmount(mov.total_value_usd ?? 0)}</td>
+                  <td className="px-3 py-2 text-xs text-right font-semibold bg-blue-50 dark:bg-blue-900/20">{formatNumber(mov.running_balance ?? 0, { maximumFractionDigits: 0 })}</td>
                   <td className="px-3 py-2 text-xs">{mov.reference || t('admin.reports.inventory.kardex.values.empty_dash', '—')}</td>
                   <td className="px-3 py-2 text-xs">{mov.notes || t('admin.reports.inventory.kardex.values.empty_dash', '—')}</td>
                 </tr>
               ))}
               {movements.data.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-3 py-6 text-center text-sm text-muted-foreground">
+                  <td colSpan={9} className="px-3 py-6 text-center text-sm text-muted-foreground">
                     {t('admin.reports.inventory.kardex.empty', 'No hay movimientos para los filtros seleccionados.')}
                   </td>
                 </tr>

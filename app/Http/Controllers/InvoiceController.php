@@ -7,6 +7,7 @@ use App\Services\{AdminMoneyService, AdminNotificationService, CurrencyService, 
 use App\Support\{Settings, Audit};
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 
@@ -14,7 +15,11 @@ class InvoiceController extends Controller
 {
     public function index(Request $request, AdminMoneyService $adminMoneyService)
     {
-        $search = trim((string) $request->input('search', ''));
+        $search        = trim((string) $request->input('search', ''));
+        $statusFilter  = $request->input('status', '');
+        $currencySettings = Settings::get('currency', []);
+        $adminCurrencyContext = $adminMoneyService->getAdminCurrencyContext($currencySettings);
+
         $invoices = Invoice::query()
             ->when($search !== '', function ($q) use ($search) {
                 $q->where(function ($qq) use ($search) {
@@ -29,23 +34,22 @@ class InvoiceController extends Controller
                         ->orWhere('code', 'like', "%{$search}%");
                 });
             })
+            ->when($statusFilter !== '', fn($q) => $q->where('status', $statusFilter))
             ->latest()
             ->with([
                 'customer:id,name',
                 'creditAccount:id,customer_id,balance_usd',
                 'layaway:id,number,status',
-                'items.product',
-                'contact',
-                'payments',
-                'gatewayTransactions',
-                'adjustments',
-                'invoiceStatus',
+                'items:id,invoice_id,product_id,quantity,price_usd,subtotal_usd,unit_currency_code,unit_price_original,subtotal_original',
+                'items.product:id,name,sku,image_url',
+                'contact:id,invoice_id,full_name,email,phone',
+                'payments:id,invoice_id,amount_usd,amount_bs,amount_original,payment_currency_code,exchange_rate_snapshot,method,reference,bank,notes,payer,created_at',
+                'gatewayTransactions:id,invoice_id,provider,status,amount,currency',
+                'adjustments:id,invoice_id,type,amount_usd,description',
+                'invoiceStatus:id,code,name',
             ])
-            ->paginate(12)
+            ->paginate(15)
             ->withQueryString();
-
-        $adminCurrencyContext = $adminMoneyService->getAdminCurrencyContext();
-        $currencySettings = Settings::get('currency', []);
 
         $invoices->setCollection(
             $invoices->getCollection()->map(function (Invoice $invoice) use ($adminMoneyService, $currencySettings) {
@@ -55,9 +59,71 @@ class InvoiceController extends Controller
             })
         );
 
+        // Summary stats — single query with conditional aggregates
+        $stats = Invoice::query()->selectRaw("
+            COUNT(*) as total,
+            SUM(CASE WHEN status = 'pending'   THEN 1 ELSE 0 END) as pending,
+            SUM(CASE WHEN status = 'paid'      THEN 1 ELSE 0 END) as paid,
+            SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled,
+            SUM(CASE WHEN status = 'paid' THEN total_usd ELSE 0 END) as revenue_usd
+        ")->first();
+
+        $totalRevUsd = (float) ($stats->revenue_usd ?? 0);
+        $revenueContext = $adminMoneyService->buildTotalsWithContext($totalRevUsd, $adminCurrencyContext);
+        $displayCode = $adminCurrencyContext['display_code'] ?? 'USD';
+
+        $summary = [
+            'total'           => (int) ($stats->total ?? 0),
+            'pending'         => (int) ($stats->pending ?? 0),
+            'paid'            => (int) ($stats->paid ?? 0),
+            'cancelled'       => (int) ($stats->cancelled ?? 0),
+            'revenue_usd'     => $totalRevUsd,
+            'revenue_display' => isset($revenueContext['totals'][$displayCode])
+                ? number_format((float) $revenueContext['totals'][$displayCode], 2) . ' ' . $displayCode
+                : number_format($totalRevUsd, 2) . ' USD',
+        ];
+
         return Inertia::render('Admin/Invoice/Index', [
-            'invoices' => $invoices,
-            'filters' => ['search' => $search],
+            'invoices'             => $invoices,
+            'filters'              => ['search' => $search, 'status' => $statusFilter],
+            'adminCurrencyContext' => $adminCurrencyContext,
+            'summary'              => $summary,
+        ]);
+    }
+
+    public function kanban(AdminMoneyService $adminMoneyService)
+    {
+        $currencySettings = Settings::get('currency', []);
+        $adminCurrencyContext = $adminMoneyService->getAdminCurrencyContext($currencySettings);
+
+        $statuses = InvoiceStatus::orderBy('id')->get(['id', 'code', 'name']);
+
+        $invoices = Invoice::query()
+            ->with([
+                'customer:id,name',
+                'items:id,invoice_id,subtotal_usd',
+                'invoiceStatus:id,code,name',
+            ])
+            ->orderByDesc('id')
+            ->limit(200)
+            ->get()
+            ->map(function (Invoice $invoice) use ($adminMoneyService, $currencySettings) {
+                $invoice->document_totals = $this->resolveInvoiceDocumentTotals($invoice, $adminMoneyService, $currencySettings);
+                $invoice->total_display = $invoice->document_totals['totals'][$currencySettings['display_currency'] ?? 'USD'] ?? $invoice->total_usd;
+                return $invoice;
+            });
+
+        $columns = $statuses->map(function ($status) use ($invoices) {
+            return [
+                'id' => $status->id,
+                'code' => $status->code,
+                'name' => $status->name,
+                'invoices' => $invoices->filter(fn ($inv) => $inv->invoice_status_id === $status->id || ($status->code === 'pending' && empty($inv->invoice_status_id)))->values(),
+            ];
+        });
+
+        return Inertia::render('Admin/Invoice/Kanban', [
+            'columns' => $columns,
             'adminCurrencyContext' => $adminCurrencyContext,
         ]);
     }
@@ -97,6 +163,30 @@ class InvoiceController extends Controller
         ]);
     }
 
+    public function pos(AdminMoneyService $adminMoneyService)
+    {
+        $currencySettings = Settings::get('currency', []);
+        $adminCurrencyContext = $adminMoneyService->getAdminCurrencyContext($currencySettings);
+
+        $products = Product::query()
+            ->select(['id', 'name', 'sku', 'barcode', 'price_usd', 'stock', 'image_url'])
+            ->where('stock', '>', 0)
+            ->orderBy('name')
+            ->limit(200)
+            ->get()
+            ->map(function (Product $product) use ($adminMoneyService, $adminCurrencyContext) {
+                $product->price_admin_totals = $adminMoneyService->buildTotalsWithContext((float) ($product->price_usd ?? 0), $adminCurrencyContext)['totals'];
+                return $product;
+            });
+
+        return Inertia::render('Admin/Invoice/Pos', [
+            'products' => $products,
+            'customers' => Customer::select('id', 'name')->orderBy('name')->get(),
+            'warehouses' => Warehouse::select('id', 'name', 'code')->orderBy('name')->get(),
+            'adminCurrencyContext' => $adminCurrencyContext,
+        ]);
+    }
+
     public function store(Request $request, CurrencyService $currency, AdminNotificationService $notificationService, AdminMoneyService $adminMoneyService)
     {
         $data = $request->validate([
@@ -109,6 +199,8 @@ class InvoiceController extends Controller
             'items.*.product_id' => ['required','exists:products,id'],
             'items.*.quantity' => ['required','integer','min:1'],
             'items.*.bs_subtotal' => ['nullable','numeric'],
+            'items.*.discount_usd' => ['nullable','numeric','min:0'],
+            'discount_usd' => ['nullable','numeric','min:0'],
             'internal_notes' => ['nullable','string'],
             'public_notes' => ['nullable','string'],
             'cancellation_reason' => ['nullable','string','max:500'],
@@ -207,10 +299,14 @@ class InvoiceController extends Controller
         $taxRate = max(0.0, min(100.0, $taxPercent)) / 100.0;
 
         $totalUsd = 0;
+        $lineDiscountTotalUsd = 0;
         foreach ($data['items'] as $it) {
             $product = Product::findOrFail($it['product_id']);
             $qty = (int) $it['quantity'];
-            $subtotalUsd = $product->price_usd * $qty;
+            $grossUsd = $product->price_usd * $qty;
+            $lineDiscountUsd = min((float) ($it['discount_usd'] ?? 0), (float) $grossUsd);
+            $subtotalUsd = round($grossUsd - $lineDiscountUsd, 2);
+            $lineDiscountTotalUsd += $lineDiscountUsd;
             // Preferir el valor en Bs provisto por el frontend (viene de la API)
             if (isset($it['bs_subtotal']) && is_numeric($it['bs_subtotal'])) {
                 $subtotalBs = (float) $it['bs_subtotal'];
@@ -223,6 +319,7 @@ class InvoiceController extends Controller
                 'product_id' => $product->id,
                 'quantity' => $qty,
                 'price_usd' => $product->price_usd,
+                'discount_usd' => $lineDiscountUsd,
                 'subtotal_usd' => $subtotalUsd,
                 'subtotal_bs' => $subtotalBs,
                 'unit_currency_code' => 'USD',
@@ -234,12 +331,18 @@ class InvoiceController extends Controller
             $totalUsd += $subtotalUsd;
         }
 
-        $taxUsd = $taxRate > 0 ? round($totalUsd * $taxRate, 2) : 0.0;
-        $grandTotalUsd = $totalUsd + $taxUsd;
+        // Descuento global sobre el subtotal (después de descuentos por línea)
+        $globalDiscountUsd = min((float) ($data['discount_usd'] ?? 0), (float) $totalUsd);
+        $netSubtotalUsd = round($totalUsd - $globalDiscountUsd, 2);
+        $totalDiscountUsd = round($lineDiscountTotalUsd + $globalDiscountUsd, 2);
+
+        $taxUsd = $taxRate > 0 ? round($netSubtotalUsd * $taxRate, 2) : 0.0;
+        $grandTotalUsd = round($netSubtotalUsd + $taxUsd, 2);
 
         $invoice->update([
             'total_usd' => $grandTotalUsd,
             'total_bs' => $currency->usdToBs($grandTotalUsd),
+            'discount_usd' => $totalDiscountUsd,
             'currency_code' => 'USD',
             'base_currency_code' => $documentSnapshot['base_currency'] ?? 'USD',
             'exchange_rate_snapshot' => 1,
@@ -247,6 +350,12 @@ class InvoiceController extends Controller
             'monetary_totals_json' => [
                 'original_currency' => 'USD',
                 'original_amount' => round($grandTotalUsd, 2),
+                'subtotal_usd' => round($totalUsd + $lineDiscountTotalUsd, 2),
+                'tax_usd' => round($taxUsd, 2),
+                'shipping_usd' => 0,
+                'discount_usd' => $totalDiscountUsd,
+                'line_discount_usd' => round($lineDiscountTotalUsd, 2),
+                'global_discount_usd' => round($globalDiscountUsd, 2),
                 ...$adminMoneyService->buildDocumentTotals($grandTotalUsd, $currencySettings, $documentSnapshot),
             ],
         ]);
@@ -347,6 +456,78 @@ class InvoiceController extends Controller
         );
 
         return redirect()->route('admin.invoices.index');
+    }
+
+    public function show(Invoice $invoice, AdminMoneyService $adminMoneyService)
+    {
+        $currencySettings = Settings::get('currency', []);
+        $adminCurrencyContext = $adminMoneyService->getAdminCurrencyContext($currencySettings);
+
+        $invoice->load([
+            'customer:id,name,email,phone',
+            'items:id,invoice_id,product_id,quantity,price_usd,subtotal_usd,subtotal_bs',
+            'items.product:id,name,sku,image_url',
+            'payments:id,invoice_id,method,amount_usd',
+            'invoiceStatus:id,code,name',
+        ]);
+
+        $invoice->document_totals = $this->resolveInvoiceDocumentTotals($invoice, $adminMoneyService, $currencySettings);
+
+        $timeline = \App\Models\AuditLog::where('auditable_type', \App\Models\Invoice::class)
+            ->where('auditable_id', $invoice->id)
+            ->whereIn('action', ['invoice_created', 'invoice_updated', 'invoice_cancelled', 'invoice_paid'])
+            ->with('user:id,name')
+            ->latest()
+            ->get()
+            ->map(fn ($log) => [
+                'id'         => $log->id,
+                'action'     => $log->action,
+                'changes'    => $log->changes,
+                'user_name'  => $log->user?->name ?? 'Sistema',
+                'created_at' => $log->created_at,
+            ]);
+
+        return Inertia::render('Admin/Invoice/Show', [
+            'invoice'             => $invoice,
+            'adminCurrencyContext' => $adminCurrencyContext,
+            'timeline'            => $timeline,
+        ]);
+    }
+
+    public function updateInternalNotes(Request $request, Invoice $invoice)
+    {
+        $data = $request->validate([
+            'internal_notes' => ['nullable', 'string', 'max:5000'],
+        ]);
+
+        $invoice->internal_notes = $data['internal_notes'] ?? null;
+        $invoice->save();
+
+        return back()->with('success', 'Notas internas actualizadas.');
+    }
+
+    public function sendEmail(Request $request, Invoice $invoice)
+    {
+        $invoice->loadMissing(['customer', 'contact']);
+
+        $to = $invoice->customer?->email ?: $invoice->contact?->email;
+
+        if (! $to) {
+            return back()->with('error', 'El cliente no tiene un email registrado.');
+        }
+
+        try {
+            \Illuminate\Support\Facades\Mail::to($to)->sendNow(new \App\Mail\InvoiceCreated($invoice));
+
+            Audit::log('invoice_emailed', 'invoices', $invoice, [
+                'to' => $to,
+                'number' => $invoice->number,
+            ]);
+        } catch (\Throwable $e) {
+            return back()->with('error', 'No se pudo enviar el correo: '.$e->getMessage());
+        }
+
+        return back()->with('success', 'Factura enviada a '.$to);
     }
 
     public function update(Request $request, Invoice $invoice, CurrencyService $currency, InventoryService $inventory, AdminNotificationService $notificationService, AdminMoneyService $adminMoneyService)
@@ -463,6 +644,10 @@ class InvoiceController extends Controller
             'original_amount' => isset($documentSnapshot['rates'][$documentCurrency]) && is_numeric($documentSnapshot['rates'][$documentCurrency])
                 ? $adminMoneyService->convertUsingSnapshot($totalUsd, $documentCurrency, $documentSnapshot, $currencySettings)
                 : ($documentCurrency === 'USD' ? $totalUsd : $adminMoneyService->convertFromBase($totalUsd, $documentCurrency, $currencySettings)),
+            'subtotal_usd' => round($itemsTotalUsd, 2),
+            'tax_usd' => round($taxUsd, 2),
+            'shipping_usd' => 0,
+            'discount_usd' => 0,
             ...$adminMoneyService->buildDocumentTotals($totalUsd, $currencySettings, $documentSnapshot),
         ];
         $invoice->status = $data['status'];
@@ -707,91 +892,151 @@ class InvoiceController extends Controller
 
     public function downloadPdf(Invoice $invoice)
     {
-        $this->authorize('view', $invoice);
+        try {
+            Gate::authorize('view', $invoice);
 
-        // Cargar relaciones necesarias
-        $invoice->load(['items.product', 'customer', 'payments', 'warehouse']);
+            // Cargar relaciones necesarias
+            $invoice->load(['items.product', 'customer', 'payments', 'warehouse']);
 
-        // Obtener configuraciones de la empresa
-        $settings = Settings::get('company', []);
-        $currencySettings = Settings::get('currency', []);
+            // Obtener configuraciones
+            $settings = Settings::get('company', []);
+            $currencySettings = Settings::get('currency', []);
 
-        // Calcular totales
-        $adminMoneyService = app(AdminMoneyService::class);
-        $currencySettings = Settings::get('currency', []);
+            // Calcular totales
+            $adminMoneyService = app(AdminMoneyService::class);
 
-        $snapshot = $invoice->exchange_rate_snapshot
-            ? [
-                'base_currency' => (string) ($invoice->base_currency_code ?: 'USD'),
-                'captured_at' => $invoice->monetary_totals_json['captured_at'] ?? null,
-                'rates' => $invoice->monetary_totals_json['rates'],
-            ]
-            : null;
+            $snapshot = $invoice->exchange_rate_snapshot
+                ? [
+                    'base_currency' => (string) ($invoice->base_currency_code ?: 'USD'),
+                    'captured_at' => $invoice->monetary_totals_json['captured_at'] ?? null,
+                    'rates' => $invoice->monetary_totals_json['rates'],
+                ]
+                : null;
 
-        $totals = $adminMoneyService->buildDocumentTotals((float) ($invoice->total_usd ?? 0), $currencySettings, $snapshot)['totals'];
+            $documentTotals = $adminMoneyService->buildDocumentTotals((float) ($invoice->total_usd ?? 0), $currencySettings, $snapshot);
 
-        // Preparar datos de pagos
-        $payments = $invoice->payments->map(function ($payment) {
-            return [
-                'id' => $payment->id,
-                'method' => $payment->method,
-                'method_label' => $this->getPaymentMethodLabel($payment->method),
-                'amount_usd' => $payment->amount_original ?? $payment->amount_usd,
-                'amount_bs' => $payment->amount_bs,
-                'currency_code' => $payment->payment_currency_code ?? 'USD',
-                'reference' => $payment->reference,
-                'bank' => $payment->bank ?? $payment->bank_name ?? $payment->bank_account,
-                'origin_bank' => $payment->origin_bank,
-                'operation_type' => $payment->operation_type,
-                'operation_type_label' => $this->getOperationTypeLabel($payment->operation_type),
-                'payment_date' => $payment->payment_date ?? $payment->created_at,
-                'notes' => $payment->notes,
-                'payer' => $payment->payer ?? $payment->paid_by,
-                'exchange_rate' => $payment->exchange_rate_snapshot ?? $payment->exchange_rate,
+            // Calcular subtotal real sumando items
+            $subtotalUsd = $invoice->items->sum(function ($item) {
+                return (float) ($item->subtotal_usd ?? ($item->price_usd * $item->quantity));
+            });
+
+            // Impuestos y envío desde monetary_totals_json o calculado
+            $mtJson = $invoice->monetary_totals_json ?? [];
+            $taxUsd      = (float) ($mtJson['tax_usd']      ?? $mtJson['tax']      ?? 0);
+            $shippingUsd = (float) ($mtJson['shipping_usd'] ?? $mtJson['shipping'] ?? 0);
+            $discountUsd = (float) ($mtJson['discount_usd'] ?? $mtJson['discount'] ?? 0);
+
+            // Si subtotal + tax + shipping - discount no cuadra con total, usar diferencia como "otros cargos"
+            $calculatedTotal = $subtotalUsd + $taxUsd + $shippingUsd - $discountUsd;
+            $otherChargesUsd = max(0, (float)($invoice->total_usd ?? 0) - $calculatedTotal);
+
+            // Tasa de cambio usada en la factura
+            $exchangeRate = $invoice->exchange_rate_snapshot ?? ($mtJson['rates']['VES'] ?? $mtJson['rates']['BS'] ?? null);
+            $exchangeRateCapturedAt = $mtJson['captured_at'] ?? null;
+            $baseCurrency = $invoice->base_currency_code ?: ($invoice->currency_code ?: 'USD');
+
+            // Construir estructura de totales
+            $totals = [
+                'total_usd'      => $invoice->total_usd,
+                'total'          => $invoice->total_usd,
+                'subtotal_usd'   => $subtotalUsd,
+                'subtotal'       => $subtotalUsd,
+                'tax_usd'        => $taxUsd,
+                'tax'            => $taxUsd,
+                'shipping_usd'   => $shippingUsd,
+                'shipping'       => $shippingUsd,
+                'discount_usd'   => $discountUsd,
+                'discount'       => $discountUsd,
+                'other_charges_usd' => $otherChargesUsd,
+                'by_currency'    => [],
+                'exchange_rate'  => $exchangeRate,
+                'exchange_rate_captured_at' => $exchangeRateCapturedAt,
+                'base_currency'  => $baseCurrency,
             ];
-        });
 
-        // Preparar datos del cliente
-        $customer = [
-            'name' => $invoice->customer?->name ?? $invoice->contact['full_name'] ?? $invoice->contact['name'] ?? 'Cliente',
-            'email' => $invoice->customer?->email ?? $invoice->contact['email'] ?? '',
-            'phone' => $invoice->customer?->phone ?? $invoice->contact['phone'] ?? '',
-            'address' => $invoice->customer?->address ?? $invoice->contact['address'] ?? '',
-            'city' => $invoice->customer?->city ?? $invoice->contact['city'] ?? '',
-            'document' => $invoice->customer?->document ?? $invoice->contact['document'] ?? $invoice->contact['dni'] ?? '',
-        ];
+            // Agregar conversiones por moneda si existen
+            foreach ($documentTotals['totals'] as $code => $amount) {
+                $rate = ($exchangeRate && $code === 'VES') ? $exchangeRate : 1;
+                $totals['by_currency'][$code] = [
+                    'total'          => $amount,
+                    'subtotal'       => round($subtotalUsd * $rate, 2),
+                    'tax'            => round($taxUsd * $rate, 2),
+                    'shipping'       => round($shippingUsd * $rate, 2),
+                    'discount'       => round($discountUsd * $rate, 2),
+                    'other_charges'  => round($otherChargesUsd * $rate, 2),
+                ];
+            }
 
-        // Preparar datos de la empresa
-        $company = [
-            'name' => $settings['name'] ?? config('app.name', 'Mi Empresa'),
-            'address' => $settings['address'] ?? '',
-            'phone' => $settings['phone'] ?? '',
-            'email' => $settings['email'] ?? '',
-            'tax_id' => $settings['tax_id'] ?? $settings['rif'] ?? '',
-            'logo' => $settings['logo'] ?? null,
-        ];
+            // Preparar datos de pagos
+            $payments = $invoice->payments->map(function ($payment) {
+                return [
+                    'id' => $payment->id,
+                    'method' => $payment->method,
+                    'method_label' => $this->getPaymentMethodLabel($payment->method),
+                    'amount_usd' => $payment->amount_original ?? $payment->amount_usd,
+                    'amount_bs' => $payment->amount_bs,
+                    'currency_code' => $payment->payment_currency_code ?? 'USD',
+                    'reference' => $payment->reference,
+                    'bank' => $payment->bank ?? $payment->bank_name ?? $payment->bank_account,
+                    'origin_bank' => $payment->origin_bank,
+                    'operation_type' => $payment->operation_type,
+                    'operation_type_label' => $this->getOperationTypeLabel($payment->operation_type),
+                    'payment_date' => $payment->payment_date ?? $payment->created_at,
+                    'notes' => $payment->notes,
+                    'payer' => $payment->payer ?? $payment->paid_by,
+                    'exchange_rate' => $payment->exchange_rate_snapshot ?? $payment->exchange_rate,
+                ];
+            });
 
-        // Generar PDF
-        $pdf = Pdf::loadView('pdf.invoice-detail', [
-            'invoice' => $invoice,
-            'customer' => $customer,
-            'company' => $company,
-            'payments' => $payments,
-            'totals' => $totals,
-            'currencySettings' => $currencySettings,
-        ]);
+            // Preparar datos del cliente
+            $customer = [
+                'name' => $invoice->customer?->name ?? $invoice->contact['full_name'] ?? $invoice->contact['name'] ?? 'Cliente',
+                'email' => $invoice->customer?->email ?? $invoice->contact['email'] ?? '',
+                'phone' => $invoice->customer?->phone ?? $invoice->contact['phone'] ?? '',
+                'address' => $invoice->customer?->address ?? $invoice->contact['address'] ?? '',
+                'city' => $invoice->customer?->city ?? $invoice->contact['city'] ?? '',
+                'document' => $invoice->customer?->document ?? $invoice->contact['document'] ?? $invoice->contact['dni'] ?? '',
+            ];
 
-        // Configurar opciones del PDF
-        $pdf->setPaper('A4');
-        $pdf->setOptions([
-            'isPhpEnabled' => true,
-            'isRemoteEnabled' => true,
-            'isHtml5ParserEnabled' => true,
-        ]);
+            // Preparar datos de la empresa (desde diferentes grupos de settings)
+            $general = Settings::get('general', []);
+            $location = Settings::get('location', []);
+            $branding = Settings::get('branding', []);
+            
+            $company = [
+                'name' => $general['company_name'] ?? $general['trade_name'] ?? config('app.name', 'Mi Empresa'),
+                'address' => $location['address'] ?? '',
+                'phone' => $general['phone'] ?? '',
+                'email' => $general['email'] ?? '',
+                'tax_id' => $general['tax_id'] ?? '',
+                'logo' => $branding['logo_url'] ?? $branding['logo_dark_url'] ?? null,
+            ];
 
-        $filename = 'factura_' . ($invoice->number ?? $invoice->id) . '.pdf';
+            // Generar PDF
+            $pdf = Pdf::loadView('pdf.invoice-detail', [
+                'invoice' => $invoice,
+                'customer' => $customer,
+                'company' => $company,
+                'payments' => $payments,
+                'totals' => $totals,
+                'currencySettings' => $currencySettings,
+            ]);
 
-        return $pdf->download($filename);
+            // Configurar opciones del PDF
+            $pdf->setPaper('A4');
+            $pdf->setOptions([
+                'isPhpEnabled' => false,
+                'isRemoteEnabled' => false,
+                'isHtml5ParserEnabled' => true,
+            ]);
+
+            $filename = 'factura_' . ($invoice->number ?? $invoice->id) . '.pdf';
+
+            return $pdf->download($filename);
+        } catch (\Exception $e) {
+            \Log::error('Error generating PDF: ' . $e->getMessage(), ['exception' => $e]);
+            return response()->json(['error' => 'Error al generar el PDF: ' . $e->getMessage()], 500);
+        }
     }
 
     private function getPaymentMethodLabel($method)

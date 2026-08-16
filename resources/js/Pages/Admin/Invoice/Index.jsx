@@ -4,14 +4,27 @@ import axios from 'axios';
 import { toast } from 'react-hot-toast';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.jsx';
 import AdminTable from '@/Components/admin/provider/AdminTableProviders.jsx';
-import AdminFilters from '@/Components/common/AdminFilters.jsx';
 import InvoiceModal from '@/Components/admin/invoice/InvoiceModal.jsx';
-import AdminIndexShell from '@/Components/admin/AdminIndexShell.jsx';
+import PageHeader from '@/Components/admin/PageHeader.jsx';
+import StatsCard from '@/Components/admin/StatsCard.jsx';
 import { useI18n } from '@/Hooks/useI18n';
 import { useLocaleFormat } from '@/Hooks/useLocaleFormat';
 import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates';
+import {
+  ShoppingCart, DollarSign, Clock, CheckCircle2, XCircle,
+  Plus, Search, X, SlidersHorizontal, Eye, FileText, TrendingUp, LayoutGrid,
+  Download, ChevronDown, FileDown, FileSpreadsheet
+} from 'lucide-react';
 
-export default function Index({ invoices, filters, adminCurrencyContext = {} }) {
+const STATUS_CONFIG = {
+  pending:   { color: 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',   dot: 'bg-amber-400' },
+  paid:      { color: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', dot: 'bg-emerald-500' },
+  shipped:   { color: 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',    dot: 'bg-blue-500' },
+  delivered: { color: 'bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',   dot: 'bg-teal-500' },
+  cancelled: { color: 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400',       dot: 'bg-red-500' },
+};
+
+export default function Index({ invoices, filters, adminCurrencyContext = {}, summary = {} }) {
   const { t } = useI18n();
   const { formatCurrency, formatNumber } = useLocaleFormat();
   const { displayCurrency, comparisonCurrency, formatPriceFromUsd, hasRateForCurrency } = useConfiguredCurrencyRates();
@@ -41,18 +54,43 @@ export default function Index({ invoices, filters, adminCurrencyContext = {} }) 
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const statusStyles = {
-    pending: 'bg-yellow-50 text-yellow-700',
-    paid: 'bg-green-50 text-green-700',
-    shipped: 'bg-blue-50 text-blue-700',
-    delivered: 'bg-teal-50 text-teal-700',
-    cancelled: 'bg-red-50 text-red-700',
+  const [statusFilter, setStatusFilter] = useState(filters?.status ?? '');
+  const [showFilters, setShowFilters] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const exportRef = useRef(null);
+
+  useEffect(() => {
+    if (!showExportMenu) return;
+    const handler = (e) => { if (exportRef.current && !exportRef.current.contains(e.target)) setShowExportMenu(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showExportMenu]);
+
+  const buildExportUrl = (format) => {
+    const params = new URLSearchParams();
+    if (debounced) params.set('search', debounced);
+    if (statusFilter) params.set('status', statusFilter);
+    params.set('format', format);
+    return route('admin.invoices.export') + '?' + params.toString();
   };
 
-  useEffect(() => { const t = setTimeout(() => setDebounced(search), 300); return () => clearTimeout(t); }, [search]);
-  useEffect(() => { if (isFirst.current) { isFirst.current = false; return; } router.get(route('admin.invoices.index'), { search: debounced, page: 1 }, { preserveScroll: true, preserveState: true, replace: true }); }, [debounced]);
+  useEffect(() => { const t = setTimeout(() => setDebounced(search), 350); return () => clearTimeout(t); }, [search]);
+  useEffect(() => {
+    if (isFirst.current) { isFirst.current = false; return; }
+    router.get(route('admin.invoices.index'), {
+      search: debounced,
+      status: statusFilter || undefined,
+      page: 1,
+    }, { preserveScroll: true, preserveState: true, replace: true });
+  }, [debounced, statusFilter]);
 
-  const handlePageChange = (nextPage) => { if (nextPage < 1 || nextPage > totalPages) return; router.get(route('admin.invoices.index'), { page: nextPage, search: debounced }, { preserveScroll: true, replace: true }); };
+  const handlePageChange = (nextPage) => {
+    if (nextPage < 1 || nextPage > totalPages) return;
+    router.get(route('admin.invoices.index'), { page: nextPage, search: debounced, status: statusFilter || undefined }, { preserveScroll: true, replace: true });
+  };
+
+  const activeFilters = [debounced, statusFilter].filter(Boolean).length;
+  const clearFilters = () => { setSearch(''); setStatusFilter(''); };
 
   const typeLabels = {
     invoice: t('admin.invoices.document_types.invoice', 'Factura'),
@@ -69,34 +107,68 @@ export default function Index({ invoices, filters, adminCurrencyContext = {} }) 
   };
 
   const columns = [
-    { key: 'number', label: t('admin.invoices.index.table.number', 'Número'), width: '20%' },
-    { key: 'document_type', label: t('admin.invoices.index.table.type', 'Tipo'), width: '15%', render: (v, row) => typeLabels[row?.document_type] ?? typeLabels.invoice },
-    { key: 'customer', label: t('admin.invoices.index.table.customer', 'Cliente'), width: '25%', render: (v, row) => row?.contact?.full_name ?? v?.name ?? t('admin.invoices.index.table.not_available', 'N/A') },
+    {
+      key: 'number',
+      label: t('admin.invoices.index.table.number', 'Número'),
+      width: '15%',
+      render: (v, row) => (
+        <span className="font-mono text-xs font-semibold text-foreground">{v}</span>
+      ),
+    },
+    {
+      key: 'document_type',
+      label: t('admin.invoices.index.table.type', 'Tipo'),
+      width: '12%',
+      render: (v, row) => (
+        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+          <FileText className="w-3 h-3" />
+          {typeLabels[row?.document_type] ?? typeLabels.invoice}
+        </span>
+      ),
+    },
+    {
+      key: 'customer',
+      label: t('admin.invoices.index.table.customer', 'Cliente'),
+      width: '22%',
+      render: (v, row) => (
+        <span className="font-medium text-foreground text-sm">
+          {row?.contact?.full_name ?? v?.name ?? t('admin.invoices.index.table.not_available', 'N/A')}
+        </span>
+      ),
+    },
     {
       key: 'status',
       label: t('admin.invoices.index.table.status', 'Estado'),
-      width: '15%',
+      width: '13%',
       render: (value, row) => {
         const code = row?.status ?? row?.invoice_status?.code ?? '';
-        // Usar traducción del frontend primero, luego el nombre del backend
         const name = statusNames[code] ?? row?.invoice_status?.name ?? value;
-
-        const color = statusStyles[code] ?? 'bg-muted text-foreground';
-
+        const cfg = STATUS_CONFIG[code] ?? { color: 'bg-muted text-muted-foreground', dot: 'bg-gray-400' };
         return (
-          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${color}`}>
+          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${cfg.color}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
             {name}
           </span>
         );
       },
     },
+    {
+      key: 'created_at',
+      label: t('admin.invoices.index.table.date', 'Fecha'),
+      width: '13%',
+      render: (v) => v ? new Date(v).toLocaleDateString() : '—',
+    },
     ...currencyColumns.map((code) => ({
       key: `total_${code}`,
       label: code,
-      width: '15%',
-      render: (v, row) => row?.document_totals?.[code] !== undefined
-        ? formatServerAmount(code, row.document_totals[code])
-        : formatActiveAmount(row?.total_usd ?? 0, code),
+      width: '13%',
+      render: (v, row) => (
+        <span className="font-semibold text-foreground">
+          {row?.document_totals?.[code] !== undefined
+            ? formatServerAmount(code, row.document_totals[code])
+            : formatActiveAmount(row?.total_usd ?? 0, code)}
+        </span>
+      ),
     })),
   ];
 
@@ -179,37 +251,200 @@ export default function Index({ invoices, filters, adminCurrencyContext = {} }) 
   return (
     <AuthenticatedLayout>
       <Head title={t('admin.invoices.index.page_title', 'Facturas')} />
-      <AdminIndexShell
-        title={t('admin.invoices.index.hero_title', 'Consulta facturas con un panel más claro para ventas y seguimiento')}
-        description={t('admin.invoices.index.hero_description', 'La vista prioriza búsqueda, acceso rápido a nuevas facturas y revisión del historial sin obligar al usuario a recorrer una página lineal y plana.')}
-        stats={[
-          { label: t('admin.invoices.index.stats.visible_invoices', 'Facturas visibles'), value: data.length },
-          { label: t('admin.invoices.index.stats.page', 'Página'), value: `${page}/${totalPages}` },
-          { label: t('admin.invoices.index.stats.filter', 'Filtro'), value: debounced ? t('admin.invoices.index.values.active', 'Activo') : t('admin.invoices.index.values.general', 'General') },
+
+      <PageHeader
+        title={t('admin.invoices.index.page_title', 'Facturas')}
+        description={t('admin.invoices.index.context_description', 'Historial de ventas, estados y totales.')}
+        icon={ShoppingCart}
+        breadcrumbs={[
+          { label: 'Dashboard', href: route('dashboard') },
+          { label: t('admin.invoices.index.page_title', 'Facturas') },
         ]}
-        contextTitle={t('admin.invoices.index.context_title', 'Facturas')}
-        contextDescription={t('admin.invoices.index.context_description', 'Revisa estados, totales y detalle comercial desde una tabla central con acceso inmediato al modal de consulta.')}
-        contextItems={[
-          { label: t('admin.invoices.index.context_items.search', 'Búsqueda'), value: debounced || t('admin.invoices.index.values.without_filter', 'Sin filtro') },
-          { label: t('admin.invoices.index.context_items.modal', 'Modal'), value: isModalOpen ? t('admin.invoices.index.values.open', 'Abierto') : t('admin.invoices.index.values.available', 'Disponible') },
-          { label: t('admin.invoices.index.context_items.new_invoice', 'Nueva factura'), value: t('admin.invoices.index.values.direct_access', 'Acceso directo') },
-        ]}
-        primaryAction={
-          <Link href={route('admin.invoices.create')} className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800">{t('admin.invoices.index.actions.new_invoice', 'Nueva factura')}</Link>
+        actions={
+          <div className="flex items-center gap-2">
+            {/* Export dropdown */}
+            <div className="relative" ref={exportRef}>
+              <button
+                onClick={() => setShowExportMenu(v => !v)}
+                className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium border border-border bg-background rounded-lg hover:bg-muted transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                <span className="hidden sm:inline">Exportar</span>
+                <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+              </button>
+              {showExportMenu && (
+                <div className="absolute right-0 mt-1 w-44 bg-card border border-border rounded-xl shadow-lg z-50 overflow-hidden">
+                  <a
+                    href={buildExportUrl('excel')}
+                    onClick={() => setShowExportMenu(false)}
+                    className="flex items-center gap-2.5 px-4 py-2.5 text-sm hover:bg-muted transition-colors"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                    Excel (.xlsx)
+                  </a>
+                  <a
+                    href={buildExportUrl('csv')}
+                    onClick={() => setShowExportMenu(false)}
+                    className="flex items-center gap-2.5 px-4 py-2.5 text-sm hover:bg-muted transition-colors"
+                  >
+                    <FileDown className="w-4 h-4 text-blue-600" />
+                    CSV
+                  </a>
+                  <a
+                    href={buildExportUrl('pdf')}
+                    onClick={() => setShowExportMenu(false)}
+                    className="flex items-center gap-2.5 px-4 py-2.5 text-sm hover:bg-muted transition-colors"
+                    target="_blank" rel="noopener noreferrer"
+                  >
+                    <FileText className="w-4 h-4 text-red-600" />
+                    PDF
+                  </a>
+                </div>
+              )}
+            </div>
+            <Link
+              href={route('admin.invoices.kanban')}
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium border border-border bg-background rounded-lg hover:bg-muted transition-colors"
+              title={t('admin.invoices.kanban_view', 'Vista Kanban')}
+            >
+              <LayoutGrid className="w-4 h-4" />
+              <span className="hidden sm:inline">{t('admin.invoices.kanban_view', 'Kanban')}</span>
+            </Link>
+            <Link
+              href={route('admin.invoices.create')}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              {t('admin.invoices.index.actions.new_invoice', 'Nueva factura')}
+            </Link>
+          </div>
         }
-        filters={
-          <AdminFilters searchPlaceholder={t('admin.invoices.index.filters.search_placeholder', 'Buscar por número, cliente o estado')} searchValue={search} onSearchChange={setSearch} />
-        }
-      >
-        <AdminTable
-          columns={columns}
-          data={data}
-          page={page}
-          totalPages={totalPages}
-          onPageChange={handlePageChange}
-          onView={handleViewInvoice}
+      />
+
+      {/* KPI row */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <StatsCard
+          label={t('admin.invoices.index.stats.total', 'Total facturas')}
+          value={formatNumber(summary?.total ?? invoices?.total ?? data.length)}
+          icon={ShoppingCart}
+          iconColor="text-blue-600"
+          iconBg="bg-blue-50 dark:bg-blue-900/20"
+          sparkColor="#3B82F6"
         />
-      </AdminIndexShell>
+        <StatsCard
+          label={t('admin.invoices.index.stats.pending', 'Pendientes')}
+          value={formatNumber(summary?.pending ?? 0)}
+          icon={Clock}
+          iconColor="text-amber-600"
+          iconBg="bg-amber-50 dark:bg-amber-900/20"
+          sparkColor="#F59E0B"
+        />
+        <StatsCard
+          label={t('admin.invoices.index.stats.paid', 'Pagadas')}
+          value={formatNumber(summary?.paid ?? 0)}
+          icon={CheckCircle2}
+          iconColor="text-emerald-600"
+          iconBg="bg-emerald-50 dark:bg-emerald-900/20"
+          sparkColor="#10B981"
+        />
+        <StatsCard
+          label={`${t('admin.invoices.index.stats.revenue', 'Ingresos')} ${displayCurrency}`}
+          value={summary?.revenue_display ?? '—'}
+          icon={TrendingUp}
+          iconColor="text-violet-600"
+          iconBg="bg-violet-50 dark:bg-violet-900/20"
+          sparkColor="#7C3AED"
+        />
+      </div>
+
+      {/* Table section */}
+      <div className="bg-card border border-border rounded-xl overflow-hidden">
+        {/* Toolbar */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-3 border-b border-border">
+          <div className="flex-1 relative">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t('admin.invoices.index.filters.search_placeholder', 'Buscar por número o cliente...')}
+              className="w-full pl-9 pr-4 py-2 text-sm border border-border rounded-lg bg-background focus:ring-2 focus:ring-ring focus:outline-none"
+            />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            {search && (
+              <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowFilters(v => !v)}
+            className={`inline-flex items-center gap-2 px-3 py-2 text-sm font-medium border rounded-lg transition-colors ${
+              showFilters || statusFilter ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-card hover:bg-muted'
+            }`}
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+            {t('admin.common.filters', 'Filtros')}
+            {activeFilters > 0 && (
+              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">
+                {activeFilters}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* Status filter chips */}
+        {showFilters && (
+          <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-border bg-muted/30">
+            <span className="text-xs font-medium text-muted-foreground mr-1">{t('admin.invoices.index.table.status', 'Estado')}:</span>
+            {['', 'pending', 'paid', 'shipped', 'delivered', 'cancelled'].map((s) => {
+              const label = s === '' ? t('admin.common.all', 'Todos') : (statusNames[s] ?? s);
+              const cfg = s ? STATUS_CONFIG[s] : null;
+              const isActive = statusFilter === s;
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setStatusFilter(s)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                    isActive
+                      ? 'border-primary bg-primary text-primary-foreground shadow-sm'
+                      : `border-border bg-card hover:border-primary/40 ${cfg?.color ?? 'text-foreground'}`
+                  }`}
+                >
+                  {cfg && <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />}
+                  {label}
+                </button>
+              );
+            })}
+            {activeFilters > 0 && (
+              <button type="button" onClick={clearFilters} className="ml-auto text-xs text-destructive hover:underline flex items-center gap-1">
+                <X className="w-3 h-3" />{t('admin.common.clear_filters', 'Limpiar')}
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Results info */}
+        <div className="px-4 py-2 border-b border-border">
+          <span className="text-xs text-muted-foreground">
+            {data.length} {t('admin.invoices.index.stats.visible_invoices', 'facturas visibles')}
+            {totalPages > 1 && ` — ${t('admin.common.page', 'pág.')} ${page}/${totalPages}`}
+          </span>
+        </div>
+
+        <div className="p-4">
+          <AdminTable
+            columns={columns}
+            data={data}
+            page={page}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+            onView={handleViewInvoice}
+          />
+        </div>
+      </div>
 
       <InvoiceModal
         isOpen={isModalOpen}

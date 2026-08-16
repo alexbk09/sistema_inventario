@@ -1,5 +1,4 @@
-import AutenticateNav from '@/Layouts/Autenticate/AutenticateNav';
-import FooterLayaout from '@/Layouts/Footer';
+import AdminSidebar from '@/Components/admin/AdminSidebar';
 import { Toaster, toast } from 'react-hot-toast';
 import { useEffect } from 'react';
 import { usePage } from '@inertiajs/react';
@@ -17,26 +16,31 @@ export default function AuthenticatedLayout({ header, children }) {
     }, [props?.flash?.error, props?.flash?.success]);
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col w-full">
-            
-            <AutenticateNav />
+        <div className="min-h-screen bg-background flex w-full">
+            <AdminSidebar />
 
+            <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
                 {header && (
-                    <header className="bg-white shadow">
-                        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+                    <header className="bg-card border-b border-border shrink-0">
+                        <div className="px-6 py-4 pl-16 lg:pl-6">
                             {header}
                         </div>
                     </header>
                 )}
 
-                <main className="lg:mx-28 md:mx-16 flex-1 px-4 py-6">{children}</main>
+                <main className="flex-1 overflow-y-auto px-4 lg:px-6 py-6 pt-16 lg:pt-6">
+                    {children}
+                </main>
+            </div>
+
             <Toaster
-                position="top-center"
+                position="top-right"
                 toastOptions={{
-                    style: { fontSize: '0.95rem' }
+                    style: { fontSize: '0.9rem' },
+                    success: { duration: 3000 },
+                    error: { duration: 5000 },
                 }}
             />
-            <FooterLayaout />
         </div>
     );
 }

@@ -14,7 +14,7 @@ class Invoice extends Model
     use HasFactory;
 
     protected $fillable = [
-        'number', 'document_type', 'customer_id', 'seller_id', 'credit_account_id', 'layaway_id', 'status', 'internal_notes', 'public_notes', 'invoice_status_id', 'total_usd', 'total_bs', 'currency_code', 'base_currency_code', 'exchange_rate_snapshot', 'exchange_rate_source', 'monetary_totals_json', 'warehouse_id', 'cancelled_at', 'cancelled_by', 'cancellation_reason'
+        'number', 'document_type', 'customer_id', 'seller_id', 'credit_account_id', 'layaway_id', 'status', 'internal_notes', 'public_notes', 'invoice_status_id', 'total_usd', 'total_bs', 'discount_usd', 'currency_code', 'base_currency_code', 'exchange_rate_snapshot', 'exchange_rate_source', 'monetary_totals_json', 'warehouse_id', 'cancelled_at', 'cancelled_by', 'cancellation_reason'
     ];
 
     protected $casts = [

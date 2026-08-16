@@ -1,10 +1,14 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, router, Link } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.jsx';
 import AdminPagination from '@/Components/admin/AdminPagination.jsx';
+import PageHeader from '@/Components/admin/PageHeader.jsx';
+import StatsCard from '@/Components/admin/StatsCard.jsx';
+import EmptyState from '@/Components/admin/EmptyState.jsx';
 import { useMemo, useState } from 'react';
 import { useI18n } from '@/Hooks/useI18n';
 import { useLocaleFormat } from '@/Hooks/useLocaleFormat';
 import { useConfiguredCurrencyRates } from '@/Hooks/useConfiguredCurrencyRates';
+import { Package, TrendingUp, TrendingDown, ArrowUpCircle, ArrowDownCircle, Filter, X, Save } from 'lucide-react';
 
 export default function Inventory({ product, movements, summary, movementTypes, providers = [], warehouses = [], filters = {}, adminCurrencyContext = {} }) {
   const { t } = useI18n();
@@ -76,33 +80,45 @@ export default function Inventory({ product, movements, summary, movementTypes, 
     <AuthenticatedLayout>
       <Head title={`${t('admin.products.inventory.page_title_prefix', 'Inventario')} - ${product.name}`} />
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground mb-2">{t('admin.products.inventory.title', 'Inventario de producto')}</h1>
-            <p className="text-muted-foreground">{t('admin.products.inventory.description', 'Gestiona entradas y salidas de stock para este producto.')}</p>
-          </div>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="p-4 rounded-lg border border-border bg-muted/40">
-            <h2 className="font-semibold text-foreground mb-2">{t('admin.products.inventory.cards.product.title', 'Producto')}</h2>
-            <p className="font-bold text-lg text-foreground">{product.name}</p>
-            <p className="text-sm text-muted-foreground">{t('admin.products.inventory.cards.product.sku_label', 'SKU')}: {product.sku}</p>
-            <p className="text-sm text-muted-foreground mt-1">{t('admin.products.inventory.cards.product.current_stock', 'Stock actual')}: <span className="font-semibold text-foreground">{product.stock}</span></p>
-            <p className="text-sm text-muted-foreground mt-1">{`${t('admin.products.inventory.cards.product.reference_price', 'Precio referencia')}: ${displayCurrency}`} <span className="font-semibold text-foreground">{product.price_admin_totals?.[displayCurrency] !== undefined ? formatServerAmount(displayCurrency, product.price_admin_totals[displayCurrency]) : formatActiveAmount(product.price_usd)}</span></p>
-          </div>
+        <PageHeader
+          title={product.name}
+          description={`${t('admin.products.inventory.cards.product.sku_label', 'SKU')}: ${product.sku} · ${t('admin.products.inventory.cards.product.current_stock', 'Stock actual')}: ${product.stock}`}
+          icon={Package}
+          breadcrumbs={[
+            { label: 'Dashboard', href: route('dashboard') },
+            { label: t('admin.products.inventory.page_title_prefix', 'Productos'), href: route('admin.products.index') },
+            { label: t('admin.products.inventory.title', 'Inventario') },
+          ]}
+        />
 
-          <div className="p-4 rounded-lg border border-border bg-emerald-50/60">
-            <h2 className="font-semibold text-emerald-800 mb-2">{t('admin.products.inventory.cards.entries.title', 'Entradas acumuladas')}</h2>
-            <p className="text-sm text-emerald-700">{t('admin.products.inventory.cards.entries.total_quantity', 'Cantidad total')}: <span className="font-bold">{summary.entries_quantity}</span></p>
-            <p className="text-sm text-emerald-700 mt-1">{`${t('admin.products.inventory.cards.entries.total_value_usd', 'Valor total')}: ${displayCurrency}`} <span className="font-bold">{summary.entries_total_value_admin_totals?.[displayCurrency] !== undefined ? formatServerAmount(displayCurrency, summary.entries_total_value_admin_totals[displayCurrency]) : formatActiveAmount(summary.entries_total_value_usd)}</span></p>
-          </div>
-
-          <div className="p-4 rounded-lg border border-border bg-rose-50/60">
-            <h2 className="font-semibold text-rose-800 mb-2">{t('admin.products.inventory.cards.exits.title', 'Salidas acumuladas')}</h2>
-            <p className="text-sm text-rose-700">{t('admin.products.inventory.cards.exits.total_quantity', 'Cantidad total')}: <span className="font-bold">{summary.exits_quantity}</span></p>
-            <p className="text-sm text-rose-700 mt-1">{`${t('admin.products.inventory.cards.exits.total_value_usd', 'Valor total')}: ${displayCurrency}`} <span className="font-bold">{summary.exits_total_value_admin_totals?.[displayCurrency] !== undefined ? formatServerAmount(displayCurrency, summary.exits_total_value_admin_totals[displayCurrency]) : formatActiveAmount(summary.exits_total_value_usd)}</span></p>
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <StatsCard
+            label={t('admin.products.inventory.cards.product.current_stock', 'Stock actual')}
+            value={product.stock}
+            icon={Package}
+            iconColor="text-blue-600"
+            iconBg="bg-blue-50 dark:bg-blue-900/20"
+            sparkColor="#3B82F6"
+          />
+          <StatsCard
+            label={t('admin.products.inventory.cards.entries.title', 'Entradas acumuladas')}
+            value={summary.entries_quantity ?? 0}
+            subvalue={`${displayCurrency} ${summary.entries_total_value_admin_totals?.[displayCurrency] !== undefined ? formatServerAmount(displayCurrency, summary.entries_total_value_admin_totals[displayCurrency]) : formatActiveAmount(summary.entries_total_value_usd)}`}
+            icon={TrendingUp}
+            iconColor="text-emerald-600"
+            iconBg="bg-emerald-50 dark:bg-emerald-900/20"
+            sparkColor="#10B981"
+          />
+          <StatsCard
+            label={t('admin.products.inventory.cards.exits.title', 'Salidas acumuladas')}
+            value={summary.exits_quantity ?? 0}
+            subvalue={`${displayCurrency} ${summary.exits_total_value_admin_totals?.[displayCurrency] !== undefined ? formatServerAmount(displayCurrency, summary.exits_total_value_admin_totals[displayCurrency]) : formatActiveAmount(summary.exits_total_value_usd)}`}
+            icon={TrendingDown}
+            iconColor="text-rose-600"
+            iconBg="bg-rose-50 dark:bg-rose-900/20"
+            sparkColor="#F43F5E"
+          />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
@@ -185,77 +201,95 @@ export default function Inventory({ product, movements, summary, movementTypes, 
           </form>
 
           <div className="md:col-span-2">
-            <h2 className="font-semibold text-foreground mb-3">{t('admin.products.inventory.history.title', 'Historial de movimientos')}</h2>
-            <div className="mb-3 grid grid-cols-1 md:grid-cols-5 gap-3">
-              <select value={filterWarehouse} onChange={(e) => setFilterWarehouse(e.target.value)} className="border border-border rounded px-3 py-2 bg-background">
-                <option value="">{t('admin.products.inventory.history.all_branches', 'Todas las sucursales')}</option>
-                {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name} ({w.code})</option>)}
-              </select>
-              <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="border border-border rounded px-3 py-2 bg-background">
-                <option value="">{t('admin.products.inventory.history.all_types', 'Todos los tipos')}</option>
-                <option value="entry">{t('admin.products.inventory.types.entry', 'Entrada')}</option>
-                <option value="exit">{t('admin.products.inventory.types.exit', 'Salida')}</option>
-              </select>
-              <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} className="border border-border rounded px-3 py-2 bg-background" />
-              <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} className="border border-border rounded px-3 py-2 bg-background" />
-           
-            <div className="flex gap-2 mb-3">
-              <button type="button" onClick={() => applyFilters(1)} className="px-3 py-1 bg-primary text-primary-foreground rounded">{t('admin.products.inventory.history.apply_filters', 'Aplicar filtros')}</button>
-              <button type="button" onClick={() => { setFilterWarehouse(''); setFilterType(''); setFilterDateFrom(''); setFilterDateTo(''); applyFilters(1); }} className="px-3 py-1 border border-border rounded">{t('admin.products.inventory.history.clear', 'Limpiar')}</button>
-            </div>
-             </div>
-            <div className="overflow-x-auto rounded-lg border border-border max-h-[420px] overflow-y-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-muted border-b border-border">
-                  <tr>
-                    <th className="px-3 py-2 text-left font-semibold">{t('admin.products.inventory.history.table.date', 'Fecha')}</th>
-                    <th className="px-3 py-2 text-left font-semibold">{t('admin.products.inventory.history.table.type', 'Tipo')}</th>
-                    <th className="px-3 py-2 text-left font-semibold">{t('admin.products.inventory.history.table.source', 'Origen')}</th>
-                    <th className="px-3 py-2 text-left font-semibold">{t('admin.products.inventory.history.table.branch', 'Sucursal')}</th>
-                    <th className="px-3 py-2 text-right font-semibold">{t('admin.products.inventory.history.table.quantity', 'Cantidad')}</th>
-                    <th className="px-3 py-2 text-right font-semibold">{`${t('admin.products.inventory.history.table.unit_price_usd', 'P. Unit')} ${displayCurrency}`}</th>
-                    <th className="px-3 py-2 text-right font-semibold">{`${t('admin.products.inventory.history.table.total_value_usd', 'Valor total')} ${displayCurrency}`}</th>
-                    <th className="px-3 py-2 text-left font-semibold">{t('admin.products.inventory.history.table.reference', 'Ref')}</th>
-                    <th className="px-3 py-2 text-left font-semibold">{t('admin.products.inventory.history.table.note', 'Nota')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {movements.data.map((m) => {
-                    const isEntry = m.type === 'entry';
-                    return (
-                      <tr key={m.id} className="border-b border-border hover:bg-muted/40">
-                        <td className="px-3 py-2">{formatDateTime(m.created_at)}</td>
-                        <td className="px-3 py-2">
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${isEntry ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
-                            {isEntry ? t('admin.products.inventory.types.entry', 'Entrada') : t('admin.products.inventory.types.exit', 'Salida')}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 text-xs">{formatMovementSource(m.source)}</td>
-                        <td className="px-3 py-2 text-xs">{m.warehouse ? `${m.warehouse.name} (${m.warehouse.code})` : t('admin.products.values.empty', '-')}</td>
-                        <td className="px-3 py-2 text-right">{m.quantity}</td>
-                        <td className="px-3 py-2 text-right">{m.unit_price_admin_totals?.[displayCurrency] !== undefined ? formatServerAmount(displayCurrency, m.unit_price_admin_totals[displayCurrency]) : formatActiveAmount(m.unit_price_usd)}</td>
-                        <td className="px-3 py-2 text-right">{m.total_value_admin_totals?.[displayCurrency] !== undefined ? formatServerAmount(displayCurrency, m.total_value_admin_totals[displayCurrency]) : formatActiveAmount(m.total_value_usd)}</td>
-                        <td className="px-3 py-2 text-xs">{m.reference || t('admin.products.values.empty', '-')}</td>
-                        <td className="px-3 py-2 text-xs truncate max-w-[180px]" title={m.notes}>{m.notes || t('admin.products.values.empty', '-')}</td>
+            <div className="bg-card border border-border rounded-xl overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+                <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  <Filter className="w-4 h-4 text-muted-foreground" />
+                  {t('admin.products.inventory.history.title', 'Historial de movimientos')}
+                </h2>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={() => applyFilters(1)} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
+                    <Filter className="w-3 h-3" />{t('admin.products.inventory.history.apply_filters', 'Filtrar')}
+                  </button>
+                  <button type="button" onClick={() => { setFilterWarehouse(''); setFilterType(''); setFilterDateFrom(''); setFilterDateTo(''); applyFilters(1); }} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-border rounded-lg hover:bg-muted transition-colors">
+                    <X className="w-3 h-3" />{t('admin.products.inventory.history.clear', 'Limpiar')}
+                  </button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 px-4 py-3 border-b border-border bg-muted/30">
+                <select value={filterWarehouse} onChange={(e) => setFilterWarehouse(e.target.value)} className="text-sm border border-border rounded-lg px-3 py-1.5 bg-background">
+                  <option value="">{t('admin.products.inventory.history.all_branches', 'Todas las sucursales')}</option>
+                  {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name} ({w.code})</option>)}
+                </select>
+                <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="text-sm border border-border rounded-lg px-3 py-1.5 bg-background">
+                  <option value="">{t('admin.products.inventory.history.all_types', 'Todos los tipos')}</option>
+                  <option value="entry">{t('admin.products.inventory.types.entry', 'Entrada')}</option>
+                  <option value="exit">{t('admin.products.inventory.types.exit', 'Salida')}</option>
+                </select>
+                <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} className="text-sm border border-border rounded-lg px-3 py-1.5 bg-background" />
+                <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} className="text-sm border border-border rounded-lg px-3 py-1.5 bg-background" />
+              </div>
+              {movements.data.length === 0 ? (
+                <EmptyState
+                  preset="products"
+                  title={t('admin.products.inventory.history.empty', 'Sin movimientos')}
+                  description={t('admin.products.inventory.history.empty_desc', 'No hay movimientos registrados con los filtros actuales.')}
+                  size="sm"
+                />
+              ) : (
+                <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted border-b border-border sticky top-0 z-10">
+                      <tr>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('admin.products.inventory.history.table.date', 'Fecha')}</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('admin.products.inventory.history.table.type', 'Tipo')}</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('admin.products.inventory.history.table.source', 'Origen')}</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('admin.products.inventory.history.table.branch', 'Sucursal')}</th>
+                        <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('admin.products.inventory.history.table.quantity', 'Cantidad')}</th>
+                        <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">{`P. Unit ${displayCurrency}`}</th>
+                        <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">{`Total ${displayCurrency}`}</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('admin.products.inventory.history.table.note', 'Nota')}</th>
                       </tr>
-                    );
-                  })}
-                  {movements.data.length === 0 && (
-                    <tr>
-                      <td colSpan={8} className="px-3 py-6 text-center text-muted-foreground text-sm">
-                        {t('admin.products.inventory.history.empty', 'No hay movimientos registrados para este producto.')}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                    </thead>
+                    <tbody>
+                      {movements.data.map((m) => {
+                        const isEntry = m.type === 'entry';
+                        return (
+                          <tr key={m.id} className="border-b border-border last:border-0 hover:bg-muted/40 transition-colors">
+                            <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{formatDateTime(m.created_at)}</td>
+                            <td className="px-3 py-2.5">
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                                isEntry
+                                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400'
+                                  : 'bg-rose-50 text-rose-700 dark:bg-rose-900/20 dark:text-rose-400'
+                              }`}>
+                                {isEntry
+                                  ? <ArrowUpCircle className="w-3 h-3" />
+                                  : <ArrowDownCircle className="w-3 h-3" />}
+                                {isEntry ? t('admin.products.inventory.types.entry', 'Entrada') : t('admin.products.inventory.types.exit', 'Salida')}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2.5 text-xs">{formatMovementSource(m.source)}</td>
+                            <td className="px-3 py-2.5 text-xs text-muted-foreground">{m.warehouse ? `${m.warehouse.name} (${m.warehouse.code})` : '—'}</td>
+                            <td className="px-3 py-2.5 text-right font-semibold">{m.quantity}</td>
+                            <td className="px-3 py-2.5 text-right text-xs">{m.unit_price_admin_totals?.[displayCurrency] !== undefined ? formatServerAmount(displayCurrency, m.unit_price_admin_totals[displayCurrency]) : formatActiveAmount(m.unit_price_usd)}</td>
+                            <td className="px-3 py-2.5 text-right text-xs font-medium">{m.total_value_admin_totals?.[displayCurrency] !== undefined ? formatServerAmount(displayCurrency, m.total_value_admin_totals[displayCurrency]) : formatActiveAmount(m.total_value_usd)}</td>
+                            <td className="px-3 py-2.5 text-xs text-muted-foreground truncate max-w-[160px]" title={m.notes}>{m.notes || m.reference || '—'}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <div className="px-4 py-2 border-t border-border">
+                <AdminPagination
+                  page={movements.current_page ?? movements.meta?.current_page ?? 1}
+                  totalPages={movements.last_page ?? movements.meta?.last_page ?? 1}
+                  onPageChange={applyFilters}
+                />
+              </div>
             </div>
-            <AdminPagination
-              page={movements.current_page ?? movements.meta?.current_page ?? 1}
-              totalPages={movements.last_page ?? movements.meta?.last_page ?? 1}
-              onPageChange={applyFilters}
-              className="mt-3"
-            />
           </div>
         </div>
       </div>

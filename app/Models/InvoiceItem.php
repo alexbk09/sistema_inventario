@@ -11,7 +11,7 @@ class InvoiceItem extends Model
     use HasFactory;
 
     protected $fillable = [
-        'invoice_id', 'product_id', 'quantity', 'price_usd', 'subtotal_usd', 'subtotal_bs', 'unit_currency_code', 'unit_price_original', 'subtotal_original', 'exchange_rate_snapshot', 'monetary_breakdown_json'
+        'invoice_id', 'product_id', 'quantity', 'price_usd', 'discount_usd', 'subtotal_usd', 'subtotal_bs', 'unit_currency_code', 'unit_price_original', 'subtotal_original', 'exchange_rate_snapshot', 'monetary_breakdown_json'
     ];
 
     protected $casts = [

@@ -22,9 +22,16 @@ class CategoryController extends Controller
             ->latest()
             ->paginate(15)
             ->withQueryString();
+        $summary = [
+            'total'            => Category::count(),
+            'with_products'    => Category::has('products')->count(),
+            'with_description' => Category::whereNotNull('description')->where('description', '!=', '')->count(),
+        ];
+
         return Inertia::render('Admin/Category/Index', [
             'categories' => $categories,
-            'filters' => ['search' => $search],
+            'filters'    => ['search' => $search],
+            'summary'    => $summary,
         ]);
     }
 
